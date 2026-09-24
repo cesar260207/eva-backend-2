@@ -1,0 +1,76 @@
+{
+  "solicitudes": [
+    {
+      "folio": "LS-2026-014",
+      "descripcion": "Reparación de luminaria en avenida principal",
+      "delegacion": "Centro",
+      "eje": "Seguridad",
+      "fecha_ingreso": "2026-08-10",
+      "fecha_compromiso": "2026-08-29",
+      "estado": "Pendiente"
+    },
+    {
+      "folio": "LS-2026-021",
+      "descripcion": "Atención a solicitud de poda y limpieza de vía pública",
+      "delegacion": "Rural",
+      "eje": "DISERCO",
+      "fecha_ingreso": "2026-08-12",
+      "fecha_compromiso": "2026-08-31",
+      "estado": "En proceso"
+    },
+    {
+      "folio": "LS-2026-033",
+      "descripcion": "Revisión de alcantarillado y derrame en sector Las Compañías",
+      "delegacion": "Las Compañías",
+      "eje": "DISERCO",
+      "fecha_ingreso": "2026-08-07",
+      "fecha_compromiso": "2026-08-25",
+      "estado": "Pendiente"
+    },
+    {
+      "folio": "LS-2026-042",
+      "descripcion": "Apoyo social para familias en riesgo de la Pampa",
+      "delegacion": "La Pampa",
+      "eje": "Gestión Social",
+      "fecha_ingreso": "2026-08-16",
+      "fecha_compromiso": "2026-09-05",
+      "estado": "Realizado"
+    },
+    {
+      "folio": "LS-2026-057",
+      "descripcion": "Monitoreo de actividades vecinales y coordinación con organizaciones comunitarias",
+      "delegacion": "La Antena",
+      "eje": "Organizaciones Comunitarias",
+      "fecha_ingreso": "2026-08-18",
+      "fecha_compromiso": "2026-08-30",
+      "estado": "En proceso"
+    },
+    {
+      "folio": "LS-2026-066",
+      "descripcion": "Patrullaje y control de tránsito en avenida del mar",
+      "delegacion": "Avenida del Mar",
+      "eje": "Seguridad",
+      "fecha_ingreso": "2026-08-15",
+      "fecha_compromiso": "2026-08-26",
+      "estado": "Pendiente"
+    },
+    {
+      "folio": "LS-2026-074",
+      "descripcion": "Entrega de kits de ayuda social y seguimiento para adultos mayores",
+      "delegacion": "Centro",
+      "eje": "Gestión Social",
+      "fecha_ingreso": "2026-08-21",
+      "fecha_compromiso": "2026-09-01",
+      "estado": "Realizado"
+    },
+    {
+      "folio": "LS-2026-081",
+      "descripcion": "Revisión del estado del mobiliario urbano en sector rural",
+      "delegacion": "Rural",
+      "eje": "DISERCO",
+      "fecha_ingreso": "2026-08-08",
+      "fecha_compromiso": "2026-08-23",
+      "estado": "Pendiente"
+    }
+  ]
+}

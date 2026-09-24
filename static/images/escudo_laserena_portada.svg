@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 900" role="img" aria-labelledby="title desc">
+  <title id="title">Escudo de La Serena</title>
+  <desc id="desc">Escudo institucional de La Serena con fondo blanco y muralla roja.</desc>
+
+  <g transform="translate(20 10)">
+    <path d="M430 18 C555 18 680 75 760 155 L760 405 C760 560 650 700 430 842 C210 700 100 560 100 405 L100 155 C180 75 305 18 430 18 Z" fill="#f5f5f5"/>
+
+    <g fill="#b10000">
+      <rect x="190" y="180" width="68" height="86" rx="8"/>
+      <rect x="278" y="150" width="68" height="116" rx="8"/>
+      <rect x="366" y="145" width="68" height="121" rx="8"/>
+      <rect x="454" y="150" width="68" height="116" rx="8"/>
+      <rect x="542" y="180" width="68" height="86" rx="8"/>
+    </g>
+
+    <g fill="#f5f5f5">
+      <rect x="220" y="118" width="28" height="50"/>
+      <rect x="308" y="95" width="28" height="60"/>
+      <rect x="396" y="92" width="28" height="63"/>
+      <rect x="484" y="95" width="28" height="60"/>
+      <rect x="572" y="118" width="28" height="50"/>
+    </g>
+
+    <g fill="#b10000">
+      <rect x="250" y="300" width="60" height="120" rx="8"/>
+      <rect x="330" y="280" width="60" height="140" rx="8"/>
+      <rect x="410" y="280" width="80" height="140" rx="8"/>
+      <rect x="510" y="300" width="60" height="120" rx="8"/>
+      <rect x="255" y="420" width="390" height="42" rx="10"/>
+    </g>
+
+    <g fill="#f5f5f5">
+      <path d="M270 455 H590 L620 610 H240 Z"/>
+      <rect x="325" y="470" width="50" height="110"/>
+      <rect x="420" y="470" width="60" height="110"/>
+      <rect x="520" y="470" width="50" height="110"/>
+    </g>
+
+    <g fill="#b10000">
+      <rect x="270" y="600" width="120" height="22"/>
+      <rect x="510" y="600" width="120" height="22"/>
+      <rect x="355" y="620" width="150" height="18"/>
+    </g>
+  </g>
+</svg>

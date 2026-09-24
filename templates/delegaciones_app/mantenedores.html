@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block title %}Mantenedores | SGR{% endblock %}
+{% block content %}
+<div class="mb-4">
+    <div class="page-kicker">Administración · Evaluación Sumativa 2</div>
+    <h1 class="page-title">Ocho mantenedores del sistema</h1>
+    <p class="page-intro mb-0">Dos mantenedores por integrante. Cada módulo consulta la base de datos con Django ORM y enlaza su CRUD al panel Django Admin.</p>
+</div>
+<div class="row g-3">
+    {% for mantenedor in mantenedores %}
+    <div class="col-md-6 col-xl-3"><div class="panel h-100 d-flex flex-column">
+        <div class="section-label">Mantenedor {{ forloop.counter|stringformat:'02d' }}</div>
+        <h2 class="h5">{{ mantenedor.titulo }}</h2>
+        <p class="text-muted small flex-grow-1">{{ mantenedor.descripcion }}</p>
+        <a class="btn btn-outline-sgr w-100" href="{% url 'mantenedor_lista' mantenedor.slug %}">Ver registros</a>
+    </div></div>
+    {% endfor %}
+</div>
+{% endblock %}

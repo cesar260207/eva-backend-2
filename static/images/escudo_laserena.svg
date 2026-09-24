@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <rect width="180" height="180" rx="20" fill="#0b3d72"/>
+  <circle cx="90" cy="90" r="62" fill="#ffffff"/>
+  <path d="M90 28 L126 54 L126 126 L90 152 L54 126 L54 54 Z" fill="#e5f1ff"/>
+  <text x="90" y="100" text-anchor="middle" font-size="34" font-family="Arial" fill="#0b3d72">LS</text>
+</svg>

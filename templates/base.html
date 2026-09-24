@@ -1,0 +1,57 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SGR | Municipalidad de La Serena{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'bootstrap/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/sgr.css' %}?v=red-20260908">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top sgr-nav">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="{% url 'inicio' %}">
+                <span class="brand-mark">SGR</span>
+                <span><strong>Gestión de Resultados</strong><small>Municipalidad de La Serena</small></span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="mainNav">
+                <ul class="navbar-nav ms-auto gap-lg-2">
+                    <li class="nav-item"><a class="nav-link" href="{% url 'inicio' %}">Inicio</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'solicitudes' %}">Agenda</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'actividad_nueva' %}">Registrar actividad</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'dashboard' %}">Medición</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'institucional' %}">Territorio</a></li>
+                    {% if user.is_authenticated %}
+                    <li class="nav-item"><a class="nav-link" href="{% url 'actividades' %}">Actividades</a></li>
+                    {% if user.is_superuser or user.perfil.rol == 'administrador' or user.perfil.rol == 'coordinador' %}<li class="nav-item"><a class="nav-link" href="{% url 'mantenedores' %}">Administración</a></li>{% endif %}
+                    <li class="nav-item"><form method="post" action="{% url 'logout' %}" class="m-0"><button class="nav-link btn btn-link border-0" type="submit">Salir</button>{% csrf_token %}</form></li>
+                    {% else %}<li class="nav-item"><a class="nav-link" href="{% url 'login' %}">Ingresar</a></li>{% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    {% block page_header %}{% endblock %}
+
+    <main class="container-fluid px-4 py-4 app-shell">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="container-fluid px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <strong>Municipalidad de La Serena</strong><br>
+                <small>Departamento de Gestión Territorial</small>
+            </div>
+            <div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="{% static 'bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+</body>
+</html>

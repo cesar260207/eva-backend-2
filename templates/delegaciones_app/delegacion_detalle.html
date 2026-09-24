@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}Detalle de Delegación | Municipalidad de La Serena{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-3">
+    <div>
+        <h2 class="mb-2">Delegación: {{ nombre }}</h2>
+        <p class="text-muted mb-0">Seguimiento de solicitudes y compromisos territoriales.</p>
+    </div>
+    <a class="btn btn-sgr" href="{% url 'compromiso_nuevo' %}">+ Agregar</a>
+</div>
+<div class="panel mb-4">
+    <form class="row g-2" method="get">
+        <div class="col-md-9"><input class="form-control" name="q" placeholder="Buscar dentro de esta delegación"></div>
+        <div class="col-md-3"><button class="btn btn-outline-sgr w-100" type="submit">Buscar</button></div>
+    </form>
+</div>
+
+<div class="row g-3">
+    {% for solicitud in solicitudes %}
+    <div class="col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h5>{{ solicitud.folio }}</h5>
+                        <small class="text-muted">{{ solicitud.eje }}</small>
+                    </div>
+                    <span class="badge bg-{{ solicitud.estado_class }} rounded-pill">{{ solicitud.estado_display }}</span>
+                </div>
+                <p class="mt-3 mb-2">{{ solicitud.descripcion }}</p>
+                <ul class="list-unstyled small mb-3">
+                    <li><strong>Ingreso:</strong> {{ solicitud.fecha_ingreso|date:'d-m-Y' }}</li>
+                    <li><strong>Compromiso:</strong> {{ solicitud.fecha_comprometida|date:'d-m-Y' }}</li>
+                    <li><strong>Estado:</strong> {{ solicitud.estado_display }}</li>
+                </ul>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-sm btn-outline-sgr" href="#">Modificar</a>
+                    <a class="btn btn-sm btn-outline-danger" href="#">Eliminar</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="alert alert-warning">No existen solicitudes registradas para esta delegación.</div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

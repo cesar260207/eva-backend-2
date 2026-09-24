@@ -1,0 +1,52 @@
+{
+  "delegaciones": [
+    {
+      "nombre": "Centro",
+      "cumplimiento": 88,
+      "meta": 92,
+      "ultimos_datos": "2026-08-24",
+      "estado": "Verde",
+      "observacion": "Cumplimiento estable con respuesta oportuna en servicios y seguridad."
+    },
+    {
+      "nombre": "Rural",
+      "cumplimiento": 74,
+      "meta": 85,
+      "ultimos_datos": "2026-08-22",
+      "estado": "Amarillo",
+      "observacion": "Se requiere reforzar coordinación territorial para alcanzar el objetivo trimestral."
+    },
+    {
+      "nombre": "La Antena",
+      "cumplimiento": 63,
+      "meta": 80,
+      "ultimos_datos": "2026-08-20",
+      "estado": "Rojo",
+      "observacion": "Existe retraso acumulado en atención a organizaciones y gestión social."
+    },
+    {
+      "nombre": "La Pampa",
+      "cumplimiento": 82,
+      "meta": 88,
+      "ultimos_datos": "2026-08-25",
+      "estado": "Verde",
+      "observacion": "Avance positivo en las actividades sociales y gestión comunitaria."
+    },
+    {
+      "nombre": "Avenida del Mar",
+      "cumplimiento": 70,
+      "meta": 84,
+      "ultimos_datos": "2026-08-19",
+      "estado": "Amarillo",
+      "observacion": "La seguridad requiere mayor monitoreo durante el período de alta afluencia."
+    },
+    {
+      "nombre": "Las Compañías",
+      "cumplimiento": 58,
+      "meta": 82,
+      "ultimos_datos": "2026-08-18",
+      "estado": "Rojo",
+      "observacion": "Se detecta retraso crítico en servicios básicos y atención de denuncias vecinales."
+    }
+  ]
+}

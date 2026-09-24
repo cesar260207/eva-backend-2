@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}Resumen Ejecutivo | Municipalidad de La Serena{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4"><div><div class="page-kicker">EP-06 · HU-18</div><h1 class="page-title mb-2">Resumen ejecutivo</h1><p class="page-intro mb-0">Lectura rápida del estado de las delegaciones para acompañar decisiones y priorizar apoyo.</p></div><div class="d-flex gap-2"><a href="#" class="btn btn-sgr">+ Agregar meta</a><a href="{% url 'semaforo' %}" class="btn btn-outline-sgr">Abrir semáforo</a></div></div>
+<div class="panel mb-4"><form class="row g-2" method="get"><div class="col-md-9"><input class="form-control" name="q" placeholder="Buscar delegación"></div><div class="col-md-3"><button class="btn btn-outline-sgr w-100" type="submit">Buscar</button></div></form></div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="metric h-100">
+            <div class="card-body">
+                <div class="text-muted">Cumplimiento promedio</div>
+                <h3>{{ promedio }}%</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="metric navy h-100">
+            <div class="card-body">
+                <div class="text-muted">Mejor delegación</div>
+                <h3>{{ mejor.nombre }}</h3>
+                <small>{{ mejor.cumplimiento }}% de avance</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="metric coral h-100">
+            <div class="card-body">
+                <div class="text-muted">Delegación crítica</div>
+                <h3>{{ critico.nombre }}</h3>
+                <small>{{ critico.cumplimiento }}% de avance</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table align-middle panel">
+        <thead>
+            <tr>
+                <th>Delegación</th>
+                <th>Meta</th>
+                <th>Cumplimiento</th>
+                <th>Estado</th>
+                <th>Último dato</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for delegacion in delegaciones %}
+            <tr>
+                <td>{{ delegacion.nombre }}</td>
+                <td>{{ delegacion.meta }}%</td>
+                <td>{{ delegacion.cumplimiento }}%</td>
+                <td><span class="badge bg-{{ delegacion.estado_class }} rounded-pill">{{ delegacion.estado }}</span></td>
+                <td>{{ delegacion.ultimos_datos }}</td>
+                <td class="d-flex gap-2"><a class="btn btn-sm btn-outline-sgr" href="#">Modificar</a><a class="btn btn-sm btn-outline-danger" href="#">Eliminar</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

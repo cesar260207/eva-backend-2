@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block title %}Territorio | SGR{% endblock %}
+{% block content %}
+<div class="hero-sgr mb-4"><div class="page-kicker text-white">Contexto institucional</div><h1 class="display-5 mb-3">Municipio central + gestión territorial</h1><p class="mb-0">Las Delegaciones Municipales acercan la gestión a barrios y localidades, recogen necesidades y coordinan respuestas trazables con las unidades técnicas.</p></div>
+<div class="row g-3 mb-4"><div class="col-md-4"><div class="metric"><strong>{{ poblacion }}</strong><small>Habitantes de la comuna</small></div></div><div class="col-md-4"><div class="metric coral"><strong>{{ urbano }}</strong><small>Población urbana</small></div></div><div class="col-md-4"><div class="metric amber"><strong>{{ rural }}</strong><small>Población rural</small></div></div></div>
+<div class="d-flex justify-content-between align-items-end mb-3"><div><div class="page-kicker">Descentralización y cercanía</div><h2 class="page-title h3 mb-0">Las seis delegaciones</h2></div><span class="badge badge-soft">Información institucional de referencia</span></div>
+<div class="row g-3">{% for nombre, territorio, enfasis in delegaciones %}<div class="col-md-6 col-xl-4"><div class="card territory-card h-100"><div class="card-body"><div class="d-flex justify-content-between align-items-start mb-3"><h3 class="mb-0">{{ nombre }}</h3><span class="badge badge-soft">Territorio</span></div><div class="section-label mb-1">Territorio predominante</div><p class="mb-3">{{ territorio }}</p><div class="section-label mb-1">Énfasis operativo</div><p class="text-muted mb-0">{{ enfasis }}</p></div></div></div>{% endfor %}</div>
+<div class="panel mt-4"><div class="section-label mb-2">Principio de acceso</div><p class="mb-0">Cada actor debe visualizar y modificar únicamente la información necesaria para su función, delegación y nivel de responsabilidad.</p></div>
+{% endblock %}

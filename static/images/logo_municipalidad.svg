@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 120">
+  <rect width="320" height="120" fill="#f7fbff"/>
+  <rect x="20" y="18" width="80" height="84" rx="10" fill="#0b3d72"/>
+  <text x="60" y="72" text-anchor="middle" font-size="30" font-family="Arial" fill="#ffffff">LS</text>
+  <text x="120" y="55" font-size="20" font-family="Arial" fill="#0b3d72">Municipalidad</text>
+  <text x="120" y="82" font-size="22" font-family="Arial" fill="#0b3d72">La Serena</text>
+</svg>

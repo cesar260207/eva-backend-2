@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block title %}Tubo de Solicitudes | Municipalidad de La Serena{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-3">
+    <h2 class="mb-0">Tubo de trabajo de solicitudes</h2>
+    <a class="btn btn-sgr" href="{% url 'compromiso_nuevo' %}">+ Agregar</a>
+</div>
+<div class="panel mb-4">
+    <form class="row g-2" method="get">
+        <div class="col-md-9"><input class="form-control" name="q" value="{{ query }}" placeholder="Buscar por folio, descripción o delegación"></div>
+        <div class="col-md-3"><button class="btn btn-outline-sgr w-100" type="submit">Buscar</button></div>
+    </form>
+</div>
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+        <div class="row text-center g-3">
+            <div class="col-md-3">
+                <div class="border rounded p-3 bg-light">
+                    <div class="text-muted">Total</div>
+                    <h4 class="mb-0">{{ total }}</h4>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="border rounded p-3 bg-light">
+                    <div class="text-muted">Pendientes</div>
+                    <h4 class="mb-0">{{ pendientes }}</h4>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="border rounded p-3 bg-light">
+                    <div class="text-muted">En proceso</div>
+                    <h4 class="mb-0">{{ en_proceso }}</h4>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="border rounded p-3 bg-light">
+                    <div class="text-muted">Alertas</div>
+                    <h4 class="mb-0">{{ alertas }}</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    {% for solicitud in solicitudes %}
+    <div class="col-lg-6">
+        <div class="card h-100 shadow-sm border-0">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h5 class="mb-1">{{ solicitud.folio }}</h5>
+                        <small class="text-muted">{{ solicitud.delegacion }} · {{ solicitud.eje }}</small>
+                    </div>
+                    <span class="badge bg-{{ solicitud.estado_class }} rounded-pill text-uppercase">{{ solicitud.estado_display }}</span>
+                </div>
+                <p class="mb-3">{{ solicitud.descripcion }}</p>
+                <div class="row small text-muted mb-3">
+                    <div class="col-md-6"><strong>Ingreso:</strong> {{ solicitud.fecha_ingreso|date:'d-m-Y' }}</div>
+                    <div class="col-md-6"><strong>Compromiso:</strong> {{ solicitud.fecha_comprometida|date:'d-m-Y' }}</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-sm btn-outline-sgr" href="#">Modificar</a>
+                    <a class="btn btn-sm btn-outline-danger" href="#">Eliminar</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="alert alert-info">No hay solicitudes registradas.</div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block title %}Control de Gestión | Municipalidad de La Serena{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4"><div><div class="page-kicker">EP-02 · HU-05 · HU-07</div><h1 class="page-title mb-2">Medición y desempeño</h1><p class="page-intro mb-0">Período demostrativo: julio a septiembre de 2026. El resultado se calcula con actividades aprobadas y metas configurables.</p></div><div class="d-flex gap-2"><a href="#" class="btn btn-sgr">+ Agregar meta</a><a href="{% url 'resumen' %}" class="btn btn-outline-sgr">Resumen ejecutivo</a></div></div>
+<div class="panel mb-4"><form class="row g-2" method="get"><div class="col-md-9"><input class="form-control" name="q" placeholder="Buscar delegación"></div><div class="col-md-3"><button class="btn btn-outline-sgr w-100" type="submit">Buscar</button></div></form></div>
+<div class="panel mb-4"><div class="row g-3 align-items-center"><div class="col-lg-7"><div class="section-label mb-2">Reglas de cálculo activas</div><div class="d-flex flex-wrap gap-2"><span class="badge badge-soft">Cumplimiento = avance aprobado / meta × 100</span><span class="badge badge-soft">Tope: 150 %</span><span class="badge badge-soft">Ponderadores: 100 %</span></div></div><div class="col-lg-5"><div class="small text-muted mb-2">Meta esperada al día · 07 sep 2026</div><div class="progress"><div class="progress-bar bg-success" style="width: 74%"></div></div><div class="d-flex justify-content-between small mt-1"><span>0 %</span><strong>74 % esperado</strong><span>100 %</span></div></div></div></div>
+
+<div class="row g-3">
+    {% for delegacion in delegaciones %}
+    <div class="col-md-6 col-xl-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">{{ delegacion.nombre }}</h5>
+                    <span class="badge {% if delegacion.estado_class == 'success' %}badge-success-soft{% elif delegacion.estado_class == 'warning' %}badge-warning-soft{% else %}badge-danger-soft{% endif %}">{{ delegacion.estado }}</span>
+                </div>
+                <div class="progress mb-3" style="height: 20px;">
+                    <div class="progress-bar bg-{{ delegacion.estado_class }}" role="progressbar" style="width: {{ delegacion.cumplimiento }}%;" aria-valuenow="{{ delegacion.cumplimiento }}" aria-valuemin="0" aria-valuemax="100">
+                        {{ delegacion.cumplimiento }}%
+                    </div>
+                </div>
+                <ul class="list-unstyled small text-muted mb-0">
+                    <li><strong>Meta:</strong> {{ delegacion.meta }}%</li>
+                    <li><strong>Último dato:</strong> {{ delegacion.ultimos_datos }}</li>
+                    <li><strong>Días transcurridos:</strong> {{ delegacion.dias_desde_registro }}</li>
+                    <li><strong>Observación:</strong> {{ delegacion.observacion }}</li>
+                </ul>
+                <div class="d-flex flex-wrap gap-2 mt-3">
+                    <a class="btn btn-sm btn-outline-sgr" href="{% url 'delegacion_detalle' delegacion.nombre %}">Ver registros de origen</a>
+                    <a class="btn btn-sm btn-outline-sgr" href="#">Modificar</a>
+                    <a class="btn btn-sm btn-outline-danger" href="#">Eliminar</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

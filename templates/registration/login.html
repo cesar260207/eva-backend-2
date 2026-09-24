@@ -1,0 +1,3 @@
+{% extends 'base.html' %}
+{% block title %}Ingresar | SGR{% endblock %}
+{% block content %}<div class="row justify-content-center"><div class="col-md-6 col-lg-4"><div class="panel"><div class="page-kicker">Acceso institucional</div><h1 class="page-title h3 mb-3">Ingresar al SGR</h1><p class="text-muted">Usa tu cuenta para acceder a las funciones autorizadas por tu rol y delegación.</p><form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn btn-sgr w-100" type="submit">Ingresar</button></form></div></div></div>{% endblock %}

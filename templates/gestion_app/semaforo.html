@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block title %}Semáforo de Metas | Municipalidad de La Serena{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-3">
+    <div>
+        <h2 class="mb-2">Semáforo de desempeño territorial</h2>
+        <p class="text-muted mb-0">Indicadores visuales de cumplimiento trimestral por delegación.</p>
+    </div>
+    <a href="#" class="btn btn-sgr">+ Agregar meta</a>
+</div>
+<div class="panel mb-4">
+    <form class="row g-2" method="get">
+        <div class="col-md-9"><input class="form-control" name="q" placeholder="Buscar delegación"></div>
+        <div class="col-md-3"><button class="btn btn-outline-sgr w-100" type="submit">Buscar</button></div>
+    </form>
+</div>
+
+<div class="row g-4">
+    {% for delegacion in delegaciones %}
+    <div class="col-md-6 col-xl-4">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5>{{ delegacion.nombre }}</h5>
+                    <span class="badge bg-{{ delegacion.estado_class }} rounded-pill">{{ delegacion.estado }}</span>
+                </div>
+                <div class="alert alert-{{ delegacion.estado_class }} mb-3">
+                    Cumplimiento: {{ delegacion.cumplimiento }}%<br>
+                    Fecha de último registro: {{ delegacion.ultimos_datos }}
+                </div>
+                <p class="small text-muted mb-3">Días transcurridos desde el último registro: {{ delegacion.dias_desde_registro }}</p>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-sm btn-outline-sgr" href="#">Modificar</a>
+                    <a class="btn btn-sm btn-outline-danger" href="#">Eliminar</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
