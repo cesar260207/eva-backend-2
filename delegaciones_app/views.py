@@ -200,7 +200,38 @@ def revisar_actividad(request, codigo, decision):
 def delegaciones_crud(request):
     if not _puede_ver_todo(request.user):
         return redirect('inicio')
-    return render(request, 'delegaciones_app/delegaciones_crud.html', {'delegaciones': Delegacion.objects.all()})
+    query = request.GET.get('q', '').strip()
+    delegaciones = Delegacion.objects.all()
+    if query:
+        delegaciones = delegaciones.filter(
+            Q(nombre__icontains=query)
+            | Q(territorio__icontains=query)
+            | Q(enfasis__icontains=query)
+        )
+    return render(request, 'delegaciones_app/delegaciones_crud.html', {
+        'delegaciones': delegaciones,
+        'query': query,
+    })
+
+
+@login_required
+def delegacion_cambiar_estado(request, pk):
+    if request.method != 'POST' or not _puede_ver_todo(request.user):
+        return redirect('delegaciones_crud')
+    delegacion = get_object_or_404(Delegacion, pk=pk)
+    delegacion.activa = not delegacion.activa
+    delegacion.save(update_fields=['activa'])
+    Auditoria.objects.create(
+        usuario=request.user,
+        accion='activar' if delegacion.activa else 'desactivar',
+        entidad='Delegacion',
+        identificador=str(delegacion.pk),
+    )
+    messages.success(
+        request,
+        f'Delegacion {delegacion.nombre}: {"activa" if delegacion.activa else "inactiva"}.',
+    )
+    return redirect('delegaciones_crud')
 
 
 @login_required

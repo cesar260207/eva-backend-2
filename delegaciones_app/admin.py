@@ -8,6 +8,7 @@ from .models import (
     Delegacion,
     Evidencia,
     HistorialCompromiso,
+    MedicionDelegacion,
     MetaMedicion,
     PerfilUsuario,
     PeriodoMedicion,
@@ -65,7 +66,6 @@ class ActividadAdmin(admin.ModelAdmin):
     readonly_fields = ['codigo', 'creada', 'actualizada']
     inlines = [EvidenciaInline]
 
-
 @admin.register(Evidencia)
 class EvidenciaAdmin(admin.ModelAdmin):
     list_display = ['actividad', 'archivo', 'aprobada', 'revisada_por', 'creada']
@@ -93,14 +93,29 @@ class MetaMedicionAdmin(admin.ModelAdmin):
     autocomplete_fields = ['delegacion']
 
 
+@admin.register(MedicionDelegacion)
+class MedicionDelegacionAdmin(admin.ModelAdmin):
+    list_display = ['delegacion', 'cumplimiento', 'meta', 'fecha_datos', 'estado_reportado']
+    list_filter = ['estado_reportado', 'delegacion', 'fecha_datos']
+    search_fields = ['delegacion__nombre', 'observacion']
+    autocomplete_fields = ['delegacion']
+    date_hierarchy = 'fecha_datos'
+
+
 @admin.register(Auditoria)
 class AuditoriaAdmin(admin.ModelAdmin):
     list_display = ['fecha', 'usuario', 'accion', 'entidad', 'identificador']
     list_filter = ['accion', 'entidad']
     search_fields = ['identificador', 'usuario__username']
     autocomplete_fields = ['usuario']
-    readonly_fields = ['usuario', 'accion', 'entidad', 'identificador', 'detalle', 'fecha']
+    readonly_fields = ['fecha']
 
-    def has_add_permission(self, request):
-        # La auditoría se genera automáticamente desde las vistas; no se crea a mano.
-        return False
+
+@admin.register(HistorialCompromiso)
+class HistorialCompromisoAdmin(admin.ModelAdmin):
+    list_display = ['compromiso', 'autor', 'estado_anterior', 'estado_nuevo', 'fecha']
+    list_filter = ['estado_anterior', 'estado_nuevo', 'fecha']
+    search_fields = ['compromiso__folio', 'compromiso__descripcion', 'autor__username', 'observacion']
+    autocomplete_fields = ['compromiso', 'autor']
+    date_hierarchy = 'fecha'
+    readonly_fields = ['fecha']

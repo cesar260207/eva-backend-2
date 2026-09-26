@@ -2,6 +2,8 @@ from django.conf import settings
 from django.core.validators import FileExtensionValidator, MinValueValidator
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.utils import timezone
+import uuid
 
 
 class Delegacion(models.Model):
@@ -94,6 +96,11 @@ class Actividad(models.Model):
 	class Meta:
 		ordering = ['-fecha', '-creada']
 
+	def save(self, *args, **kwargs):
+		if not self.codigo:
+			self.codigo = f'EVD-{timezone.localdate():%Y%m%d}-{uuid.uuid4().hex[:6].upper()}'
+		super().save(*args, **kwargs)
+
 	def __str__(self):
 		return f'{self.codigo} - {self.descripcion[:50]}'
 
@@ -105,6 +112,10 @@ class Evidencia(models.Model):
 	aprobada = models.BooleanField(null=True, blank=True)
 	revisada_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name='evidencias_revisadas')
 	creada = models.DateTimeField(auto_now_add=True)
+
+	def __str__(self):
+		archivo = self.archivo.name if self.archivo else 'sin archivo'
+		return f'{self.actividad.codigo} - {archivo}'
 
 
 class Compromiso(models.Model):
@@ -123,6 +134,7 @@ class Compromiso(models.Model):
 	eje = models.CharField(max_length=40, choices=EJES, default='Gestión Social')
 	descripcion = models.TextField()
 	fecha_comprometida = models.DateField()
+	fecha_ingreso = models.DateField(default=timezone.localdate)
 	estado = models.CharField(max_length=20, choices=ESTADOS, default='ingresado')
 	observacion = models.TextField(blank=True)
 	creado = models.DateTimeField(auto_now_add=True)
@@ -167,6 +179,26 @@ class MetaMedicion(models.Model):
 	def resultado_ponderado(self):
 		return float(self.ponderador) * self.cumplimiento / 100
 
+	def __str__(self):
+		return f'{self.delegacion.nombre} - {self.nombre}'
+
+
+class MedicionDelegacion(models.Model):
+	ESTADOS = [('verde', 'Verde'), ('amarillo', 'Amarillo'), ('rojo', 'Rojo')]
+	delegacion = models.ForeignKey(Delegacion, on_delete=models.PROTECT, related_name='mediciones')
+	cumplimiento = models.DecimalField(max_digits=5, decimal_places=2)
+	meta = models.DecimalField(max_digits=5, decimal_places=2)
+	fecha_datos = models.DateField()
+	estado_reportado = models.CharField(max_length=12, choices=ESTADOS)
+	observacion = models.TextField(blank=True)
+
+	class Meta:
+		ordering = ['delegacion__nombre', '-fecha_datos']
+		constraints = [models.UniqueConstraint(fields=['delegacion', 'fecha_datos'], name='medicion_delegacion_fecha_unica')]
+
+	def __str__(self):
+		return f'{self.delegacion} - {self.fecha_datos}: {self.cumplimiento}%'
+
 
 class HistorialCompromiso(models.Model):
 	compromiso = models.ForeignKey(Compromiso, on_delete=models.CASCADE, related_name='historial')
@@ -176,6 +208,9 @@ class HistorialCompromiso(models.Model):
 	observacion = models.TextField(blank=True)
 	fecha = models.DateTimeField(auto_now_add=True)
 
+	def __str__(self):
+		return f'{self.compromiso.folio}: {self.estado_anterior or "inicio"} -> {self.estado_nuevo}'
+
 
 class Auditoria(models.Model):
 	usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
@@ -184,3 +219,6 @@ class Auditoria(models.Model):
 	identificador = models.CharField(max_length=80)
 	detalle = models.JSONField(default=dict)
 	fecha = models.DateTimeField(auto_now_add=True)
+
+	def __str__(self):
+		return f'{self.fecha:%Y-%m-%d %H:%M} - {self.accion} - {self.entidad} {self.identificador}'

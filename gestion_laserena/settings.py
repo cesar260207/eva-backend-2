@@ -17,6 +17,7 @@ import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Variables de entorno: todo dato sensible (SECRET_KEY, credenciales de BD,
 # ALLOWED_HOSTS, etc.) se lee desde un archivo .env que NO se sube a git
@@ -27,7 +28,7 @@ env = environ.Env(
 environ.Env.read_env(BASE_DIR / '.env')
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env('SECRET_KEY', default='django-insecure-change-this-in-your-.env-file')
+SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool('DEBUG', default=False)
@@ -96,9 +97,9 @@ else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
-            'NAME': env('DB_NAME', default='gestion_laserena'),
-            'USER': env('DB_USER', default='gestion_user'),
-            'PASSWORD': env('DB_PASSWORD', default=''),
+            'NAME': env('DB_NAME'),
+            'USER': env('DB_USER'),
+            'PASSWORD': env('DB_PASSWORD'),
             'HOST': env('DB_HOST', default='127.0.0.1'),
             'PORT': env('DB_PORT', default='3306'),
             'OPTIONS': {
@@ -152,12 +153,3 @@ MEDIA_ROOT = BASE_DIR / 'media'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'inicio'
 LOGOUT_REDIRECT_URL = 'inicio'
-
-# Email
-# https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
-
-MAILERS = {
-    'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
-    },
-}

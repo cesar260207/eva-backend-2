@@ -16,6 +16,7 @@ urlpatterns = [
     path('administracion/<slug:slug>/', views.mantenedor_lista, name='mantenedor_lista'),
     path('administracion/delegaciones/nueva/', views.delegacion_form, name='delegacion_nueva'),
     path('administracion/delegaciones/<int:pk>/editar/', views.delegacion_form, name='delegacion_editar'),
+    path('administracion/delegaciones/<int:pk>/estado/', views.delegacion_cambiar_estado, name='delegacion_cambiar_estado'),
     path('territorio/', views.institucional, name='institucional'),
     path('delegacion/<str:nombre>/', views.delegacion_detalle, name='delegacion_detalle'),
 ]

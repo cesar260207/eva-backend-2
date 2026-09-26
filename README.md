@@ -25,8 +25,13 @@ administrable desde Django Admin y desplegable en una instancia AWS EC2.
 Toda la informacion vive en el modelo relacional de `delegaciones_app` (ver
 `delegaciones_app/models.py`): `Delegacion`, `PerfilUsuario`, `CatalogoItem`,
 `PeriodoMedicion`, `Actividad`, `Evidencia`, `Compromiso`, `MetaMedicion`,
-`HistorialCompromiso` y `Auditoria`. Las vistas obtienen los datos exclusivamente
+`MedicionDelegacion`, `HistorialCompromiso` y `Auditoria`. `MedicionDelegacion`
+conserva los indicadores iniciales de `metas_delegaciones.json`, incluidos su
+cumplimiento, meta, fecha, estado y observación. Las vistas obtienen los datos exclusivamente
 mediante el ORM de Django (`objects.filter/get/aggregate`, etc.).
+
+La descripción de entidades, relaciones y migración de JSON está en
+[MODELO_DATOS.md](MODELO_DATOS.md).
 
 Los archivos `data/solicitudes.json` y `data/metas_delegaciones.json` de la
 version anterior del proyecto se conservan solo como **fuente de carga inicial**
@@ -46,7 +51,7 @@ ejecucion). Ninguna vista los vuelve a leer.
 
 ```bash
 git clone <URL_DEL_REPOSITORIO>
-cd proyecto-de-titulo-mockups
+cd eva-backend-2
 python -m venv .venv
 source .venv/bin/activate        # En Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
@@ -60,6 +65,8 @@ cp .env.example .env
 
 Edita `.env` con tus propios valores (clave secreta nueva, credenciales de tu
 MySQL local). **Este archivo nunca se sube a git** (esta en `.gitignore`).
+La aplicación no arranca si falta `SECRET_KEY`; reemplaza el valor de ejemplo
+por una clave propia antes de ejecutar Django.
 
 ### 4. Crear la base de datos en MySQL
 
@@ -75,11 +82,13 @@ FLUSH PRIVILEGES;
 ### 5. Migrar y cargar datos de demostracion
 
 ```bash
-python manage.py makemigrations
 python manage.py migrate
 python manage.py seed_demo
 python manage.py runserver
 ```
+
+`makemigrations` se usa durante el desarrollo cuando cambian los modelos; al
+instalar o desplegar se aplican las migraciones versionadas con `migrate`.
 
 Abrir `http://127.0.0.1:8000/`. El panel de administracion esta en
 `http://127.0.0.1:8000/admin/`.
@@ -150,7 +159,7 @@ phpMyAdmin a MySQL.)
 
 ```bash
 git clone <URL_DEL_REPOSITORIO>
-cd proyecto-de-titulo-mockups
+cd eva-backend-2
 ```
 
 ### 4. Entorno virtual y dependencias Python

@@ -5,7 +5,7 @@ from pathlib import Path
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 
-from delegaciones_app.models import Actividad, CatalogoItem, Compromiso, Delegacion, MetaMedicion, PerfilUsuario, PeriodoMedicion
+from delegaciones_app.models import Actividad, CatalogoItem, Compromiso, Delegacion, MedicionDelegacion, MetaMedicion, PerfilUsuario, PeriodoMedicion
 
 
 class Command(BaseCommand):
@@ -56,9 +56,33 @@ class Command(BaseCommand):
                 continue
             Compromiso.objects.update_or_create(folio=item['folio'], defaults={'delegacion': delegacion, 'responsable': funcionario, 'solicitante': 'Organizacion territorial', 'territorio': item['delegacion'], 'eje': item.get('eje', 'Gestión Social'), 'descripcion': item['descripcion'], 'fecha_comprometida': item['fecha_compromiso'], 'estado': {'Pendiente': 'pendiente', 'En proceso': 'proceso', 'Realizado': 'realizado'}.get(item['estado'], 'ingresado')})
 
+        for item in solicitudes:
+            Compromiso.objects.filter(folio=item['folio']).update(
+                fecha_ingreso=date.fromisoformat(item['fecha_ingreso']),
+            )
+
         Actividad.objects.get_or_create(codigo='EVD-DEMO-0001', defaults={'funcionario': funcionario, 'delegacion': objetos['Centro'], 'fecha': date(2026, 9, 1), 'tipo_atencion': 'Solicitud ciudadana', 'descripcion': 'Orientacion vecinal sobre reparacion de luminaria.', 'accion': 'Derivacion a unidad municipal responsable y seguimiento territorial.', 'item_medicion': 'Seguridad y prevencion', 'estado': 'aprobada'})
         for nombre, objetivo in [('Centro', 10), ('Rural', 10), ('La Antena', 10), ('La Pampa', 10), ('Avenida del Mar', 10), ('Las Compañías', 10)]:
             MetaMedicion.objects.update_or_create(delegacion=objetos[nombre], nombre='Seguridad y prevencion', defaults={'objetivo': objetivo, 'periodo_inicio': date(2026, 7, 1), 'periodo_termino': date(2026, 9, 30), 'ponderador': 100, 'activa': True})
+        archivo_metas = Path(__file__).resolve().parents[3] / 'data' / 'metas_delegaciones.json'
+        metas_json = json.loads(archivo_metas.read_text(encoding='utf-8')).get('delegaciones', [])
+        estados = {'Verde': 'verde', 'Amarillo': 'amarillo', 'Rojo': 'rojo'}
+        for item in metas_json:
+            delegacion = objetos.get(item['nombre'])
+            if not delegacion:
+                continue
+            fecha_datos = date.fromisoformat(item['ultimos_datos'])
+            MedicionDelegacion.objects.update_or_create(
+                delegacion=delegacion,
+                fecha_datos=fecha_datos,
+                defaults={
+                    'cumplimiento': item['cumplimiento'],
+                    'meta': item['meta'],
+                    'estado_reportado': estados[item['estado']],
+                    'observacion': item.get('observacion', ''),
+                },
+            )
+
         PeriodoMedicion.objects.update_or_create(nombre='Trimestre julio-septiembre 2026', defaults={'inicio': date(2026, 7, 1), 'termino': date(2026, 9, 30), 'estado': 'abierto', 'version_parametros': 1, 'umbral_colectivo': 80, 'maximo_cumplimiento': 150})
         catalogos = [
             ('actividad', 'ACT-TERR', 'Gestión territorial'),
