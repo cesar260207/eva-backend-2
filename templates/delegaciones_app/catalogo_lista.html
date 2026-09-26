@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}Catálogo | SGR{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+    <div>
+        <div class="page-kicker">Administración · Catálogo</div>
+        <h1 class="page-title">Catálogo de ítems</h1>
+        <p class="page-intro mb-0">Administra las opciones normalizadas utilizadas por los módulos.</p>
+    </div>
+    <a class="btn btn-sgr" href="{% url 'catalogo_nuevo' %}">Agregar ítem</a>
+</div>
+<div class="panel">
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-md-9"><input class="form-control" type="search" name="q" value="{{ query }}" placeholder="Buscar por código, nombre, área o categoría"></div>
+        <div class="col-md-3"><button class="btn btn-outline-sgr w-100" type="submit">Buscar</button></div>
+    </form>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Categoría</th><th>Código</th><th>Nombre</th><th>Área</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody>
+            {% for item in registros %}
+                <tr>
+                    <td>{{ item.get_categoria_display }}</td>
+                    <td>{{ item.codigo }}</td>
+                    <td>{{ item.nombre }}</td>
+                    <td>{{ item.area|default:'—' }}</td>
+                    <td>{% if item.activo %}Activo{% else %}Inactivo{% endif %}</td>
+                    <td class="d-flex flex-wrap gap-2">
+                        <a class="btn btn-sm btn-outline-sgr" href="{% url 'catalogo_editar' item.pk %}">Modificar</a>
+                        <a class="btn btn-sm btn-outline-danger" href="{% url 'catalogo_eliminar' item.pk %}">Eliminar</a>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6" class="text-center py-4">No hay ítems para este criterio de búsqueda.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

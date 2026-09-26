@@ -61,7 +61,8 @@ La interfaz presenta exactamente ocho mantenedores, dos por integrante:
 Delegaciones, Perfiles, Catálogo, Períodos, Actividades, Evidencias,
 Compromisos y Metas. `MedicionDelegacion`, `HistorialCompromiso` y `Auditoria`
 son entidades adicionales administradas en Django Admin, no mantenedores
-visuales adicionales.
+visuales adicionales. Delegaciones y Catalogo cuentan con CRUD propio en la
+aplicacion; los seis mantenedores restantes aun enlazan las acciones con Admin.
 
 ## Comandos para crear y revisar el esquema
 

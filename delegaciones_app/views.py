@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from .forms import ActividadForm, CompromisoForm, DelegacionForm, EvidenciaForm
+from .forms import ActividadForm, CatalogoItemForm, CompromisoForm, DelegacionForm, EvidenciaForm
 from .models import (
     Actividad, Auditoria, CatalogoItem, Compromiso, Delegacion, Evidencia,
     HistorialCompromiso, MetaMedicion, PerfilUsuario, PeriodoMedicion,
@@ -231,6 +231,71 @@ def delegacion_cambiar_estado(request, pk):
         f'Delegacion {delegacion.nombre}: {"activa" if delegacion.activa else "inactiva"}.',
     )
     return redirect('delegaciones_crud')
+
+
+@login_required
+def catalogo_lista(request):
+    if not _puede_ver_todo(request.user):
+        return redirect('inicio')
+    query = request.GET.get('q', '').strip()
+    registros = CatalogoItem.objects.all()
+    if query:
+        registros = registros.filter(
+            Q(codigo__icontains=query)
+            | Q(nombre__icontains=query)
+            | Q(area__icontains=query)
+            | Q(categoria__icontains=query)
+        )
+    return render(request, 'delegaciones_app/catalogo_lista.html', {
+        'registros': registros,
+        'query': query,
+    })
+
+
+@login_required
+def catalogo_form(request, pk=None):
+    if not _puede_ver_todo(request.user):
+        return redirect('inicio')
+    instancia = get_object_or_404(CatalogoItem, pk=pk) if pk else None
+    form = CatalogoItemForm(request.POST or None, instance=instancia)
+    if request.method == 'POST' and form.is_valid():
+        objeto = form.save()
+        Auditoria.objects.create(
+            usuario=request.user,
+            accion='editar' if instancia else 'crear',
+            entidad='CatalogoItem',
+            identificador=str(objeto.pk),
+            detalle={'codigo': objeto.codigo, 'nombre': objeto.nombre},
+        )
+        messages.success(request, f'Elemento de catalogo "{objeto.nombre}" guardado.')
+        return redirect('catalogo_lista')
+    return render(request, 'delegaciones_app/catalogo_form.html', {
+        'form': form,
+        'titulo': 'Modificar elemento' if instancia else 'Agregar elemento al catalogo',
+        'instancia': instancia,
+    })
+
+
+@login_required
+def catalogo_eliminar(request, pk):
+    if not _puede_ver_todo(request.user):
+        return redirect('inicio')
+    objeto = get_object_or_404(CatalogoItem, pk=pk)
+    if request.method == 'POST':
+        nombre, identificador = objeto.nombre, str(objeto.pk)
+        Auditoria.objects.create(
+            usuario=request.user,
+            accion='eliminar',
+            entidad='CatalogoItem',
+            identificador=identificador,
+            detalle={'codigo': objeto.codigo, 'nombre': nombre},
+        )
+        objeto.delete()
+        messages.success(request, f'Elemento de catalogo "{nombre}" eliminado.')
+        return redirect('catalogo_lista')
+    return render(request, 'delegaciones_app/catalogo_confirmar_eliminar.html', {
+        'objeto': objeto,
+    })
 
 
 @login_required

@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Actividad, Compromiso, Delegacion, Evidencia
+from .models import Actividad, CatalogoItem, Compromiso, Delegacion, Evidencia
 
 
 class DelegacionForm(forms.ModelForm):
@@ -8,6 +8,19 @@ class DelegacionForm(forms.ModelForm):
         model = Delegacion
         fields = ['nombre', 'territorio', 'enfasis', 'activa']
         widgets = {'enfasis': forms.Textarea(attrs={'rows': 4})}
+
+
+class CatalogoItemForm(forms.ModelForm):
+    class Meta:
+        model = CatalogoItem
+        fields = ['categoria', 'codigo', 'nombre', 'area', 'activo']
+        widgets = {
+            'categoria': forms.Select(attrs={'class': 'form-select'}),
+            'codigo': forms.TextInput(attrs={'class': 'form-control'}),
+            'nombre': forms.TextInput(attrs={'class': 'form-control'}),
+            'area': forms.TextInput(attrs={'class': 'form-control'}),
+            'activo': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
 
 
 class ActividadForm(forms.ModelForm):
