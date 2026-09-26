@@ -81,7 +81,6 @@ def _calcular_estado_compromiso(compromiso):
 
 def _decorar_compromiso(compromiso):
     compromiso.estado_display, compromiso.estado_class = _calcular_estado_compromiso(compromiso)
-    compromiso.fecha_ingreso = compromiso.creado
     return compromiso
 
 
@@ -336,10 +335,18 @@ def agenda(request):
         compromisos = compromisos.filter(delegacion=perfil.delegacion)
     delegacion_id = request.GET.get('delegacion')
     estado = request.GET.get('estado')
+    query = request.GET.get('q', '').strip()
     if delegacion_id:
         compromisos = compromisos.filter(delegacion_id=delegacion_id)
     if estado:
         compromisos = compromisos.filter(estado=estado)
+    if query:
+        compromisos = compromisos.filter(
+            Q(folio__icontains=query)
+            | Q(descripcion__icontains=query)
+            | Q(solicitante__icontains=query)
+            | Q(delegacion__nombre__icontains=query)
+        )
     compromisos = list(compromisos)
     for compromiso in compromisos:
         compromiso.estado_display = 'Vencido' if compromiso.vencido else compromiso.get_estado_display()
@@ -349,6 +356,7 @@ def agenda(request):
         'delegaciones_filtro': Delegacion.objects.filter(activa=True),
         'estado_filtro': estado or '',
         'delegacion_filtro': delegacion_id or '',
+        'query': query,
         'proximos': sum(1 for item in compromisos if item.estado != 'realizado' and not item.vencido),
         'vencidos': sum(1 for item in compromisos if item.vencido),
         'realizados': sum(1 for item in compromisos if item.estado == 'realizado'),

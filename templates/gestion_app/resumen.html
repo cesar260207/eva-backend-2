@@ -61,4 +61,27 @@
         </tbody>
     </table>
 </div>
+<section class="mt-5">
+    <div class="section-label">Datos migrados</div>
+    <h2 class="h4 mb-3">Histórico reportado por delegación</h2>
+    <div class="table-responsive">
+        <table class="table align-middle panel">
+            <thead><tr><th>Delegación</th><th>Fecha de datos</th><th>Meta</th><th>Cumplimiento</th><th>Estado reportado</th><th>Observación</th></tr></thead>
+            <tbody>
+                {% for medicion in mediciones_historicas %}
+                <tr>
+                    <td>{{ medicion.delegacion.nombre }}</td>
+                    <td>{{ medicion.fecha_datos|date:'d-m-Y' }}</td>
+                    <td>{{ medicion.meta }}%</td>
+                    <td>{{ medicion.cumplimiento }}%</td>
+                    <td>{{ medicion.get_estado_reportado_display }}</td>
+                    <td>{{ medicion.observacion|default:'—' }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="text-center py-4">Aún no hay mediciones históricas.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
 {% endblock %}

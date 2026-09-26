@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from django.utils import timezone
 
-from delegaciones_app.models import MetaMedicion
+from delegaciones_app.models import MedicionDelegacion, MetaMedicion
 
 
 def _color_porcentaje(cumplimiento):
@@ -44,6 +44,7 @@ def semaforo(request):
 
 def resumen(request):
     delegaciones = _datos_medicion()
+    mediciones_historicas = MedicionDelegacion.objects.select_related('delegacion')[:12]
 
     total = 0
     for item in delegaciones:
@@ -57,4 +58,5 @@ def resumen(request):
         'mejor': mejor,
         'critico': critico,
         'delegaciones': delegaciones,
+        'mediciones_historicas': mediciones_historicas,
     })

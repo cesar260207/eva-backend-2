@@ -52,6 +52,10 @@ Este documento resume la pauta compartida por el equipo. El orden de trabajo aco
 
 - `MODELO_DATOS.md` explica las once entidades, sus relaciones y la migracion de los JSON.
 - `settings.py` exige `SECRET_KEY` desde `.env`; no hay clave secreta de respaldo en el codigo.
+- WhiteNoise esta configurado para servir archivos estaticos con `DEBUG=False`; Gunicorn se instala solo en sistemas distintos de Windows.
+- Se conserva `fecha_ingreso` importada, Agenda permite buscar y Resumen consulta el historico de `MedicionDelegacion`.
+- `Auditoria` permite altas, cambios y eliminaciones solo al superusuario en Django Admin; la decision queda explicada en `MODELO_DATOS.md`.
+- Los otros siete mantenedores aun requieren CRUD propio; la lista generica sigue siendo una etapa pendiente.
 
 - El proyecto cuenta con ocho entradas en `MANTENEDORES`.
 - Las 11 entidades del modelo están registradas en Admin; la comprobación confirmó acceso de permisos CRUD para un superusuario.

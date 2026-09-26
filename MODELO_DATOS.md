@@ -66,11 +66,19 @@ visuales adicionales.
 ## Comandos para crear y revisar el esquema
 
 ```bash
-python manage.py makemigrations
 python manage.py migrate
 python manage.py seed_demo
 python manage.py showmigrations
 ```
+
+`makemigrations` se ejecuta durante el desarrollo solo cuando cambian los
+modelos; la instalacion utiliza las migraciones ya versionadas.
+
+La entidad `Auditoria` se conserva como historial de acciones. Para cumplir el
+criterio academico de administrar todas las entidades, el superusuario puede
+crear, modificar y eliminar sus filas desde Django Admin. En produccion se
+recomienda que los usuarios administrativos solo puedan consultarla y que
+cualquier rectificacion se realice mediante una funcion controlada.
 
 En phpMyAdmin se selecciona `gestion_laserena` para inspeccionar tablas,
 columnas, llaves foráneas y registros. Django genera el esquema a partir de las

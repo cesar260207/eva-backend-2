@@ -47,3 +47,11 @@ Utilizamos La IA del Visual Studio Code para la implementacion de algunos logos 
 **Respuesta de apoyo:** Se revisó el estado del repositorio y se procedió a hacer el `commit` y `push` al remoto de GitHub.
 
 **Implementación realizada:** Los cambios del branding del landing page quedaron subidos a GitHub en el repositorio principal del proyecto.
+
+## Prompt 7 - Migracion y administracion relacional (Sumativa 2)
+
+**Solicitud:** Se compartio feedback de revision sobre modelos Django, migraciones, datos JSON, Django Admin, los ocho mantenedores, variables de entorno, archivos estaticos y evidencia de la evaluacion.
+
+**Respuesta de apoyo:** Se priorizaron las correcciones observadas y se propusieron mejoras incrementales a la persistencia relacional, los formularios, la busqueda y el despliegue.
+
+**Implementacion realizada:** Se corrigio la generacion del codigo de actividades desde el modelo; se agregaron representaciones legibles en modelos; se ajustaron la busqueda y desactivacion de delegaciones; se preservo la fecha de ingreso importada; se agrego busqueda a Agenda y una tabla historica basada en `MedicionDelegacion` al Resumen; se incorporaron WhiteNoise y Gunicorn a la configuracion; y se actualizaron los documentos del modelo de datos y la checklist.
