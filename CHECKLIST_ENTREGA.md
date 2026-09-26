@@ -4,7 +4,7 @@ Este documento resume la pauta compartida por el equipo. El orden de trabajo aco
 
 ## Requisito de equipo
 
-- [x] Mantener exactamente **8 mantenedores visuales**, dos por cada integrante del equipo de cuatro:
+- [ ] Completar los CRUD de exactamente **8 mantenedores visuales**, dos por cada integrante del equipo de cuatro:
   Delegaciones, Perfiles, Catálogo, Períodos, Actividades, Evidencias, Compromisos y Metas.
 - [ ] Administrar cualquier entidad adicional del modelo en Django Admin, sin convertirla en un noveno mantenedor visual. `MedicionDelegacion` es una entidad adicional para conservar los indicadores importados.
 

@@ -63,6 +63,10 @@ Compromisos y Metas. `MedicionDelegacion`, `HistorialCompromiso` y `Auditoria`
 son entidades adicionales administradas en Django Admin, no mantenedores
 visuales adicionales. Delegaciones y Catalogo cuentan con CRUD propio en la
 aplicacion; los seis mantenedores restantes aun enlazan las acciones con Admin.
+El Catalogo no tiene llaves foraneas desde otras entidades actualmente, por lo
+que su CRUD permite eliminar un item tras confirmacion. Si otros modelos pasan
+a referenciarlo, se debe cambiar esa accion por desactivacion para conservar el
+historial.
 
 ## Comandos para crear y revisar el esquema
 

@@ -55,3 +55,11 @@ Utilizamos La IA del Visual Studio Code para la implementacion de algunos logos 
 **Respuesta de apoyo:** Se priorizaron las correcciones observadas y se propusieron mejoras incrementales a la persistencia relacional, los formularios, la busqueda y el despliegue.
 
 **Implementacion realizada:** Se corrigio la generacion del codigo de actividades desde el modelo; se agregaron representaciones legibles en modelos; se ajustaron la busqueda y desactivacion de delegaciones; se preservo la fecha de ingreso importada; se agrego busqueda a Agenda y una tabla historica basada en `MedicionDelegacion` al Resumen; se incorporaron WhiteNoise y Gunicorn a la configuracion; y se actualizaron los documentos del modelo de datos y la checklist.
+
+## Prompt 8 - Correccion de rutas del CRUD de Catalogo
+
+**Prompt literal del usuario:** "otro feedback:" seguido por el informe de revision que identifica el conflicto entre la ruta de Catalogo y la ruta generica, solicita ordenar las rutas, anota que faltan pruebas del CRUD y recomienda corregir la checklist.
+
+**Respuesta de apoyo:** Se confirmo el conflicto por orden de evaluacion de rutas y se aplicaron las correcciones solicitadas. Se agregaron pruebas para comprobar que la URL canonica usa la plantilla propia, que el alta y validacion de duplicados funcionan, que eliminar exige POST y que un funcionario no accede al mantenedor.
+
+**Implementacion realizada:** Las rutas especificas de Catalogo quedaron antes de la ruta generica `<slug:slug>`, se agrego un comentario preventivo, se ajusto la checklist y se documento la politica de eliminacion del catalogo.
