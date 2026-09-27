@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}{{ titulo }} | SGR{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="page-kicker">Administración · Catálogo</div>
+        <h1 class="page-title mb-4">{{ titulo }}</h1>
+        <div class="panel">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                {{ form.as_p }}
+                <div class="d-flex justify-content-end gap-2">
+                    <a class="btn btn-light" href="{% url 'catalogo_lista' %}">Cancelar</a>
+                    <button class="btn btn-sgr" type="submit">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

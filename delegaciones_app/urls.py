@@ -15,10 +15,15 @@ urlpatterns = [
     path('administracion/perfiles/', views.perfiles_usuario, name='perfiles_usuario'),
     path('administracion/periodos/', views.periodos_medicion, name='periodos_medicion'),
     path('administracion/', views.mantenedores, name='mantenedores'),
-    path('administracion/<slug:slug>/', views.mantenedor_lista, name='mantenedor_lista'),
     path('administracion/delegaciones/nueva/', views.delegacion_form, name='delegacion_nueva'),
     path('administracion/delegaciones/<int:pk>/editar/', views.delegacion_form, name='delegacion_editar'),
     path('administracion/delegaciones/<int:pk>/estado/', views.delegacion_cambiar_estado, name='delegacion_cambiar_estado'),
+    path('administracion/catalogo/', views.catalogo_lista, name='catalogo_lista'),
+    path('administracion/catalogo/nuevo/', views.catalogo_form, name='catalogo_nuevo'),
+    path('administracion/catalogo/<int:pk>/editar/', views.catalogo_form, name='catalogo_editar'),
+    path('administracion/catalogo/<int:pk>/eliminar/', views.catalogo_eliminar, name='catalogo_eliminar'),
+    # Las rutas especificas de cada CRUD deben ir antes de esta ruta generica.
+    path('administracion/<slug:slug>/', views.mantenedor_lista, name='mantenedor_lista'),
     path('territorio/', views.institucional, name='institucional'),
     path('delegacion/<str:nombre>/', views.delegacion_detalle, name='delegacion_detalle'),
 ]

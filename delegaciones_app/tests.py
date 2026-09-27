@@ -6,7 +6,7 @@ from django.urls import reverse
 
 from django.core.exceptions import ValidationError
 
-from .models import Actividad, Auditoria, Compromiso, Delegacion, HistorialCompromiso, MetaMedicion, PerfilUsuario, PeriodoMedicion
+from .models import Actividad, Auditoria, CatalogoItem, Compromiso, Delegacion, HistorialCompromiso, MetaMedicion, PerfilUsuario, PeriodoMedicion
 
 
 class SGRMVPTests(TestCase):
@@ -85,3 +85,66 @@ class SGRMVPTests(TestCase):
 		response = self.client.post(reverse('logout'))
 		self.assertRedirects(response, reverse('inicio'))
 		self.assertFalse('_auth_user_id' in self.client.session)
+
+
+class CatalogoCRUDTests(TestCase):
+	def setUp(self):
+		self.delegacion = Delegacion.objects.create(nombre='Centro', territorio='Centro', enfasis='Atencion territorial')
+		self.coordinador = User.objects.create_user('coordinador-catalogo', password='clave-segura')
+		PerfilUsuario.objects.create(usuario=self.coordinador, rol='coordinador')
+		self.funcionario = User.objects.create_user('funcionario-catalogo', password='clave-segura')
+		PerfilUsuario.objects.create(usuario=self.funcionario, rol='funcionario', delegacion=self.delegacion)
+		self.client.force_login(self.coordinador)
+
+	def test_ruta_catalogo_muestra_su_lista_y_busca(self):
+		CatalogoItem.objects.create(categoria='servicio', codigo='SRV-01', nombre='Orientacion vecinal')
+		CatalogoItem.objects.create(categoria='actividad', codigo='ACT-02', nombre='Operativo rural')
+
+		response = self.client.get(reverse('mantenedor_lista', args=['catalogo']), {'q': 'SRV-01'})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertTemplateUsed(response, 'delegaciones_app/catalogo_lista.html')
+		self.assertContains(response, 'Orientacion vecinal')
+		self.assertNotContains(response, 'Operativo rural')
+
+	def test_crear_item_y_registrar_auditoria(self):
+		response = self.client.post(reverse('catalogo_nuevo'), {
+			'categoria': 'servicio', 'codigo': 'SRV-NUEVO', 'nombre': 'Atencion comunitaria',
+			'area': 'Territorio', 'activo': 'on',
+		})
+
+		self.assertRedirects(response, reverse('catalogo_lista'))
+		item = CatalogoItem.objects.get(categoria='servicio', codigo='SRV-NUEVO')
+		self.assertTrue(Auditoria.objects.filter(entidad='CatalogoItem', identificador=str(item.pk), accion='crear').exists())
+
+	def test_formulario_rechaza_categoria_y_codigo_duplicados(self):
+		CatalogoItem.objects.create(categoria='servicio', codigo='SRV-DUP', nombre='Existente')
+
+		response = self.client.post(reverse('catalogo_nuevo'), {
+			'categoria': 'servicio', 'codigo': 'SRV-DUP', 'nombre': 'Duplicado',
+			'area': '', 'activo': 'on',
+		})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertFalse(response.context['form'].is_valid())
+		self.assertTrue(response.context['form'].errors)
+		self.assertEqual(CatalogoItem.objects.filter(categoria='servicio', codigo='SRV-DUP').count(), 1)
+
+	def test_eliminar_requiere_confirmacion_post_y_audita(self):
+		item = CatalogoItem.objects.create(categoria='servicio', codigo='SRV-BORRAR', nombre='Temporal')
+
+		response = self.client.get(reverse('catalogo_eliminar', args=[item.pk]))
+		self.assertEqual(response.status_code, 200)
+		self.assertTrue(CatalogoItem.objects.filter(pk=item.pk).exists())
+
+		response = self.client.post(reverse('catalogo_eliminar', args=[item.pk]))
+		self.assertRedirects(response, reverse('catalogo_lista'))
+		self.assertFalse(CatalogoItem.objects.filter(pk=item.pk).exists())
+		self.assertTrue(Auditoria.objects.filter(entidad='CatalogoItem', identificador=str(item.pk), accion='eliminar').exists())
+
+	def test_funcionario_no_puede_entrar_al_mantenedor(self):
+		self.client.force_login(self.funcionario)
+
+		response = self.client.get(reverse('catalogo_lista'))
+
+		self.assertRedirects(response, reverse('inicio'))
