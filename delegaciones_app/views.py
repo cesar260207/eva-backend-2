@@ -4,7 +4,7 @@ from datetime import datetime
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.db.models import Avg, Q
+from django.db.models import Avg, Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -51,6 +51,11 @@ def _perfil(user):
 def _puede_ver_todo(user):
     perfil = _perfil(user)
     return user.is_superuser or perfil and perfil.rol in {'administrador', 'coordinador'}
+
+
+def _puede_administrar_perfiles(user):
+    perfil = _perfil(user)
+    return user.is_superuser or (perfil and perfil.rol == 'administrador')
 
 
 def _actividades_autorizadas(user):
@@ -377,4 +382,74 @@ def institucional(request):
         'poblacion': '250.141',
         'urbano': '89,14 %',
         'rural': '10,86 %',
+    })
+
+
+@login_required
+def perfiles_usuario(request):
+    if not _puede_administrar_perfiles(request.user):
+        return redirect('inicio')
+
+    query = request.GET.get('q', '').strip()
+    perfiles = PerfilUsuario.objects.select_related('usuario', 'delegacion').all()
+
+    if query:
+        perfiles = perfiles.filter(
+            Q(usuario__username__icontains=query)
+            | Q(usuario__first_name__icontains=query)
+            | Q(usuario__last_name__icontains=query)
+            | Q(rol__icontains=query)
+            | Q(delegacion__nombre__icontains=query)
+            | Q(cargo__icontains=query)
+        )
+
+    conteos_por_rol = {
+        fila['rol']: fila['total']
+        for fila in PerfilUsuario.objects.values('rol').annotate(total=Count('pk'))
+    }
+    resumen_roles = [
+        {'nombre': etiqueta, 'total': conteos_por_rol.get(codigo, 0)}
+        for codigo, etiqueta in PerfilUsuario.ROLES
+    ]
+
+    return render(request, 'delegaciones_app/perfiles_usuario.html', {
+        'perfiles': perfiles,
+        'query': query,
+        'total_perfiles': perfiles.count(),
+        'resumen_roles': resumen_roles,
+    })
+
+
+@login_required
+def periodos_medicion(request):
+    if not _puede_ver_todo(request.user):
+        return redirect('inicio')
+
+    query = request.GET.get('q', '').strip()
+    todos_los_periodos = PeriodoMedicion.objects.all()
+    periodos = todos_los_periodos.order_by('-inicio', 'nombre')
+
+    if query:
+        periodos = periodos.filter(
+            Q(nombre__icontains=query)
+            | Q(estado__icontains=query)
+        )
+
+    resumen_estados = [
+        {
+            'nombre': etiqueta,
+            'total': todos_los_periodos.filter(estado=codigo).count(),
+        }
+        for codigo, etiqueta in PeriodoMedicion.ESTADOS
+    ]
+    periodo_abierto = todos_los_periodos.filter(
+        estado='abierto'
+    ).order_by('-inicio').first()
+
+    return render(request, 'delegaciones_app/periodos_medicion.html', {
+        'periodos': periodos,
+        'query': query,
+        'total_periodos': todos_los_periodos.count(),
+        'resumen_estados': resumen_estados,
+        'periodo_abierto': periodo_abierto,
     })
