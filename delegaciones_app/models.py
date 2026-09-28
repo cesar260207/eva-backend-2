@@ -162,6 +162,11 @@ class MetaMedicion(models.Model):
 	tope_cumplimiento = models.DecimalField(max_digits=5, decimal_places=2, default=150)
 	activa = models.BooleanField(default=True)
 
+	def clean(self):
+		if self.periodo_inicio and self.periodo_termino and self.periodo_termino < self.periodo_inicio:
+			raise ValidationError('El término no puede ser anterior al inicio.')
+		if self.ponderador is not None and self.ponderador > 100:
+			raise ValidationError('El ponderador no puede superar 100%.')
 	@property
 	def avance_calculado(self):
 		return self.delegacion.actividades.filter(
