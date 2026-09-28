@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+﻿{% extends 'base.html' %}
 {% block title %}Mantenedores | SGR{% endblock %}
 {% block content %}
 <div class="mb-4">
@@ -16,6 +16,10 @@
         <span class="btn btn-outline-secondary w-100 disabled" aria-disabled="true">Disponible para administradores</span>
         {% elif mantenedor.slug == 'actividades' %}
         <a class="btn btn-outline-sgr w-100" href="{% url 'actividades' %}">Ver registros</a>
+        {% elif mantenedor.slug == 'compromisos' %}
+        <a class="btn btn-outline-sgr w-100" href="{% url 'agenda' %}">Ver registros</a>
+        {% elif mantenedor.slug == 'metas' %}
+        <a class="btn btn-outline-sgr w-100" href="{% url 'metas_lista' %}">Ver registros</a>
         {% else %}
         <a class="btn btn-outline-sgr w-100" href="{% url 'mantenedor_lista' mantenedor.slug %}">Ver registros</a>
         {% endif %}

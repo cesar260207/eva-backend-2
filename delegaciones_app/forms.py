@@ -1,10 +1,10 @@
-from django import forms
+﻿from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from .models import Actividad, CatalogoItem, Compromiso, Delegacion, Evidencia, PerfilUsuario, PeriodoMedicion
+from .models import Actividad, CatalogoItem, Compromiso, Delegacion, Evidencia, MetaMedicion, PerfilUsuario, PeriodoMedicion
 
 
 class DelegacionForm(forms.ModelForm):
@@ -210,3 +210,42 @@ class CompromisoForm(forms.ModelForm):
         model = Compromiso
         fields = ['delegacion', 'responsable', 'solicitante', 'territorio', 'eje', 'descripcion', 'fecha_comprometida', 'estado', 'observacion']
         widgets = {'fecha_comprometida': forms.DateInput(attrs={'type': 'date'}), 'descripcion': forms.Textarea(attrs={'rows': 3}), 'observacion': forms.Textarea(attrs={'rows': 2})}
+
+
+class MetaMedicionForm(forms.ModelForm):
+    class Meta:
+        model = MetaMedicion
+        fields = ['delegacion', 'nombre', 'objetivo', 'avance', 'ponderador', 'periodo_inicio', 'periodo_termino', 'tope_cumplimiento', 'activa']
+        labels = {
+            'nombre': 'Nombre de la meta',
+            'objetivo': 'Objetivo',
+            'avance': 'Avance manual',
+            'ponderador': 'Ponderador (%)',
+            'periodo_inicio': 'Inicio del período',
+            'periodo_termino': 'Término del período',
+            'tope_cumplimiento': 'Tope de cumplimiento (%)',
+            'activa': 'Meta activa',
+        }
+        help_texts = {
+            'avance': 'Se usa solo si no hay actividades aprobadas que calcular automáticamente.',
+            'tope_cumplimiento': 'Límite superior aplicado al porcentaje de cumplimiento.',
+        }
+        widgets = {
+            'delegacion': forms.Select(attrs={'class': 'form-select'}),
+            'nombre': forms.TextInput(attrs={'class': 'form-control'}),
+            'objetivo': forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+            'avance': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+            'ponderador': forms.NumberInput(attrs={'class': 'form-control', 'min': 0, 'max': 100, 'step': '0.01'}),
+            'periodo_inicio': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'periodo_termino': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'tope_cumplimiento': forms.NumberInput(attrs={'class': 'form-control', 'min': 0.01, 'step': '0.01'}),
+            'activa': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        inicio = cleaned_data.get('periodo_inicio')
+        termino = cleaned_data.get('periodo_termino')
+        if inicio and termino and termino < inicio:
+            self.add_error('periodo_termino', 'El término no puede ser anterior al inicio.')
+        return cleaned_data

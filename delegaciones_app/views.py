@@ -1,4 +1,4 @@
-import uuid
+﻿import uuid
 from datetime import datetime
 
 from django.contrib import messages
@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from .forms import (
     ActividadForm, CatalogoItemForm, CompromisoForm, DelegacionForm,
-    EvidenciaForm, EvidenciaMantenedorForm, PerfilUsuarioForm, PeriodoMedicionForm,
+    EvidenciaForm, EvidenciaMantenedorForm, MetaMedicionForm, PerfilUsuarioForm, PeriodoMedicionForm,
 )
 from .models import (
     Actividad, Auditoria, CatalogoItem, Compromiso, Delegacion, Evidencia,
@@ -549,6 +549,122 @@ def compromiso_estado(request, pk, estado):
     Auditoria.objects.create(usuario=request.user, accion='cambio_estado', entidad='Compromiso', identificador=compromiso.folio, detalle={'anterior': anterior, 'nuevo': estado})
     messages.success(request, f'El compromiso {compromiso.folio} cambió a {compromiso.get_estado_display()}.')
     return redirect('agenda')
+
+
+def _puede_editar_compromiso(user, compromiso):
+    perfil = _perfil(user)
+    if _puede_ver_todo(user):
+        return True
+    return bool(perfil and perfil.rol in {'delegado', 'funcionario'} and compromiso.responsable_id == user.pk)
+
+
+@login_required
+def compromiso_editar(request, pk):
+    compromiso = get_object_or_404(Compromiso, pk=pk)
+    if not _puede_editar_compromiso(request.user, compromiso):
+        messages.error(request, 'No tienes permiso para modificar este compromiso.')
+        return redirect('agenda')
+    estado_anterior = compromiso.estado
+    form = CompromisoForm(request.POST or None, instance=compromiso, user=request.user)
+    if request.method == 'POST' and form.is_valid():
+        compromiso = form.save()
+        if compromiso.estado != estado_anterior:
+            HistorialCompromiso.objects.create(
+                compromiso=compromiso, autor=request.user,
+                estado_anterior=estado_anterior, estado_nuevo=compromiso.estado,
+            )
+        Auditoria.objects.create(
+            usuario=request.user, accion='editar', entidad='Compromiso',
+            identificador=compromiso.folio, detalle={'campos': form.changed_data},
+        )
+        messages.success(request, f'Compromiso {compromiso.folio} actualizado.')
+        return redirect('agenda')
+    return render(request, 'delegaciones_app/compromiso_form.html', {
+        'form': form,
+        'titulo': f'Modificar compromiso {compromiso.folio}',
+        'compromiso': compromiso,
+    })
+
+
+@login_required
+@login_required
+def compromiso_eliminar(request, pk):
+    if not _puede_ver_todo(request.user):
+        messages.error(request, 'Solo administración o coordinación puede eliminar compromisos.')
+        return redirect('agenda')
+    compromiso = get_object_or_404(Compromiso, pk=pk)
+    if request.method == 'POST':
+        folio = compromiso.folio
+        Auditoria.objects.create(
+            usuario=request.user, accion='eliminar', entidad='Compromiso',
+            identificador=folio, detalle={'delegacion': compromiso.delegacion.nombre},
+        )
+        compromiso.delete()
+        messages.success(request, f'Compromiso {folio} eliminado.')
+        return redirect('agenda')
+    return render(request, 'delegaciones_app/compromiso_confirmar_eliminar.html', {
+        'compromiso': compromiso,
+    })
+
+
+@login_required
+def meta_lista(request):
+    if not _puede_ver_todo(request.user):
+        return redirect('inicio')
+    query = request.GET.get('q', '').strip()
+    registros = MetaMedicion.objects.select_related('delegacion').order_by('delegacion__nombre', 'nombre')
+    if query:
+        registros = registros.filter(
+            Q(nombre__icontains=query)
+            | Q(delegacion__nombre__icontains=query)
+        )
+    return render(request, 'delegaciones_app/meta_lista.html', {
+        'registros': registros,
+        'query': query,
+    })
+
+
+@login_required
+def meta_form(request, pk=None):
+    if not _puede_ver_todo(request.user):
+        return redirect('inicio')
+    instancia = get_object_or_404(MetaMedicion, pk=pk) if pk else None
+    form = MetaMedicionForm(request.POST or None, instance=instancia)
+    if request.method == 'POST' and form.is_valid():
+        meta = form.save()
+        Auditoria.objects.create(
+            usuario=request.user,
+            accion='editar' if instancia else 'crear',
+            entidad='MetaMedicion',
+            identificador=str(meta.pk),
+            detalle={'nombre': meta.nombre, 'delegacion': meta.delegacion.nombre, 'campos': form.changed_data},
+        )
+        messages.success(request, f'Meta "{meta.nombre}" guardada correctamente.')
+        return redirect('metas_lista')
+    return render(request, 'delegaciones_app/meta_form.html', {
+        'form': form,
+        'titulo': 'Modificar meta' if instancia else 'Agregar meta',
+        'instancia': instancia,
+    })
+
+
+@login_required
+def meta_eliminar(request, pk):
+    if not _puede_ver_todo(request.user):
+        return redirect('inicio')
+    meta = get_object_or_404(MetaMedicion.objects.select_related('delegacion'), pk=pk)
+    if request.method == 'POST':
+        nombre, identificador = meta.nombre, str(meta.pk)
+        Auditoria.objects.create(
+            usuario=request.user, accion='eliminar', entidad='MetaMedicion',
+            identificador=identificador, detalle={'nombre': nombre, 'delegacion': meta.delegacion.nombre},
+        )
+        meta.delete()
+        messages.success(request, f'Meta "{nombre}" eliminada.')
+        return redirect('metas_lista')
+    return render(request, 'delegaciones_app/meta_confirmar_eliminar.html', {
+        'objeto': meta,
+    })
 
 
 def agenda(request):

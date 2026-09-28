@@ -1,4 +1,4 @@
-from django.urls import path
+﻿from django.urls import path
 from . import views
 
 urlpatterns = [
@@ -7,6 +7,8 @@ urlpatterns = [
     path('agenda/', views.agenda, name='agenda'),
     path('agenda/nueva/', views.compromiso_nuevo, name='compromiso_nuevo'),
     path('agenda/<int:pk>/estado/<str:estado>/', views.compromiso_estado, name='compromiso_estado'),
+    path('agenda/<int:pk>/editar/', views.compromiso_editar, name='compromiso_editar'),
+    path('agenda/<int:pk>/eliminar/', views.compromiso_eliminar, name='compromiso_eliminar'),
     path('actividades/', views.actividades, name='actividades'),
     path('actividad/nueva/', views.actividad_nueva, name='actividad_nueva'),
     path('actividad/<str:codigo>/', views.actividad_detalle, name='actividad_detalle'),
@@ -35,6 +37,10 @@ urlpatterns = [
     path('administracion/evidencias/nueva/', views.evidencia_form, name='evidencia_nueva'),
     path('administracion/evidencias/<int:pk>/editar/', views.evidencia_form, name='evidencia_editar'),
     path('administracion/evidencias/<int:pk>/eliminar/', views.evidencia_eliminar, name='evidencia_eliminar'),
+    path('administracion/metas/', views.meta_lista, name='metas_lista'),
+    path('administracion/metas/nueva/', views.meta_form, name='meta_nueva'),
+    path('administracion/metas/<int:pk>/editar/', views.meta_form, name='meta_editar'),
+    path('administracion/metas/<int:pk>/eliminar/', views.meta_eliminar, name='meta_eliminar'),
     # Las rutas especificas de cada CRUD deben ir antes de esta ruta generica.
     path('administracion/<slug:slug>/', views.mantenedor_lista, name='mantenedor_lista'),
     path('territorio/', views.institucional, name='institucional'),

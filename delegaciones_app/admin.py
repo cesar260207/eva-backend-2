@@ -24,7 +24,12 @@ class HistorialCompromisoInline(admin.TabularInline):
     model = HistorialCompromiso
     extra = 0
     readonly_fields = ['autor', 'estado_anterior', 'estado_nuevo', 'observacion', 'fecha']
-    can_delete = False
+    can_delete = False 
+
+class MetaMedicionInline(admin.TabularInline):
+    model = MetaMedicion
+    extra = 0
+    show_change_link = True
 
 
 @admin.register(Delegacion)
@@ -32,6 +37,7 @@ class DelegacionAdmin(admin.ModelAdmin):
     list_display = ['nombre', 'territorio', 'activa']
     list_filter = ['activa']
     search_fields = ['nombre', 'territorio']
+    inlines = [MetaMedicionInline]
 
 
 @admin.register(PerfilUsuario)
