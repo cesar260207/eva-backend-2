@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block title %}{{ titulo }} | SGR{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="page-kicker">Confirmación requerida</div>
+        <h1 class="page-title mb-4">{{ titulo }}</h1>
+        <div class="panel">
+            <p>¿Confirmas eliminar <strong>{{ objeto }}</strong>?</p>
+            {% if advertencia %}<div class="alert alert-warning">{{ advertencia }}</div>{% endif %}
+            <form method="post" class="d-flex justify-content-end gap-2">
+                {% csrf_token %}
+                <a href="{{ volver_url }}" class="btn btn-light">Cancelar</a>
+                <button class="btn btn-danger" type="submit">Confirmar eliminación</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

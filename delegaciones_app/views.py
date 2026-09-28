@@ -4,12 +4,16 @@ from datetime import datetime
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+from django.db import transaction
 from django.db.models import Avg, Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from .forms import ActividadForm, CatalogoItemForm, CompromisoForm, DelegacionForm, EvidenciaForm, EvidenciaMantenedorForm
+from .forms import (
+    ActividadForm, CatalogoItemForm, CompromisoForm, DelegacionForm,
+    EvidenciaForm, EvidenciaMantenedorForm, PerfilUsuarioForm, PeriodoMedicionForm,
+)
 from .models import (
     Actividad, Auditoria, CatalogoItem, Compromiso, Delegacion, Evidencia,
     HistorialCompromiso, MetaMedicion, PerfilUsuario, PeriodoMedicion,
@@ -458,6 +462,7 @@ def mantenedores(request):
         return redirect('inicio')
     return render(request, 'delegaciones_app/mantenedores.html', {
         'mantenedores': [dict(configuracion, slug=slug) for slug, configuracion in MANTENEDORES.items()],
+        'puede_administrar_perfiles': _puede_administrar_perfiles(request.user),
     })
 
 
@@ -604,13 +609,14 @@ def perfiles_usuario(request):
         return redirect('inicio')
 
     query = request.GET.get('q', '').strip()
-    perfiles = PerfilUsuario.objects.select_related('usuario', 'delegacion').all()
+    perfiles = PerfilUsuario.objects.select_related('usuario', 'delegacion').order_by('usuario__username')
 
     if query:
         perfiles = perfiles.filter(
             Q(usuario__username__icontains=query)
             | Q(usuario__first_name__icontains=query)
             | Q(usuario__last_name__icontains=query)
+            | Q(usuario__email__icontains=query)
             | Q(rol__icontains=query)
             | Q(delegacion__nombre__icontains=query)
             | Q(cargo__icontains=query)
@@ -630,6 +636,84 @@ def perfiles_usuario(request):
         'query': query,
         'total_perfiles': perfiles.count(),
         'resumen_roles': resumen_roles,
+    })
+
+
+@login_required
+def perfil_usuario_form(request, pk=None):
+    if not _puede_administrar_perfiles(request.user):
+        return redirect('inicio')
+    instancia = get_object_or_404(PerfilUsuario.objects.select_related('usuario'), pk=pk) if pk else None
+    form = PerfilUsuarioForm(request.POST or None, instance=instancia)
+    if request.method == 'POST' and form.is_valid():
+        cambia_su_acceso = (
+            instancia
+            and instancia.usuario_id == request.user.pk
+            and (form.cleaned_data['rol'] != instancia.rol or not form.cleaned_data['usuario_activo'])
+        )
+        if cambia_su_acceso:
+            form.add_error(None, 'No puedes quitarte el rol administrador ni desactivar tu propia cuenta.')
+        else:
+            perfil = form.save()
+            Auditoria.objects.create(
+                usuario=request.user,
+                accion='editar' if instancia else 'crear',
+                entidad='PerfilUsuario',
+                identificador=str(perfil.pk),
+                detalle={
+                    'username': perfil.usuario.username,
+                    'rol': perfil.rol,
+                    'delegacion': perfil.delegacion.nombre if perfil.delegacion else None,
+                    'campos': form.changed_data,
+                },
+            )
+            messages.success(request, f'Perfil de {perfil.usuario.username} guardado correctamente.')
+            return redirect('perfiles_usuario')
+    return render(request, 'delegaciones_app/mantenedor_form.html', {
+        'form': form,
+        'titulo': 'Modificar perfil de usuario' if instancia else 'Agregar perfil de usuario',
+        'volver_url': reverse('perfiles_usuario'),
+        'ayuda': 'Al crear un perfil también se crea la cuenta de acceso. Al editar, deja la contraseña vacía para conservarla.',
+    })
+
+
+@login_required
+def perfil_usuario_eliminar(request, pk):
+    if not _puede_administrar_perfiles(request.user):
+        return redirect('inicio')
+    perfil = get_object_or_404(PerfilUsuario.objects.select_related('usuario', 'delegacion'), pk=pk)
+    if perfil.usuario_id == request.user.pk:
+        messages.error(request, 'No puedes eliminar tu propio perfil desde esta pantalla.')
+        return redirect('perfiles_usuario')
+    if request.method == 'POST':
+        usuario = perfil.usuario
+        identificador = str(perfil.pk)
+        detalle = {
+            'username': usuario.username,
+            'rol': perfil.rol,
+            'delegacion': perfil.delegacion.nombre if perfil.delegacion else None,
+            'cuenta_desactivada': True,
+        }
+        # Se conserva la cuenta para no romper actividades, compromisos ni auditorías
+        # que la referencian; al quitar su perfil y desactivarla ya no puede acceder.
+        with transaction.atomic():
+            usuario.is_active = False
+            usuario.save(update_fields=['is_active'])
+            Auditoria.objects.create(
+                usuario=request.user,
+                accion='eliminar',
+                entidad='PerfilUsuario',
+                identificador=identificador,
+                detalle=detalle,
+            )
+            perfil.delete()
+        messages.success(request, f'Perfil eliminado y cuenta {usuario.username} desactivada.')
+        return redirect('perfiles_usuario')
+    return render(request, 'delegaciones_app/mantenedor_confirmar_eliminar.html', {
+        'objeto': perfil,
+        'titulo': 'Eliminar perfil de usuario',
+        'volver_url': reverse('perfiles_usuario'),
+        'advertencia': f'Se eliminará el perfil y se desactivará la cuenta de {perfil.usuario.username}. La cuenta se conserva para mantener sus registros históricos.',
     })
 
 
@@ -665,4 +749,55 @@ def periodos_medicion(request):
         'total_periodos': todos_los_periodos.count(),
         'resumen_estados': resumen_estados,
         'periodo_abierto': periodo_abierto,
+    })
+
+
+@login_required
+def periodo_medicion_form(request, pk=None):
+    if not _puede_ver_todo(request.user):
+        return redirect('inicio')
+    instancia = get_object_or_404(PeriodoMedicion, pk=pk) if pk else None
+    form = PeriodoMedicionForm(request.POST or None, instance=instancia)
+    if request.method == 'POST' and form.is_valid():
+        periodo = form.save()
+        Auditoria.objects.create(
+            usuario=request.user,
+            accion='editar' if instancia else 'crear',
+            entidad='PeriodoMedicion',
+            identificador=str(periodo.pk),
+            detalle={'nombre': periodo.nombre, 'estado': periodo.estado, 'campos': form.changed_data},
+        )
+        messages.success(request, f'Período "{periodo.nombre}" guardado correctamente.')
+        return redirect('periodos_medicion')
+    return render(request, 'delegaciones_app/mantenedor_form.html', {
+        'form': form,
+        'titulo': 'Modificar período de medición' if instancia else 'Agregar período de medición',
+        'volver_url': reverse('periodos_medicion'),
+        'ayuda': 'El término debe ser igual o posterior al inicio. El umbral se expresa entre 0 y 100%.',
+    })
+
+
+@login_required
+def periodo_medicion_eliminar(request, pk):
+    if not _puede_ver_todo(request.user):
+        return redirect('inicio')
+    periodo = get_object_or_404(PeriodoMedicion, pk=pk)
+    if request.method == 'POST':
+        identificador, nombre = str(periodo.pk), periodo.nombre
+        with transaction.atomic():
+            Auditoria.objects.create(
+                usuario=request.user,
+                accion='eliminar',
+                entidad='PeriodoMedicion',
+                identificador=identificador,
+                detalle={'nombre': nombre},
+            )
+            periodo.delete()
+        messages.success(request, f'Período "{nombre}" eliminado.')
+        return redirect('periodos_medicion')
+    return render(request, 'delegaciones_app/mantenedor_confirmar_eliminar.html', {
+        'objeto': periodo,
+        'titulo': 'Eliminar período de medición',
+        'volver_url': reverse('periodos_medicion'),
+        'advertencia': 'Esta acción eliminará el período de la base de datos y no se puede deshacer.',
     })

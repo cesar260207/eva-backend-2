@@ -61,9 +61,9 @@ La interfaz presenta exactamente ocho mantenedores, dos por integrante:
 Delegaciones, Perfiles, Catálogo, Períodos, Actividades, Evidencias,
 Compromisos y Metas. `MedicionDelegacion`, `HistorialCompromiso` y `Auditoria`
 son entidades adicionales administradas en Django Admin, no mantenedores
-visuales adicionales. Delegaciones, Catalogo, Actividades y Evidencias cuentan
-con CRUD propio en la aplicacion; los cuatro mantenedores restantes aun enlazan
-las acciones con Admin.
+visuales adicionales. Delegaciones, Perfiles, Catálogo, Períodos, Actividades y
+Evidencias cuentan con CRUD propio en la aplicación. Compromisos y Metas enlazan
+sus acciones a Django Admin mientras se implementan sus CRUD propios.
 El Catalogo no tiene llaves foraneas desde otras entidades actualmente, por lo
 que su CRUD permite eliminar un item tras confirmacion. Si otros modelos pasan
 a referenciarlo, se debe cambiar esa accion por desactivacion para conservar el

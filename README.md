@@ -11,9 +11,10 @@ administrable desde Django Admin y desplegable en una instancia AWS EC2.
 - CRUD de delegaciones para administradores y coordinadores.
 - Ocho mantenedores visuales (dos por integrante para un equipo de cuatro):
   Delegaciones, Perfiles, Catálogo, Períodos, Actividades, Evidencias,
-  Compromisos y Metas. Todos usan Django ORM y ofrecen busqueda; Delegaciones
-  y Catalogo tienen CRUD propio en la aplicacion. Los seis mantenedores restantes
-  todavia enlazan sus acciones a Django Admin mientras se implementan sus CRUD.
+  Compromisos y Metas. Todos usan Django ORM y ofrecen búsqueda. Delegaciones,
+  Perfiles, Catálogo, Períodos, Actividades y Evidencias tienen
+  CRUD propio en la aplicación. Compromisos y Metas mantienen sus acciones en
+  Django Admin mientras se implementan sus CRUD propios.
 - Registro persistente de actividades con codigo unico y evidencias.
 - Carga de evidencias y flujo de aprobacion/rechazo.
 - Compromisos colectivos y auditoria de operaciones criticas.

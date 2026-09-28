@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}{{ titulo }} | SGR{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="page-kicker">Administración</div>
+        <h1 class="page-title mb-3">{{ titulo }}</h1>
+        {% if ayuda %}<p class="page-intro mb-4">{{ ayuda }}</p>{% endif %}
+        <div class="panel">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+                {% for field in form %}
+                <div class="mb-3 {% if field.field.widget.input_type == 'checkbox' %}form-check{% endif %}">
+                    {% if field.field.widget.input_type == 'checkbox' %}
+                        {{ field }}<label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {% else %}
+                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}
+                    {% endif %}
+                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                    {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+                {% endfor %}
+                <div class="d-flex justify-content-end gap-2"><a href="{{ volver_url }}" class="btn btn-light">Cancelar</a><button class="btn btn-sgr" type="submit">Guardar</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
