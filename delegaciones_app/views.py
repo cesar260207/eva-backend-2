@@ -587,8 +587,10 @@ def compromiso_editar(request, pk):
 
 
 @login_required
+@login_required
 def compromiso_eliminar(request, pk):
     if not _puede_ver_todo(request.user):
+        messages.error(request, 'Solo administración o coordinación puede eliminar compromisos.')
         return redirect('agenda')
     compromiso = get_object_or_404(Compromiso, pk=pk)
     if request.method == 'POST':
