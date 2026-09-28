@@ -1,4 +1,6 @@
 import json
+import os
+import secrets
 from datetime import date
 from pathlib import Path
 
@@ -11,7 +13,18 @@ from delegaciones_app.models import Actividad, CatalogoItem, Compromiso, Delegac
 class Command(BaseCommand):
     help = 'Carga delegaciones, usuarios y registros ficticios para la demostracion SGR.'
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--password',
+            help='Clave para las cuentas demo nuevas. Si se omite, se usa la variable DEMO_PASSWORD o se genera una aleatoria.',
+        )
+
     def handle(self, *args, **options):
+        clave = options.get('password') or os.environ.get('DEMO_PASSWORD')
+        clave_generada = not clave
+        if clave_generada:
+            clave = secrets.token_urlsafe(12)
+
         delegaciones = {
             'Centro': ('Centro historico, administrativo, comercial y patrimonial', 'Atencion territorial y gestion del espacio publico.'),
             'Rural': ('Localidades y comunidades rurales dispersas', 'Acercamiento de servicios, emergencias y coordinacion intersectorial.'),
@@ -34,7 +47,7 @@ class Command(BaseCommand):
         for username, nombre, rol, delegacion in cuentas:
             usuario, creado = User.objects.get_or_create(username=username, defaults={'first_name': nombre})
             if creado:
-                usuario.set_password('Demo2026!')
+                usuario.set_password(clave)
                 usuario.save()
             if rol == 'administrador':
                 usuario.is_staff = True
@@ -92,4 +105,7 @@ class Command(BaseCommand):
         ]
         for categoria, codigo, nombre in catalogos:
             CatalogoItem.objects.update_or_create(categoria=categoria, codigo=codigo, defaults={'nombre': nombre, 'activo': True})
-        self.stdout.write(self.style.SUCCESS('Datos demo cargados. Usuario demo: coordinador.demo / Demo2026!'))
+
+        if clave_generada:
+            self.stdout.write(self.style.WARNING(f'Clave generada para las cuentas demo NUEVAS (se muestra una sola vez): {clave}'))
+        self.stdout.write(self.style.SUCCESS('Datos demo cargados. Cuentas demo: admin.demo, coordinador.demo, funcionario.centro, verificador.demo'))
