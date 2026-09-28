@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Confirmar eliminación | SGR{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="page-kicker">Actividades · Eliminación</div>
+        <h1 class="page-title mb-4">Confirmar eliminación</h1>
+        <div class="panel">
+            <p>¿Eliminar la actividad <strong>{{ actividad.codigo }}</strong> de la delegación <strong>{{ actividad.delegacion }}</strong>?</p>
+            <p class="text-muted">{{ actividad.descripcion|truncatechars:140 }}</p>
+            <div class="alert alert-warning">
+                Al eliminar la actividad también se eliminan sus evidencias asociadas:
+                <strong>{{ total_evidencias }} evidencia{{ total_evidencias|pluralize }}</strong>.
+            </div>
+            <p class="text-muted">Esta acción no se puede deshacer.</p>
+            <form method="post">
+                {% csrf_token %}
+                <div class="d-flex justify-content-end gap-2">
+                    <a class="btn btn-light" href="{% url 'actividades' %}">Cancelar</a>
+                    <button class="btn btn-danger" type="submit">Confirmar eliminación</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

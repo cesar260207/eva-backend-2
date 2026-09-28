@@ -10,6 +10,9 @@ urlpatterns = [
     path('actividades/', views.actividades, name='actividades'),
     path('actividad/nueva/', views.actividad_nueva, name='actividad_nueva'),
     path('actividad/<str:codigo>/', views.actividad_detalle, name='actividad_detalle'),
+    # editar/eliminar deben ir antes de <str:decision>, que tambien los capturaria.
+    path('actividad/<str:codigo>/editar/', views.actividad_editar, name='actividad_editar'),
+    path('actividad/<str:codigo>/eliminar/', views.actividad_eliminar, name='actividad_eliminar'),
     path('actividad/<str:codigo>/<str:decision>/', views.revisar_actividad, name='revisar_actividad'),
     path('administracion/delegaciones/', views.delegaciones_crud, name='delegaciones_crud'),
     path('administracion/perfiles/', views.perfiles_usuario, name='perfiles_usuario'),
@@ -22,6 +25,10 @@ urlpatterns = [
     path('administracion/catalogo/nuevo/', views.catalogo_form, name='catalogo_nuevo'),
     path('administracion/catalogo/<int:pk>/editar/', views.catalogo_form, name='catalogo_editar'),
     path('administracion/catalogo/<int:pk>/eliminar/', views.catalogo_eliminar, name='catalogo_eliminar'),
+    path('administracion/evidencias/', views.evidencia_lista, name='evidencia_lista'),
+    path('administracion/evidencias/nueva/', views.evidencia_form, name='evidencia_nueva'),
+    path('administracion/evidencias/<int:pk>/editar/', views.evidencia_form, name='evidencia_editar'),
+    path('administracion/evidencias/<int:pk>/eliminar/', views.evidencia_eliminar, name='evidencia_eliminar'),
     # Las rutas especificas de cada CRUD deben ir antes de esta ruta generica.
     path('administracion/<slug:slug>/', views.mantenedor_lista, name='mantenedor_lista'),
     path('territorio/', views.institucional, name='institucional'),

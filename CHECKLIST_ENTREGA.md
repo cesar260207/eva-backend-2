@@ -6,6 +6,8 @@ Este documento resume la pauta compartida por el equipo. El orden de trabajo aco
 
 - [ ] Completar los CRUD de exactamente **8 mantenedores visuales**, dos por cada integrante del equipo de cuatro:
   Delegaciones, Perfiles, Catálogo, Períodos, Actividades, Evidencias, Compromisos y Metas.
+  - [x] Actividades: CRUD propio sobre el listado `/actividades/` (agregar, modificar, eliminar con confirmación y buscar).
+  - [x] Evidencias: CRUD propio en `/administracion/evidencias/` (agregar, modificar, eliminar con confirmación y buscar).
 - [ ] Administrar cualquier entidad adicional del modelo en Django Admin, sin convertirla en un noveno mantenedor visual. `MedicionDelegacion` es una entidad adicional para conservar los indicadores importados.
 
 ## Base de datos y Django ORM
@@ -55,8 +57,7 @@ Este documento resume la pauta compartida por el equipo. El orden de trabajo aco
 - WhiteNoise esta configurado para servir archivos estaticos con `DEBUG=False`; Gunicorn se instala solo en sistemas distintos de Windows.
 - Se conserva `fecha_ingreso` importada, Agenda permite buscar y Resumen consulta el historico de `MedicionDelegacion`.
 - `Auditoria` permite altas, cambios y eliminaciones solo al superusuario en Django Admin; la decision queda explicada en `MODELO_DATOS.md`.
-- Seis mantenedores aun requieren CRUD propio; los restantes tienen CRUD propio en Delegaciones y Catalogo.
-- Catalogo ya tiene CRUD propio en la rama `crud-catalogo`; quedan seis CRUD propios por implementar.
+- Delegaciones, Catalogo (rama `crud-catalogo`), Actividades y Evidencias tienen CRUD propio; quedan cuatro CRUD propios por implementar: Perfiles, Periodos, Compromisos y Metas.
 
 - El proyecto cuenta con ocho entradas en `MANTENEDORES`.
 - Las 11 entidades del modelo están registradas en Admin; la comprobación confirmó acceso de permisos CRUD para un superusuario.
