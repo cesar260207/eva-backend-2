@@ -61,12 +61,38 @@ La interfaz presenta exactamente ocho mantenedores, dos por integrante:
 Delegaciones, Perfiles, Catálogo, Períodos, Actividades, Evidencias,
 Compromisos y Metas. `MedicionDelegacion`, `HistorialCompromiso` y `Auditoria`
 son entidades adicionales administradas en Django Admin, no mantenedores
-visuales adicionales. Delegaciones y Catalogo cuentan con CRUD propio en la
-aplicacion; los seis mantenedores restantes aun enlazan las acciones con Admin.
+visuales adicionales. Delegaciones, Catalogo, Actividades y Evidencias cuentan
+con CRUD propio en la aplicacion; los cuatro mantenedores restantes aun enlazan
+las acciones con Admin.
 El Catalogo no tiene llaves foraneas desde otras entidades actualmente, por lo
 que su CRUD permite eliminar un item tras confirmacion. Si otros modelos pasan
 a referenciarlo, se debe cambiar esa accion por desactivacion para conservar el
 historial.
+
+Actividades usa su listado propio (`/actividades/`), que ya filtra por rol y
+delegación; la tarjeta del índice de mantenedores enlaza ahí para no duplicar
+pantallas. Solo quien registró la actividad o un perfil con visión completa
+(administrador o coordinador) puede modificarla o eliminarla, con estas reglas:
+
+- Una actividad `aprobada` no se modifica ni se elimina desde la aplicación,
+  para nadie. `MetaMedicion.avance_calculado` cuenta las actividades aprobadas
+  según delegación, fecha e ítem de medición; cambiar esos datos o borrar la
+  actividad alteraría en silencio un avance ya validado. Una corrección
+  excepcional la hace el superusuario en Django Admin, que guarda su historial.
+- Una actividad `rechazada` sí se puede editar, porque no suma al avance. Al
+  guardarla vuelve a `pendiente`, de modo que el verificador revise la
+  corrección antes de que cuente.
+- Eliminar una actividad borra también sus evidencias (`on_delete=CASCADE`); la
+  pantalla de confirmación indica cuántas se eliminarán.
+
+El mantenedor de Evidencias (`/administracion/evidencias/`) es una herramienta
+administrativa: no cambia el estado de la actividad asociada, así que tampoco
+altera el avance. La aprobación o el rechazo de la actividad completa sigue en
+el detalle de la actividad. El campo de revisión (`aprobada`) solo se ofrece a
+quien puede validar y, al cambiarlo, registra en `revisada_por` quién lo hizo;
+como el mantenedor está restringido a administración y coordinación, en la
+práctica siempre aparece. Django no borra del disco el archivo de una evidencia
+eliminada o reemplazada.
 
 ## Comandos para crear y revisar el esquema
 

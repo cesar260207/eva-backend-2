@@ -31,6 +31,9 @@ class ActividadForm(forms.ModelForm):
             self.fields['delegacion'].queryset = Delegacion.objects.filter(pk=perfil.delegacion_id, activa=True)
         else:
             self.fields['delegacion'].queryset = Delegacion.objects.filter(activa=True)
+        if self.instance.pk:
+            # Al editar se conserva la delegación actual aunque luego se haya desactivado.
+            self.fields['delegacion'].queryset |= Delegacion.objects.filter(pk=self.instance.delegacion_id)
 
     class Meta:
         model = Actividad
@@ -43,6 +46,33 @@ class EvidenciaForm(forms.ModelForm):
         model = Evidencia
         fields = ['archivo', 'comentario']
         widgets = {'comentario': forms.Textarea(attrs={'rows': 2})}
+
+
+class EvidenciaMantenedorForm(forms.ModelForm):
+    """Alta y edición desde el mantenedor de Evidencias. A diferencia de
+    EvidenciaForm, elige la actividad y ofrece la revisión solo a quien valida."""
+
+    def __init__(self, *args, puede_validar=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        if puede_validar:
+            self.fields['aprobada'].widget.choices = [('unknown', 'Pendiente de revisión'), ('true', 'Aprobada'), ('false', 'Rechazada')]
+        else:
+            del self.fields['aprobada']
+
+    class Meta:
+        model = Evidencia
+        fields = ['actividad', 'archivo', 'comentario', 'aprobada']
+        labels = {'aprobada': 'Revisión'}
+        help_texts = {
+            'archivo': 'Formatos permitidos: JPG, PNG o PDF.',
+            'aprobada': 'Al cambiar la revisión queda registrado quién la realizó.',
+        }
+        widgets = {
+            'actividad': forms.Select(attrs={'class': 'form-select'}),
+            'archivo': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+            'comentario': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'aprobada': forms.NullBooleanSelect(attrs={'class': 'form-select'}),
+        }
 
 
 class CompromisoForm(forms.ModelForm):

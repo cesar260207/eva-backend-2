@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from .forms import ActividadForm, CatalogoItemForm, CompromisoForm, DelegacionForm, EvidenciaForm
+from .forms import ActividadForm, CatalogoItemForm, CompromisoForm, DelegacionForm, EvidenciaForm, EvidenciaMantenedorForm
 from .models import (
     Actividad, Auditoria, CatalogoItem, Compromiso, Delegacion, Evidencia,
     HistorialCompromiso, MetaMedicion, PerfilUsuario, PeriodoMedicion,
@@ -66,6 +66,24 @@ def _actividades_autorizadas(user):
     if perfil and perfil.delegacion_id:
         return queryset.filter(delegacion=perfil.delegacion)
     return queryset.filter(funcionario=user)
+
+
+def _puede_validar(user):
+    perfil = _perfil(user)
+    return _puede_ver_todo(user) or bool(perfil and perfil.rol == 'verificador')
+
+
+def _bloqueo_actividad(user, actividad, puede_ver_todo):
+    """Motivo por el que `user` no puede modificar ni eliminar la actividad, o None.
+
+    Una actividad aprobada queda cerrada para todos: ya suma en
+    MetaMedicion.avance_calculado y cambiarla alteraría ese avance sin revisión.
+    """
+    if actividad.estado == 'aprobada':
+        return 'Actividad aprobada: ya suma al avance de las metas y no se modifica.'
+    if not (puede_ver_todo or actividad.funcionario_id == user.pk):
+        return 'Solo quien registró la actividad o la coordinación puede modificarla.'
+    return None
 
 
 def _codigo_actividad():
@@ -163,6 +181,10 @@ def actividades(request):
     registros = _actividades_autorizadas(request.user)
     if query:
         registros = registros.filter(Q(codigo__icontains=query) | Q(descripcion__icontains=query) | Q(item_medicion__icontains=query))
+    puede_ver_todo = _puede_ver_todo(request.user)
+    registros = list(registros)
+    for actividad in registros:
+        actividad.bloqueo = _bloqueo_actividad(request.user, actividad, puede_ver_todo)
     return render(request, 'delegaciones_app/actividades.html', {'actividades': registros, 'query': query, 'puede_crear': request.user.is_authenticated})
 
 
@@ -198,6 +220,63 @@ def revisar_actividad(request, codigo, decision):
     Auditoria.objects.create(usuario=request.user, accion=decision, entidad='Actividad', identificador=actividad.codigo)
     messages.success(request, f'Actividad {actividad.codigo}: {actividad.get_estado_display()}.')
     return redirect('actividad_detalle', codigo=codigo)
+
+
+@login_required
+def actividad_editar(request, codigo):
+    actividad = get_object_or_404(_actividades_autorizadas(request.user), codigo=codigo)
+    bloqueo = _bloqueo_actividad(request.user, actividad, _puede_ver_todo(request.user))
+    if bloqueo:
+        messages.error(request, bloqueo)
+        return redirect('actividad_detalle', codigo=codigo)
+    estado_anterior = actividad.estado
+    form = ActividadForm(request.POST or None, instance=actividad, user=request.user)
+    if request.method == 'POST' and form.is_valid():
+        actividad = form.save(commit=False)
+        if estado_anterior == 'rechazada':
+            # Corregir una actividad rechazada la devuelve a la cola de revisión.
+            actividad.estado = 'pendiente'
+        actividad.save()
+        Auditoria.objects.create(
+            usuario=request.user,
+            accion='editar',
+            entidad='Actividad',
+            identificador=actividad.codigo,
+            detalle={'campos': form.changed_data, 'estado_anterior': estado_anterior, 'estado': actividad.estado},
+        )
+        messages.success(request, f'Actividad {actividad.codigo} actualizada.')
+        return redirect('actividad_detalle', codigo=actividad.codigo)
+    return render(request, 'delegaciones_app/actividad_form.html', {
+        'form': form,
+        'titulo': f'Modificar actividad {actividad.codigo}',
+        'actividad': actividad,
+    })
+
+
+@login_required
+def actividad_eliminar(request, codigo):
+    actividad = get_object_or_404(_actividades_autorizadas(request.user), codigo=codigo)
+    bloqueo = _bloqueo_actividad(request.user, actividad, _puede_ver_todo(request.user))
+    if bloqueo:
+        messages.error(request, bloqueo)
+        return redirect('actividad_detalle', codigo=codigo)
+    # Evidencia usa on_delete=CASCADE: borrar la actividad borra también sus evidencias.
+    total_evidencias = actividad.evidencias.count()
+    if request.method == 'POST':
+        Auditoria.objects.create(
+            usuario=request.user,
+            accion='eliminar',
+            entidad='Actividad',
+            identificador=actividad.codigo,
+            detalle={'delegacion': actividad.delegacion.nombre, 'evidencias_eliminadas': total_evidencias},
+        )
+        actividad.delete()
+        messages.success(request, f'Actividad {codigo} eliminada junto con {total_evidencias} evidencia(s).')
+        return redirect('actividades')
+    return render(request, 'delegaciones_app/actividad_confirmar_eliminar.html', {
+        'actividad': actividad,
+        'total_evidencias': total_evidencias,
+    })
 
 
 @login_required
@@ -299,6 +378,75 @@ def catalogo_eliminar(request, pk):
         messages.success(request, f'Elemento de catalogo "{nombre}" eliminado.')
         return redirect('catalogo_lista')
     return render(request, 'delegaciones_app/catalogo_confirmar_eliminar.html', {
+        'objeto': objeto,
+    })
+
+
+@login_required
+def evidencia_lista(request):
+    if not _puede_ver_todo(request.user):
+        return redirect('inicio')
+    query = request.GET.get('q', '').strip()
+    registros = Evidencia.objects.select_related('actividad', 'revisada_por').order_by('-creada')
+    if query:
+        registros = registros.filter(
+            Q(actividad__codigo__icontains=query)
+            | Q(comentario__icontains=query)
+        )
+    return render(request, 'delegaciones_app/evidencia_lista.html', {
+        'registros': registros,
+        'query': query,
+    })
+
+
+@login_required
+def evidencia_form(request, pk=None):
+    if not _puede_ver_todo(request.user):
+        return redirect('inicio')
+    instancia = get_object_or_404(Evidencia, pk=pk) if pk else None
+    # Al editar sin subir un archivo nuevo, el FileField conserva el actual.
+    form = EvidenciaMantenedorForm(
+        request.POST or None, request.FILES or None,
+        instance=instancia, puede_validar=_puede_validar(request.user),
+    )
+    if request.method == 'POST' and form.is_valid():
+        objeto = form.save(commit=False)
+        if 'aprobada' in form.changed_data:
+            objeto.revisada_por = request.user if objeto.aprobada is not None else None
+        objeto.save()
+        Auditoria.objects.create(
+            usuario=request.user,
+            accion='editar' if instancia else 'crear',
+            entidad='Evidencia',
+            identificador=str(objeto.pk),
+            detalle={'actividad': objeto.actividad.codigo, 'archivo': objeto.archivo.name},
+        )
+        messages.success(request, f'Evidencia de la actividad {objeto.actividad.codigo} guardada.')
+        return redirect('evidencia_lista')
+    return render(request, 'delegaciones_app/evidencia_form.html', {
+        'form': form,
+        'titulo': 'Modificar evidencia' if instancia else 'Agregar evidencia',
+        'instancia': instancia,
+    })
+
+
+@login_required
+def evidencia_eliminar(request, pk):
+    if not _puede_ver_todo(request.user):
+        return redirect('inicio')
+    objeto = get_object_or_404(Evidencia.objects.select_related('actividad'), pk=pk)
+    if request.method == 'POST':
+        Auditoria.objects.create(
+            usuario=request.user,
+            accion='eliminar',
+            entidad='Evidencia',
+            identificador=str(objeto.pk),
+            detalle={'actividad': objeto.actividad.codigo, 'archivo': objeto.archivo.name},
+        )
+        objeto.delete()
+        messages.success(request, f'Evidencia de la actividad {objeto.actividad.codigo} eliminada.')
+        return redirect('evidencia_lista')
+    return render(request, 'delegaciones_app/evidencia_confirmar_eliminar.html', {
         'objeto': objeto,
     })
 

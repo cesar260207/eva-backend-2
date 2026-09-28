@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}Evidencias | SGR{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+    <div>
+        <div class="page-kicker">Administración · Evidencias</div>
+        <h1 class="page-title">Evidencias</h1>
+        <p class="page-intro mb-0">Archivos de respaldo asociados a las actividades territoriales.</p>
+    </div>
+    <a class="btn btn-sgr" href="{% url 'evidencia_nueva' %}">Agregar evidencia</a>
+</div>
+<div class="panel">
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-md-9"><input class="form-control" type="search" name="q" value="{{ query }}" placeholder="Buscar por código de actividad o comentario"></div>
+        <div class="col-md-3"><button class="btn btn-outline-sgr w-100" type="submit">Buscar</button></div>
+    </form>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Actividad</th><th>Archivo</th><th>Comentario</th><th>Revisión</th><th>Revisada por</th><th>Cargada</th><th>Acciones</th></tr></thead>
+            <tbody>
+            {% for evidencia in registros %}
+                <tr>
+                    <td><a href="{% url 'actividad_detalle' evidencia.actividad.codigo %}"><strong>{{ evidencia.actividad.codigo }}</strong></a></td>
+                    <td>{% if evidencia.archivo %}<a href="{{ evidencia.archivo.url }}" target="_blank" rel="noopener">{{ evidencia.archivo.name }}</a>{% else %}—{% endif %}</td>
+                    <td>{{ evidencia.comentario|default:'—'|truncatechars:70 }}</td>
+                    <td>{% if evidencia.aprobada %}<span class="badge badge-success-soft">Aprobada</span>{% elif evidencia.aprobada == False %}<span class="badge badge-danger-soft">Rechazada</span>{% else %}<span class="badge badge-warning-soft">Pendiente</span>{% endif %}</td>
+                    <td>{% if evidencia.revisada_por %}{{ evidencia.revisada_por.get_full_name|default:evidencia.revisada_por.username }}{% else %}—{% endif %}</td>
+                    <td>{{ evidencia.creada|date:'d-m-Y H:i' }}</td>
+                    <td class="d-flex flex-wrap gap-2">
+                        <a class="btn btn-sm btn-outline-sgr" href="{% url 'evidencia_editar' evidencia.pk %}">Modificar</a>
+                        <a class="btn btn-sm btn-outline-danger" href="{% url 'evidencia_eliminar' evidencia.pk %}">Eliminar</a>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7" class="text-center py-4">No hay evidencias para este criterio de búsqueda.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
