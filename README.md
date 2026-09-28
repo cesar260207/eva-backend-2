@@ -98,6 +98,11 @@ Abrir `http://127.0.0.1:8000/`. El panel de administracion esta en
 > `DB_ENGINE=sqlite` en tu `.env` para usar SQLite localmente. Para la entrega
 > (evidencia de phpMyAdmin) se necesita `DB_ENGINE=mysql`.
 
+Configura `DB_PORT` segun el puerto donde escucha tu servidor. En el equipo
+local actual MariaDB usa `3307`; MySQL/MariaDB con configuracion estandar,
+incluido el servidor EC2 del ejemplo, usa `3306`. Esta diferencia va en el
+`.env` individual y no se debe subir junto con contrasenas o claves.
+
 ## Cuentas demo
 
 Todas usan la clave `Demo2026!`:
