@@ -106,7 +106,10 @@ incluido el servidor EC2 del ejemplo, usa `3306`. Esta diferencia va en el
 
 ## Cuentas demo
 
-Todas usan la clave `Demo2026!`:
+Las cuentas se crean con la clave que se indique al cargar los datos
+(`python manage.py seed_demo --password TU_CLAVE`), con la variable de
+entorno `DEMO_PASSWORD`, o con una clave aleatoria que el comando muestra una
+sola vez si no se indica ninguna. No hay claves fijas en el repositorio.
 
 | Usuario | Rol | Ambito |
 |---|---|---|
