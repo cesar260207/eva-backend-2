@@ -1,6 +1,6 @@
 # Checklist de la entrega
 
-Este documento resume la pauta compartida por el equipo. El orden de trabajo acordado es completar y revisar el proyecto local primero; desplegar en EC2 queda para la etapa final.
+Este documento resume la pauta compartida por el equipo. El proyecto se completó y revisó en local y luego se desplegó en EC2 (ver la sección de despliegue del README.md).
 
 ## Requisito de equipo
 
@@ -40,17 +40,17 @@ Este documento resume la pauta compartida por el equipo. El orden de trabajo aco
 
 ## Evidencias para la revisión presencial
 
-- [ ] Django Admin: modelos, migraciones, registros y operaciones CRUD.
-- [ ] phpMyAdmin: todas las tablas, estructura, relaciones y registros.
-- [ ] GitHub: repositorio remoto, commits, remoto configurado y clonación.
-- [ ] EC2: conexión SSH, proyecto clonado, entorno virtual y aplicación ejecutándose.
+- [x] Django Admin: modelos, migraciones, registros y operaciones CRUD.
+- [x] phpMyAdmin: todas las tablas, estructura, relaciones y registros.
+- [x] GitHub: repositorio remoto, commits, remoto configurado y clonación.
+- [x] EC2: conexión SSH, proyecto clonado, entorno virtual y aplicación ejecutándose.
 - [ ] Capturas de AWS, terminal Linux, aplicación, GitHub, migraciones/modelos, tablas phpMyAdmin y uso de IA.
 
-## EC2 — dejar para el final
+## EC2 — desplegado
 
-- [ ] Crear/preparar instancia EC2 Linux con Python, venv, Django, Git, servidor web y base de datos compatible.
-- [ ] Clonar desde el repositorio GitHub, configurar variables de entorno, instalar dependencias, migrar y cargar datos.
-- [ ] Verificar aplicación y phpMyAdmin desde EC2.
+- [x] Crear/preparar instancia EC2 Linux con Python, venv, Django, Git, servidor web y base de datos compatible.
+- [x] Clonar desde el repositorio GitHub, configurar variables de entorno, instalar dependencias, migrar y cargar datos.
+- [x] Verificar aplicación y phpMyAdmin desde EC2.
 
 ## Notas del estado actual
 
@@ -59,10 +59,11 @@ Este documento resume la pauta compartida por el equipo. El orden de trabajo aco
 - WhiteNoise esta configurado para servir archivos estaticos con `DEBUG=False`; Gunicorn se instala solo en sistemas distintos de Windows.
 - Se conserva `fecha_ingreso` importada, Agenda permite buscar y Resumen consulta el historico de `MedicionDelegacion`.
 - `Auditoria` permite altas, cambios y eliminaciones solo al superusuario en Django Admin; la decision queda explicada en `MODELO_DATOS.md`.
-- Delegaciones, Catálogo, Perfiles, Períodos, Actividades y Evidencias tienen CRUD propio; quedan Compromisos y Metas por implementar.
+- Delegaciones, Catálogo, Perfiles, Períodos, Actividades, Evidencias, Compromisos y Metas tienen CRUD propio.
 
 - El proyecto cuenta con ocho entradas en `MANTENEDORES`.
 - Las 11 entidades del modelo están registradas en Admin; la comprobación confirmó acceso de permisos CRUD para un superusuario.
 - La base local provisional se migró y recibió los datos de demostración; las verificaciones de Django y consistencia de migraciones pasaron.
-- En XAMPP existe `gestion_laserena` con codificación `utf8mb4`, pero sigue sin tablas: MariaDB 10.4.32 no es compatible con Django 5.2 (requiere MariaDB 10.5+). Por ahora `.env` usa SQLite localmente. Para phpMyAdmin se deberá usar una base compatible en la etapa final.
+- Despliegue real en EC2: Amazon Linux 2023, MySQL 8.4 (no MariaDB), Gunicorn como servicio systemd, Nginx como proxy inverso y phpMyAdmin con PHP-FPM protegido con doble autenticación.
+- La base local con XAMPP/MariaDB 10.4 no era compatible con Django 5.2; por eso la base definitiva es MySQL 8.4 en la EC2.
 - XAMPP reportó un error de checksum de Aria al configurar privilegios de un usuario de aplicación local; `gestion_user` quedó sin privilegios sobre la base.
