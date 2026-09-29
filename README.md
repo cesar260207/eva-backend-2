@@ -144,92 +144,139 @@ python manage.py test
 
 ## Despliegue en AWS EC2
 
-Guia resumida para desplegar sobre una instancia EC2 con Ubuntu Server (Linux),
-usando Git para traer el codigo desde GitHub y Gunicorn como servidor WSGI.
+Guia del despliegue real: instancia EC2 con Amazon Linux 2023, MySQL 8.4,
+Gunicorn como servicio systemd, Nginx como proxy inverso y phpMyAdmin con
+PHP-FPM. El codigo se trae desde GitHub con Git.
 
-### 1. Conectarse a la instancia
+### 1. Instancia y red
+
+- Amazon Linux 2023, usuario `ec2-user`.
+- Grupo de seguridad con SSH (22) y HTTP (80). El puerto 3306 (MySQL) **no** se abre.
+- Elastic IP asociada, para que la IP publica no cambie al detener e iniciar la instancia.
 
 ```bash
-ssh -i tu-llave.pem ubuntu@<IP_PUBLICA_EC2>
+ssh -i tu-llave.pem ec2-user@<IP_PUBLICA_EC2>
 ```
 
-### 2. Instalar dependencias del sistema
+### 2. Dependencias del sistema
 
 ```bash
-sudo apt update
-sudo apt install -y python3-pip python3-venv git mysql-server \
-    libmysqlclient-dev pkg-config phpmyadmin
+sudo dnf install -y python3.14 python3.14-pip git nginx gcc pkgconf-pkg-config unzip
 ```
 
-(Durante la instalacion de `phpmyadmin`, selecciona `apache2` o configura tu
-propio servidor web segun lo que uses; sigue el asistente para conectar
-phpMyAdmin a MySQL.)
+MySQL 8.4 se instala desde el repositorio oficial de MySQL (no MariaDB), junto
+con `mysql-community-server` y `mysql-community-devel` (necesario para compilar
+`mysqlclient`).
 
-### 3. Clonar el proyecto desde GitHub
+### 3. Swap persistente (instancia con poca memoria)
 
 ```bash
-git clone <URL_DEL_REPOSITORIO>
+sudo fallocate -l 1G /swapfile && sudo chmod 600 /swapfile
+sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+### 4. Clonar el proyecto y preparar Python
+
+```bash
+cd /var/www
+sudo git clone https://github.com/cesar260207/eva-backend-2.git
 cd eva-backend-2
+python3.14 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt gunicorn
+pip install --no-cache-dir --no-binary mysqlclient mysqlclient
 ```
 
-### 4. Entorno virtual y dependencias Python
+`mysqlclient` se compila contra MySQL para evitar el error
+`libmariadb.so.3: cannot open shared object file`.
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+### 5. Base de datos y archivo `.env`
+
+```sql
+CREATE DATABASE gestion_laserena CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish_ci;
+CREATE USER 'gestion_user'@'localhost' IDENTIFIED BY '<CLAVE_SEGURA>';
+GRANT ALL PRIVILEGES ON gestion_laserena.* TO 'gestion_user'@'localhost';
 ```
 
-### 5. Configurar MySQL y el archivo `.env`
-
 ```bash
-sudo mysql -e "CREATE DATABASE gestion_laserena CHARACTER SET utf8mb4;"
-sudo mysql -e "CREATE USER 'gestion_user'@'localhost' IDENTIFIED BY 'tu-clave-segura';"
-sudo mysql -e "GRANT ALL PRIVILEGES ON gestion_laserena.* TO 'gestion_user'@'localhost'; FLUSH PRIVILEGES;"
-
 cp .env.example .env
-nano .env   # completar SECRET_KEY, DEBUG=False, ALLOWED_HOSTS=<IP_PUBLICA_EC2>, credenciales DB
+chmod 600 .env
+nano .env   # SECRET_KEY, DEBUG=False, ALLOWED_HOSTS=<IP_PUBLICA_EC2>, datos de la base
 ```
+
+El `.env` nunca se sube a Git.
 
 ### 6. Migraciones, datos demo y estaticos
 
 ```bash
 python manage.py migrate
-python manage.py seed_demo
-python manage.py createsuperuser   # opcional, cuenta propia ademas de admin.demo
+python manage.py seed_demo          # entrega o genera la clave demo una sola vez
 python manage.py collectstatic --noinput
 ```
 
-### 7. Ejecutar el servidor
+### 7. Gunicorn como servicio systemd
 
-Para la revision (rapido, sirve para demostrar el funcionamiento):
+Archivo `/etc/systemd/system/gunicorn.service`:
 
-```bash
-python manage.py runserver 0.0.0.0:8000
+```ini
+[Unit]
+Description=Gunicorn daemon para Django (gestion_laserena)
+After=network.target mysqld.service
+
+[Service]
+User=ec2-user
+Group=nginx
+WorkingDirectory=/var/www/eva-backend-2
+ExecStart=/var/www/eva-backend-2/venv/bin/gunicorn \
+          --access-logfile - \
+          --workers 3 \
+          --bind unix:/var/www/eva-backend-2/gunicorn.sock \
+          gestion_laserena.wsgi:application
+
+[Install]
+WantedBy=multi-user.target
 ```
 
-Abre el **Security Group** de la instancia para permitir trafico entrante en el
-puerto 8000 (o 80 si usas Gunicorn + Nginx). Verifica en el navegador:
-`http://<IP_PUBLICA_EC2>:8000/`.
-
-Para un despliegue mas cercano a produccion, sirve con Gunicorn:
+`Group=nginx` permite que Nginx lea el socket de Gunicorn.
 
 ```bash
-pip install gunicorn
-gunicorn gestion_laserena.wsgi:application --bind 0.0.0.0:8000
+sudo systemctl daemon-reload
+sudo systemctl enable --now gunicorn
 ```
 
-### 8. Evidencia a mostrar durante la revision
+### 8. Nginx como proxy inverso
 
-- Conexion SSH activa a la instancia EC2.
-- `git log --oneline` mostrando el historial de commits.
-- `git remote -v` mostrando el repositorio remoto configurado.
-- La aplicacion respondiendo en el navegador desde la IP publica de EC2.
-- `/admin/` con las entidades del modelo: crear, editar, eliminar, buscar y
-  navegar entre relaciones (por ejemplo, desde una `Actividad` a sus
-  `Evidencia`s).
-- phpMyAdmin mostrando las tablas generadas por las migraciones de Django y
-  sus registros.
+Archivo `/etc/nginx/conf.d/eva-backend-2.conf`: sirve `/static/` y `/media/`
+directamente, y pasa el resto al socket de Gunicorn.
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Se accede con `http://<IP_PUBLICA_EC2>/` (sin https).
+
+### 9. phpMyAdmin (PHP-FPM + Nginx)
+
+1. Instalar `php8.4-fpm` con los modulos `mysqlnd`, `mbstring`, `xml`, `gd`,
+   `intl` y `zip`, y activar el servicio (`systemctl enable --now php-fpm`).
+2. Descargar phpMyAdmin 5.2.3 (`all-languages.zip`) en `/usr/share/phpmyadmin`.
+3. Crear `config.inc.php` con `blowfish_secret` y `TempDir`, propiedad de
+   `apache` con permisos 640.
+4. Publicarlo en Nginx bajo `/phpmyadmin/` con `fastcgi_pass` al socket de PHP-FPM.
+5. **Seguridad:** doble puerta. Autenticacion basica de Nginx
+   (`auth_basic` con archivo `.htpasswd`) y despues el login de MySQL con
+   `gestion_user` (no `root`). El puerto 3306 permanece cerrado.
+
+### 10. Evidencia a mostrar durante la revision
+
+- Instancia EC2 en ejecucion, IP publica e IP elastica.
+- `git log --oneline`, `git remote -v` y `git status` limpio.
+- `systemctl status` de mysqld, gunicorn, nginx y php-fpm en verde; `nginx -t`.
+- La aplicacion respondiendo en el navegador desde la IP publica.
+- `/admin/` con las 11 entidades: crear, editar, eliminar, buscar y navegar
+  relaciones (por ejemplo, Compromiso con su Historial).
+- phpMyAdmin (`/phpmyadmin/`) mostrando tablas, estructura, relaciones y registros.
 
 ## Evidencia de uso de IA
 
