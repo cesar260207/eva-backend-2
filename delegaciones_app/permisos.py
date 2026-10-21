@@ -6,7 +6,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import redirect_to_login
 from django.shortcuts import redirect
 
-from .models import Funcionario, Rol, UsuarioMaestro
+from .models import Auditoria, Funcionario, Rol, UsuarioMaestro
 
 ADMINISTRADOR = 'administrador'
 COORDINADOR = 'coordinador'
@@ -52,6 +52,15 @@ def funcionario_de(user):
     return Funcionario.objects.select_related('delegacion', 'cargo').filter(usuario=user, estado=True).first()
 
 
+def registrar_acceso_denegado(request, entidad='Acceso', identificador=None, motivo='rol insuficiente'):
+    """CU-26.1: un intento de acceso sin autorización queda en la auditoría (solo si el usuario está identificado)."""
+    if request.user.is_authenticated:
+        Auditoria.registrar_evento(
+            request.user, 'acceso_denegado', entidad, identificador or request.path,
+            None, {'metodo': request.method, 'ruta': request.path, 'motivo': motivo},
+        )
+
+
 def rol_requerido(*roles):
     """Decorador para vistas de función: exige sesión iniciada y alguno de los roles."""
     def decorador(vista):
@@ -60,6 +69,7 @@ def rol_requerido(*roles):
             if not request.user.is_authenticated:
                 return redirect_to_login(request.get_full_path())
             if not tiene_rol(request.user, *roles):
+                registrar_acceso_denegado(request)
                 messages.error(request, MENSAJE_SIN_PERMISO, fail_silently=True)
                 return redirect('inicio')
             return vista(request, *args, **kwargs)
@@ -74,6 +84,7 @@ class RolRequeridoMixin(LoginRequiredMixin):
 
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated and not tiene_rol(request.user, *self.roles_permitidos):
+            registrar_acceso_denegado(request)
             messages.error(request, MENSAJE_SIN_PERMISO, fail_silently=True)
             return redirect('inicio')
         # Sin sesión, LoginRequiredMixin redirige al login.

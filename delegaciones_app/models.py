@@ -762,7 +762,22 @@ class HistorialCompromiso(models.Model):
 		return f'{self.compromiso.folio}: {self.estado_anterior or "inicio"} -> {self.estado_nuevo}'
 
 
+MENSAJE_AUDITORIA_SOLO_LECTURA = 'La auditoría es de solo lectura: sus registros no se modifican ni se eliminan (RNF-008).'
+
+
+class AuditoriaQuerySet(models.QuerySet):
+	"""Impide modificar o borrar auditoría en bloque: solo se agregan eventos."""
+
+	def update(self, **kwargs):
+		raise ValidationError(MENSAJE_AUDITORIA_SOLO_LECTURA)
+
+	def delete(self):
+		raise ValidationError(MENSAJE_AUDITORIA_SOLO_LECTURA)
+
+
 class Auditoria(models.Model):
+	objects = AuditoriaQuerySet.as_manager()
+
 	funcionario = models.ForeignKey(Funcionario, on_delete=models.PROTECT, null=True, blank=True, related_name='auditorias')
 	usuario_maestro = models.ForeignKey(UsuarioMaestro, on_delete=models.PROTECT, null=True, blank=True, related_name='auditorias')
 	evento = models.CharField(max_length=255)
@@ -777,6 +792,15 @@ class Auditoria(models.Model):
 
 	def __str__(self):
 		return f'{self.fecha:%Y-%m-%d %H:%M} - {self.evento} - {self.entidad} {self.identificador_registro}'
+
+	def save(self, *args, **kwargs):
+		# RNF-008: un evento ya registrado no se vuelve a guardar.
+		if not self._state.adding:
+			raise ValidationError(MENSAJE_AUDITORIA_SOLO_LECTURA)
+		super().save(*args, **kwargs)
+
+	def delete(self, *args, **kwargs):
+		raise ValidationError(MENSAJE_AUDITORIA_SOLO_LECTURA)
 
 	@staticmethod
 	def _como_texto(valor):

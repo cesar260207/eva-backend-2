@@ -1,5 +1,5 @@
-﻿from django.urls import path
-from . import crud, views
+from django.urls import path
+from . import auditoria, crud, views
 
 urlpatterns = [
     path('', views.index, name='inicio'),
@@ -19,6 +19,7 @@ urlpatterns = [
     # Mantenedores de las tablas maestras (ver crud.py).
     path('administracion/', crud.indice, name='mantenedores'),
     path('administracion/periodos/<int:pk>/estado/<str:accion>/', crud.PeriodoAccion.as_view(), name='periodo_accion'),
+    path('administracion/auditoria/', auditoria.AuditoriaConsulta.as_view(), name='auditoria_consulta'),
     path('administracion/<slug:slug>/', crud.MantenedorLista.as_view(), name='mantenedor_lista'),
     path('administracion/<slug:slug>/nuevo/', crud.MantenedorNuevo.as_view(), name='mantenedor_nuevo'),
     path('administracion/<slug:slug>/<int:pk>/editar/', crud.MantenedorEditar.as_view(), name='mantenedor_editar'),

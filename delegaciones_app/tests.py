@@ -1,3 +1,4 @@
+import json
 import shutil
 import tempfile
 from io import StringIO
@@ -1417,7 +1418,8 @@ class AdminTests(TestCase):
 			nombre = modelo.__name__
 			self.assertEqual(self.client.get(self._url(modelo, 'changelist')).status_code, 200, nombre)
 			self.assertEqual(self.client.get(self._url(modelo, 'changelist'), {'q': 'demo'}).status_code, 200, nombre)
-			self.assertEqual(self.client.get(self._url(modelo, 'add')).status_code, 200, nombre)
+			# La auditoría es de solo lectura: ni el superusuario puede agregar (CU-30.1).
+			self.assertEqual(self.client.get(self._url(modelo, 'add')).status_code, 403 if modelo is Auditoria else 200, nombre)
 			objeto = modelo.objects.first()
 			if objeto is not None:
 				self.assertEqual(self.client.get(self._url(modelo, 'change', objeto.pk)).status_code, 200, nombre)
@@ -1430,7 +1432,135 @@ class AdminTests(TestCase):
 		Periodo.objects.filter(pk=periodo.pk).update(estado='abierto')
 		self.assertEqual(self.client.get(self._url(Periodo, 'delete', periodo.pk)).status_code, 200)
 
-	def test_la_auditoria_solo_la_modifica_el_superusuario(self):
+	def test_un_usuario_staff_sin_permisos_no_agrega_auditoria(self):
 		empleado = User.objects.create_user('staff-sin-permisos', password=CLAVE_DEMO, is_staff=True)
 		self.client.force_login(empleado)
 		self.assertEqual(self.client.get(self._url(Auditoria, 'add')).status_code, 403)
+
+
+class AuditoriaTests(BaseOperacion):
+	"""Lote 1 (CU-30, CU-30.1, CU-26.1, RF-036, RNF-008): auditoría inmutable, accesos denegados y cambios del admin auditados."""
+
+	def _evento(self, evento, entidad=None):
+		eventos = Auditoria.objects.filter(evento=evento)
+		return eventos.filter(entidad=entidad) if entidad else eventos
+
+	def _superusuario(self):
+		cargar_demo()
+		self.assertTrue(self.client.login(username='admin.demo', password=CLAVE_DEMO))
+
+	def test_un_evento_registrado_no_se_modifica_ni_se_elimina(self):
+		evento = Auditoria.registrar_evento(self.coordinador, 'crear', 'Cargo', 1)
+		evento.evento = 'otro'
+		with self.assertRaises(ValidationError):
+			evento.save()
+		with self.assertRaises(ValidationError):
+			evento.delete()
+		with self.assertRaises(ValidationError):
+			Auditoria.objects.all().update(evento='otro')
+		with self.assertRaises(ValidationError):
+			Auditoria.objects.all().delete()
+		self.assertEqual(Auditoria.objects.get(pk=evento.pk).evento, 'crear')
+
+	def test_el_superusuario_no_puede_agregar_modificar_ni_eliminar_auditoria_y_el_intento_se_registra(self):
+		self._superusuario()
+		evento = Auditoria.registrar_evento(self.coordinador, 'crear', 'Cargo', 1)
+		self.assertEqual(self.client.get(reverse('admin:delegaciones_app_auditoria_add')).status_code, 403)
+		self.assertEqual(self.client.post(reverse('admin:delegaciones_app_auditoria_change', args=[evento.pk]), {'evento': 'otro'}).status_code, 403)
+		self.assertEqual(self.client.post(reverse('admin:delegaciones_app_auditoria_delete', args=[evento.pk]), {'post': 'yes'}).status_code, 403)
+		self.assertEqual(Auditoria.objects.get(pk=evento.pk).evento, 'crear')
+		acciones = [json.loads(e.valor_nuevo)['accion'] for e in self._evento('intento_alteracion', 'Auditoria').order_by('pk')]
+		self.assertEqual(acciones, ['agregar', 'modificar', 'eliminar'])
+		# Ver sigue permitido y no ofrece acciones de borrado masivo.
+		self.assertEqual(self.client.get(reverse('admin:delegaciones_app_auditoria_changelist')).status_code, 200)
+		self.assertEqual(self.client.get(reverse('admin:delegaciones_app_auditoria_change', args=[evento.pk])).status_code, 200)
+
+	def test_los_cambios_hechos_en_el_admin_quedan_auditados(self):
+		self._superusuario()
+		self.client.post(reverse('admin:delegaciones_app_cargo_add'), {'nombre': 'Cargo del admin', 'vigencia': 'on'})
+		cargo = Cargo.objects.get(nombre='Cargo del admin')
+		self.assertEqual(self._evento('admin_crear', 'Cargo').get().identificador_registro, str(cargo.pk))
+
+		self.client.post(reverse('admin:delegaciones_app_cargo_change', args=[cargo.pk]), {'nombre': 'Cargo renombrado', 'vigencia': 'on'})
+		edicion = self._evento('admin_editar', 'Cargo').get()
+		self.assertEqual((edicion.valor_anterior, edicion.valor_nuevo), ('{"nombre": "Cargo del admin"}', '{"nombre": "Cargo renombrado"}'))
+
+		self.client.post(reverse('admin:delegaciones_app_cargo_delete', args=[cargo.pk]), {'post': 'yes'})
+		self.assertFalse(Cargo.objects.filter(pk=cargo.pk).exists())
+		self.assertEqual(json.loads(self._evento('admin_eliminar', 'Cargo').get().valor_anterior), {'descripcion': 'Cargo renombrado'})
+
+	def test_el_cambio_de_un_parametro_desde_el_admin_queda_auditado(self):
+		self._superusuario()
+		parametro = ParametroVersionado.objects.get(clave='maximo_cumplimiento')
+		self.client.post(reverse('admin:delegaciones_app_parametroversionado_change', args=[parametro.pk]), {'periodo': parametro.periodo.pk, 'clave': 'maximo_cumplimiento', 'valor': '120', 'descripcion': parametro.descripcion})
+		self.assertEqual(ParametroVersionado.objects.get(pk=parametro.pk).valor, '120')
+		cambio = self._evento('admin_editar', 'ParametroVersionado').get()
+		self.assertEqual((cambio.valor_anterior, cambio.valor_nuevo), ('{"valor": "150"}', '{"valor": "120"}'))
+
+	def test_un_acceso_denegado_por_rol_queda_registrado(self):
+		self.client.force_login(self.funcionario)
+		self.client.get(reverse('mantenedor_lista', args=['catalogo']))
+		evento = self._evento('acceso_denegado', 'Acceso').get()
+		self.assertEqual(evento.funcionario, self.funcionario.funcionario)
+		self.assertEqual(json.loads(evento.valor_nuevo)['motivo'], 'rol insuficiente')
+
+	def test_sin_sesion_no_se_registra_acceso_denegado(self):
+		self.client.get(reverse('mantenedor_lista', args=['catalogo']))
+		self.assertFalse(self._evento('acceso_denegado').exists())
+
+	def test_consultar_un_registro_fuera_del_ambito_da_404_y_queda_registrado(self):
+		actividad = self._actividad()
+		self.client.force_login(crear_funcionario('intruso-aud', 'funcionario', cargo=self.cargo, delegacion=self.rural))
+		self.assertEqual(self.client.get(reverse('actividad_detalle', args=[actividad.codigo_verificador])).status_code, 404)
+		evento = self._evento('acceso_denegado', 'Actividad').get()
+		self.assertEqual((evento.identificador_registro, json.loads(evento.valor_nuevo)['motivo']), (actividad.codigo_verificador, 'fuera del ámbito'))
+
+	def test_un_codigo_inexistente_da_404_sin_registrar_acceso_denegado(self):
+		self.client.force_login(self.funcionario)
+		self.assertEqual(self.client.get(reverse('actividad_detalle', args=['EVD-NO-EXISTE'])).status_code, 404)
+		self.assertFalse(self._evento('acceso_denegado').exists())
+
+	def test_modificar_lo_de_otro_sin_ser_responsable_ni_autor_queda_registrado(self):
+		compromiso = self._compromiso()
+		actividad = self._actividad()
+		self.client.force_login(crear_funcionario('companero-aud', 'funcionario', cargo=self.cargo, delegacion=self.centro))
+		self.client.get(reverse('compromiso_editar', args=[compromiso.pk]))
+		self.client.get(reverse('actividad_editar', args=[actividad.codigo_verificador]))
+		motivos = sorted(json.loads(e.valor_nuevo)['motivo'] for e in self._evento('acceso_denegado'))
+		self.assertEqual(motivos, ['no es el autor', 'no es el responsable'])
+
+	def test_un_rechazo_por_regla_de_negocio_no_cuenta_como_acceso_denegado(self):
+		aprobada = self._actividad(estado='aprobada')
+		self.client.force_login(self.coordinador)
+		self.client.get(reverse('actividad_editar', args=[aprobada.codigo_verificador]))
+		self.assertFalse(self._evento('acceso_denegado').exists())
+
+	def test_la_consulta_de_auditoria_filtra_y_solo_la_ve_el_administrador(self):
+		administrador = crear_funcionario('admin-aud', 'administrador', cargo=self.cargo)
+		Auditoria.registrar_evento(self.coordinador, 'crear', 'Cargo', 'C-1', None, {'nombre': 'Uno'})
+		Auditoria.registrar_evento(self.coordinador, 'editar', 'Delegacion', 'D-1')
+		self.client.force_login(administrador)
+		url = reverse('auditoria_consulta')
+		respuesta = self.client.get(url)
+		self.assertContains(respuesta, 'Auditoría de cambios')
+		self.assertContains(respuesta, 'C-1')
+		self.assertContains(self.client.get(url, {'entidad': 'Cargo'}), 'C-1')
+		self.assertNotContains(self.client.get(url, {'entidad': 'Cargo'}), 'D-1')
+		self.assertNotContains(self.client.get(url, {'evento': 'editar'}), 'C-1')
+		self.assertContains(self.client.get(url, {'q': 'D-1'}), 'D-1')
+		hoy = timezone.localdate().isoformat()
+		self.assertContains(self.client.get(url, {'desde': hoy, 'hasta': hoy}), 'C-1')
+		self.assertNotContains(self.client.get(url, {'desde': '2999-01-01'}), 'C-1')
+		# Solo lectura: no hay formularios ni acciones de modificación.
+		self.assertNotContains(respuesta, 'Eliminar')
+		contenido = respuesta.content.decode().split('<main', 1)[1]
+		self.assertNotIn('method="post"', contenido)
+		self.client.force_login(self.coordinador)
+		self.assertRedirects(self.client.get(url), reverse('inicio'))
+		self.assertTrue(self._evento('acceso_denegado').exists())
+
+	def test_el_indice_de_mantenedores_enlaza_la_auditoria_solo_al_administrador(self):
+		self.client.force_login(self.coordinador)
+		self.assertNotContains(self.client.get(reverse('mantenedores')), reverse('auditoria_consulta'))
+		self.client.force_login(crear_funcionario('admin-aud2', 'administrador', cargo=self.cargo))
+		self.assertContains(self.client.get(reverse('mantenedores')), reverse('auditoria_consulta'))

@@ -3,7 +3,8 @@ from datetime import datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.http import Http404
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
@@ -11,7 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from .forms import ActividadForm, CompromisoForm, EvidenciaForm
 from .medicion import periodo_vigente, promedio_general, resultados_por_delegacion
 from .models import Actividad, Auditoria, Compromiso, Delegacion, Validacion
-from .permisos import ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICADOR, funcionario_de, puede_ver_todo, tiene_rol
+from .permisos import ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICADOR, funcionario_de, puede_ver_todo, registrar_acceso_denegado, tiene_rol
 
 # Decisión de la revisión -> método de Validacion que la aplica a cada evidencia pendiente.
 DECISIONES = {'aprobar': 'aprobar_evidencia', 'rechazar': 'rechazar_evidencia', 'corregir': 'solicitar_correccion'}
@@ -56,6 +57,20 @@ def _compromisos_autorizados(user):
     return compromisos
 
 
+def _obtener_autorizado(request, autorizados, entidad, **filtro):
+    """Registro que el usuario puede ver o 404. Si existe pero queda fuera de su ámbito, el intento
+    queda en la auditoría (CU-26.1)."""
+    try:
+        return autorizados.get(**filtro)
+    except ObjectDoesNotExist:
+        if autorizados.model.objects.filter(**filtro).exists():
+            registrar_acceso_denegado(request, entidad, str(next(iter(filtro.values()))), 'fuera del ámbito')
+        raise Http404(f'{entidad} no encontrada.') from None
+
+
+MENSAJE_SOLO_AUTOR = 'Solo quien registró la actividad o la coordinación puede modificarla.'
+
+
 def _bloqueo_actividad(funcionario, actividad, ve_todo):
     """Motivo por el que el funcionario no puede modificar ni eliminar la actividad, o None.
 
@@ -67,7 +82,7 @@ def _bloqueo_actividad(funcionario, actividad, ve_todo):
     if actividad.item_id and actividad.item.periodo.estado == 'cerrado':
         return 'El período de la actividad está cerrado: no se modifica.'
     if not (ve_todo or (funcionario and actividad.funcionario_autor_id == funcionario.pk)):
-        return 'Solo quien registró la actividad o la coordinación puede modificarla.'
+        return MENSAJE_SOLO_AUTOR
     return None
 
 
@@ -172,7 +187,7 @@ def actividades(request):
 @login_required
 def actividad_detalle(request, codigo):
     actividades = _actividades_autorizadas(request.user).prefetch_related('evidencias__validaciones__funcionario_verificador')
-    actividad = get_object_or_404(actividades, codigo_verificador=codigo)
+    actividad = _obtener_autorizado(request, actividades, 'Actividad', codigo_verificador=codigo)
     evidencia_form = EvidenciaForm(request.POST or None, request.FILES or None)
     if request.method == 'POST':
         if actividad.estado == 'aprobada':
@@ -201,11 +216,12 @@ def revisar_actividad(request, codigo, decision):
     if request.method != 'POST' or decision not in DECISIONES:
         return redirect('actividad_detalle', codigo=codigo)
     if not tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, VERIFICADOR):
+        registrar_acceso_denegado(request, 'Actividad', codigo)
         return redirect('actividad_detalle', codigo=codigo)
     verificador = _funcionario_requerido(request)
     if verificador is None:
         return redirect('actividad_detalle', codigo=codigo)
-    actividad = get_object_or_404(_actividades_autorizadas(request.user), codigo_verificador=codigo)
+    actividad = _obtener_autorizado(request, _actividades_autorizadas(request.user), 'Actividad', codigo_verificador=codigo)
     pendientes = list(actividad.evidencias.filter(estado_revision='pendiente'))
     if not pendientes:
         messages.error(request, 'La actividad no tiene evidencias pendientes de revisión.')
@@ -230,9 +246,11 @@ def revisar_actividad(request, codigo, decision):
 
 @login_required
 def actividad_editar(request, codigo):
-    actividad = get_object_or_404(_actividades_autorizadas(request.user), codigo_verificador=codigo)
+    actividad = _obtener_autorizado(request, _actividades_autorizadas(request.user), 'Actividad', codigo_verificador=codigo)
     bloqueo = _bloqueo_actividad(funcionario_de(request.user), actividad, puede_ver_todo(request.user))
     if bloqueo:
+        if bloqueo == MENSAJE_SOLO_AUTOR:
+            registrar_acceso_denegado(request, 'Actividad', codigo, 'no es el autor')
         messages.error(request, bloqueo)
         return redirect('actividad_detalle', codigo=codigo)
     estado_anterior = actividad.estado
@@ -266,9 +284,11 @@ def actividad_editar(request, codigo):
 
 @login_required
 def actividad_eliminar(request, codigo):
-    actividad = get_object_or_404(_actividades_autorizadas(request.user), codigo_verificador=codigo)
+    actividad = _obtener_autorizado(request, _actividades_autorizadas(request.user), 'Actividad', codigo_verificador=codigo)
     bloqueo = _bloqueo_actividad(funcionario_de(request.user), actividad, puede_ver_todo(request.user))
     if bloqueo:
+        if bloqueo == MENSAJE_SOLO_AUTOR:
+            registrar_acceso_denegado(request, 'Actividad', codigo, 'no es el autor')
         messages.error(request, bloqueo)
         return redirect('actividad_detalle', codigo=codigo)
     # Evidencia usa on_delete=CASCADE: borrar la actividad borra también sus evidencias.
@@ -291,6 +311,7 @@ def actividad_eliminar(request, codigo):
 @login_required
 def compromiso_nuevo(request):
     if not tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO):
+        registrar_acceso_denegado(request, 'Compromiso', None, 'rol insuficiente')
         return redirect('inicio')
     funcionario = _funcionario_requerido(request)
     if funcionario is None:
@@ -317,7 +338,7 @@ def compromiso_estado(request, pk, estado):
     funcionario = _funcionario_requerido(request)
     if funcionario is None:
         return redirect('agenda')
-    compromiso = get_object_or_404(_compromisos_autorizados(request.user), pk=pk)
+    compromiso = _obtener_autorizado(request, _compromisos_autorizados(request.user), 'Compromiso', pk=pk)
     anterior = compromiso.estado
     try:
         with transaction.atomic():
@@ -340,6 +361,7 @@ def _puede_editar_compromiso(user, funcionario, compromiso):
 def compromiso_editar(request, pk):
     compromiso = get_object_or_404(Compromiso, pk=pk)
     if not _puede_editar_compromiso(request.user, funcionario_de(request.user), compromiso):
+        registrar_acceso_denegado(request, 'Compromiso', compromiso.folio, 'no es el responsable')
         messages.error(request, 'No tienes permiso para modificar este compromiso.')
         return redirect('agenda')
     form = CompromisoForm(request.POST or None, instance=compromiso, user=request.user)
@@ -363,6 +385,7 @@ def compromiso_editar(request, pk):
 @login_required
 def compromiso_eliminar(request, pk):
     if not puede_ver_todo(request.user):
+        registrar_acceso_denegado(request, 'Compromiso', str(pk), 'rol insuficiente')
         messages.error(request, 'Solo administración o coordinación puede eliminar compromisos.')
         return redirect('agenda')
     compromiso = get_object_or_404(Compromiso, pk=pk)

@@ -8,7 +8,6 @@ import datetime
 from dataclasses import dataclass
 from typing import Callable, Optional
 
-from django import forms
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -19,6 +18,7 @@ from django.urls import reverse
 from django.views import View
 from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 
+from .auditoria import cambios_de_formulario
 from .forms import CargoForm, CatalogoForm, DelegacionForm, FuncionarioForm, ItemMedibleForm, MetaForm, PeriodoForm, RolForm
 from .models import Auditoria, Cargo, Catalogo, Delegacion, Funcionario, Indicador, ItemMedible, Meta, Periodo, Rol
 from .permisos import ADMINISTRADOR, COORDINADOR, ROLES_DEL_SISTEMA, RolRequeridoMixin, rol_requerido, tiene_rol
@@ -192,24 +192,6 @@ def _texto(objeto, acceso):
     return str(valor)
 
 
-def _plano(valor):
-    """Valor apto para guardar en la auditoría."""
-    if hasattr(valor, 'all'):
-        return [str(elemento) for elemento in valor.all()]
-    if valor is None or isinstance(valor, (bool, int, float, str)):
-        return valor
-    return str(valor)
-
-
-def _valor_inicial(form, campo):
-    """Valor del campo antes de editar; las claves foráneas se muestran con su nombre y no con su número."""
-    campo_form = form.fields[campo]
-    valor = form.get_initial_for_field(campo_form, campo)
-    if isinstance(campo_form, forms.ModelChoiceField) and not isinstance(campo_form, forms.ModelMultipleChoiceField) and valor is not None:
-        valor = campo_form.queryset.model.objects.filter(pk=valor).first()
-    return valor
-
-
 def _auditar(request, config, accion, objeto, anterior=None, nuevo=None):
     Auditoria.registrar_evento(request.user, accion, config.entidad, objeto.pk, anterior, nuevo)
 
@@ -300,9 +282,7 @@ class MantenedorFormularioMixin(MantenedorMixin):
 
     def form_valid(self, form):
         editando = form.instance.pk is not None
-        campos = [campo for campo in form.changed_data if campo not in getattr(form, 'campos_sin_auditar', ())]
-        anterior = {campo: _plano(_valor_inicial(form, campo)) for campo in campos} if editando else None
-        nuevo = {campo: _plano(form.cleaned_data.get(campo)) for campo in campos}
+        anterior, nuevo = cambios_de_formulario(form, getattr(form, 'campos_sin_auditar', ()))
         with transaction.atomic():
             respuesta = super().form_valid(form)
             _auditar(self.request, self.config, 'editar' if editando else 'crear', self.object, anterior, nuevo)
@@ -417,4 +397,4 @@ def indice(request):
         {'slug': m.slug, 'titulo': m.titulo, 'descripcion': m.descripcion, 'permitido': tiene_rol(request.user, *m.roles)}
         for m in MANTENEDORES.values()
     ]
-    return render(request, 'delegaciones_app/mantenedores.html', {'tarjetas': tarjetas})
+    return render(request, 'delegaciones_app/mantenedores.html', {'tarjetas': tarjetas, 'puede_auditar': tiene_rol(request.user, ADMINISTRADOR)})
