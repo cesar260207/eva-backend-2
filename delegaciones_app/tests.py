@@ -12,9 +12,11 @@ from django.db import IntegrityError, transaction
 
 from .forms import EvidenciaMantenedorForm
 from .models import (
-	Actividad, Auditoria, Cargo, CatalogoItem, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
-	HistorialCompromiso, MetaMedicion, PerfilUsuario, PeriodoMedicion, Rol, UsuarioMaestro,
+	Actividad, Auditoria, Cargo, Catalogo, CatalogoItem, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
+	HistorialCompromiso, Indicador, ItemMedible, Meta, MetaMedicion, ParametroVersionado, PerfilUsuario, Periodo,
+	PeriodoMedicion, Rol, UsuarioMaestro,
 )
+from decimal import Decimal
 
 
 class SGRMVPTests(TestCase):
@@ -505,3 +507,118 @@ class OrganizacionAccesoTests(TestCase):
 		self.assertEqual(evento.usuario_maestro, maestro)
 		self.assertIsNone(evento.funcionario)
 		self.assertEqual(evento.identificador_registro, '7')
+
+
+class MedicionTests(TestCase):
+	"""Etapa 2: reglas RN-001 a RN-008 y RN-013 (se amplían con sus CU en la Etapa 6)."""
+
+	def setUp(self):
+		self.centro = Delegacion.objects.create(nombre='Centro', territorio='Centro', enfasis='Atencion territorial')
+		self.cargo = Cargo.objects.create(nombre='Profesional territorial')
+		self.usuario = User.objects.create_user('func.medicion', password='clave-segura')
+		self.funcionario = Funcionario.objects.create(usuario=self.usuario, identificador_institucional='func.medicion', nombre='Funcionario Medicion', cargo=self.cargo, delegacion=self.centro)
+		self.periodo = Periodo.objects.create(nombre='Septiembre 2026', fecha_inicio=date(2026, 9, 1), fecha_termino=date(2026, 9, 30))
+
+	def _item(self, ponderacion, nombre='Atencion territorial'):
+		return ItemMedible.objects.create(cargo=self.cargo, periodo=self.periodo, nombre=nombre, ponderacion=ponderacion)
+
+	def _indicador(self, avance, ponderador=100):
+		meta = Meta.objects.create(item=self._item(100), funcionario=self.funcionario, valor_objetivo=10, ponderador=ponderador)
+		indicador = Indicador(meta=meta, periodo=self.periodo, avance=avance)
+		indicador.calcular_cumplimiento()
+		return indicador
+
+	def test_dias_computables_se_calculan_al_guardar(self):
+		self.assertEqual(self.periodo.dias_computables, 30)
+
+	def test_periodo_rechaza_termino_anterior(self):
+		with self.assertRaises(ValidationError):
+			Periodo(nombre='Invalido', fecha_inicio=date(2026, 9, 30), fecha_termino=date(2026, 9, 1)).full_clean()
+
+	def test_rn001_ponderaciones_del_cargo_no_superan_100(self):
+		self._item(60)
+		with self.assertRaises(ValidationError):
+			ItemMedible(cargo=self.cargo, periodo=self.periodo, nombre='Exceso', ponderacion=50).full_clean()
+		ItemMedible(cargo=self.cargo, periodo=self.periodo, nombre='Justo', ponderacion=40).full_clean()
+
+	def test_rn001_iniciar_periodo_exige_100_por_cargo(self):
+		item = self._item(60)
+		with self.assertRaises(ValidationError):
+			self.periodo.iniciar_periodo()
+		self.cargo.actualizar_ponderaciones(item, 100)
+		self.periodo.iniciar_periodo()
+		self.assertEqual(Periodo.objects.get(pk=self.periodo.pk).estado, 'abierto')
+
+	def test_rn013_periodo_cerrado_no_se_modifica(self):
+		item = self._item(100)
+		self.periodo.iniciar_periodo()
+		self.periodo.cerrar_periodo()
+		self.periodo.nombre = 'Cambio indebido'
+		with self.assertRaises(ValidationError):
+			self.periodo.save()
+		item.nombre = 'Cambio indebido'
+		with self.assertRaises(ValidationError):
+			item.save()
+		with self.assertRaises(ValidationError):
+			ParametroVersionado.objects.create(periodo=self.periodo, clave='maximo_cumplimiento', valor='120')
+
+	def test_rn013_reapertura_exige_motivo_y_queda_auditada(self):
+		self.periodo.iniciar_periodo()
+		self.periodo.cerrar_periodo()
+		with self.assertRaises(ValidationError):
+			self.periodo.reabrir_periodo('', self.usuario)
+		self.periodo.reabrir_periodo('Corrección de datos', self.usuario)
+		periodo = Periodo.objects.get(pk=self.periodo.pk)
+		self.assertEqual((periodo.estado, periodo.version_parametros), ('abierto', 2))
+		self.assertTrue(Auditoria.objects.filter(evento='reabrir_periodo', identificador_registro=str(periodo.pk), funcionario=self.funcionario).exists())
+
+	def test_rn007_porcentaje_esperado_y_dias_restantes(self):
+		self.assertEqual(self.periodo.porcentaje_esperado(date(2026, 9, 15)), Decimal('50.00'))
+		self.assertEqual(self.periodo.calcular_dias_restantes(date(2026, 9, 15)), 15)
+		self.assertEqual(self.periodo.porcentaje_esperado(date(2026, 8, 1)), Decimal('0.00'))
+		self.assertEqual(self.periodo.porcentaje_esperado(date(2026, 10, 15)), Decimal('100.00'))
+
+	def test_rn002_valor_objetivo_mayor_que_cero(self):
+		meta = Meta(item=self._item(100), funcionario=self.funcionario, valor_objetivo=0)
+		with self.assertRaises(ValidationError):
+			meta.full_clean()
+
+	def test_rn004_evaluar_progreso_y_actualizar_objetivo(self):
+		meta = Meta.objects.create(item=self._item(100), funcionario=self.funcionario, valor_objetivo=8)
+		self.assertEqual(meta.evaluar_progreso(2), Decimal('25.00'))
+		meta.actualizar_valor_objetivo(4)
+		self.assertEqual(Meta.objects.get(pk=meta.pk).valor_objetivo, 4)
+
+	def test_rn005_tope_por_defecto_150_y_ponderado(self):
+		indicador = self._indicador(avance=20, ponderador=50)
+		self.assertEqual(indicador.cumplimiento, Decimal('150'))
+		self.assertEqual(indicador.ponderacion, Decimal('75.00'))
+
+	def test_rn005_tope_configurable_por_parametro(self):
+		ParametroVersionado.objects.create(periodo=self.periodo, clave='maximo_cumplimiento', valor='120')
+		self.assertEqual(self._indicador(avance=20).cumplimiento, Decimal('120'))
+
+	def test_rn006_umbral_minimo_por_defecto_80(self):
+		self.assertTrue(self.periodo.alcanza_umbral(Decimal('80')))
+		self.assertFalse(self.periodo.alcanza_umbral(Decimal('79.99')))
+
+	def test_rn008_semaforo(self):
+		# El 15 de septiembre lo esperado es 50 %: ámbar desde 30 %.
+		casos = [(5, 'verde'), (3, 'ambar'), (2, 'rojo')]
+		for avance, color in casos:
+			Meta.objects.all().delete()
+			indicador = self._indicador(avance)
+			self.assertEqual(indicador.actualizar_semaforo(date(2026, 9, 15)), color, avance)
+
+	def test_cumplimiento_global_de_la_delegacion(self):
+		self._indicador(avance=10).save()
+		self.assertEqual(self.centro.obtener_cumplimiento_global(self.periodo), Decimal('100.00'))
+
+	def test_catalogo_codigo_unico_y_activacion(self):
+		elemento = Catalogo.objects.create(codigo='AT-OPER', nombre='Operativo en terreno', tipo='atencion')
+		elemento.desactivar()
+		self.assertFalse(Catalogo.objects.get(pk=elemento.pk).activo)
+		elemento.activar()
+		self.assertTrue(Catalogo.objects.get(pk=elemento.pk).activo)
+		with self.assertRaises(IntegrityError), transaction.atomic():
+			Catalogo.objects.create(codigo='AT-OPER', nombre='Duplicado', tipo='servicio')
