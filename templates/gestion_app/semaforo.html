@@ -6,16 +6,11 @@
 <div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-3">
     <div>
         <h2 class="mb-2">Semáforo de desempeño territorial</h2>
-        <p class="text-muted mb-0">Indicadores visuales de cumplimiento trimestral por delegación.</p>
+        <p class="text-muted mb-0">{% if periodo %}Período {{ periodo.nombre }}: verde si alcanza lo esperado al día ({{ esperado }} %), ámbar desde el 60 % de lo esperado y rojo bajo eso.{% else %}Indicadores visuales de cumplimiento por delegación.{% endif %}</p>
     </div>
-    <a href="#" class="btn btn-sgr">+ Agregar meta</a>
+    {% if puede_administrar %}<a href="{% url 'mantenedor_nuevo' 'metas' %}" class="btn btn-sgr">+ Agregar meta</a>{% endif %}
 </div>
-<div class="panel mb-4">
-    <form class="row g-2" method="get">
-        <div class="col-md-9"><input class="form-control" name="q" placeholder="Buscar delegación"></div>
-        <div class="col-md-3"><button class="btn btn-outline-sgr w-100" type="submit">Buscar</button></div>
-    </form>
-</div>
+{% include 'gestion_app/_filtros.html' %}
 
 <div class="row g-4">
     {% for delegacion in delegaciones %}
@@ -28,16 +23,16 @@
                 </div>
                 <div class="alert alert-{{ delegacion.estado_class }} mb-3">
                     Cumplimiento: {{ delegacion.cumplimiento }}%<br>
-                    Fecha de último registro: {{ delegacion.ultimos_datos }}
+                    {% if delegacion.diferencia != None %}Diferencia con lo esperado: {{ delegacion.diferencia }} puntos{% if delegacion.desviacion %} · <strong>desviación</strong>{% endif %}<br>{% endif %}
+                    Último cálculo: {{ delegacion.ultimos_datos|date:'d-m-Y'|default:'Sin cálculo' }}
                 </div>
-                <p class="small text-muted mb-3">Días transcurridos desde el último registro: {{ delegacion.dias_desde_registro }}</p>
-                <div class="d-flex gap-2">
-                    <a class="btn btn-sm btn-outline-sgr" href="#">Modificar</a>
-                    <a class="btn btn-sm btn-outline-danger" href="#">Eliminar</a>
-                </div>
+                {% if delegacion.dias_desde_registro != None %}<p class="small text-muted mb-3">Días transcurridos desde el último cálculo: {{ delegacion.dias_desde_registro }}</p>{% endif %}
+                {% if puede_administrar %}<a class="btn btn-sm btn-outline-sgr" href="{% url 'mantenedor_lista' 'metas' %}?q={{ delegacion.nombre|urlencode }}">Gestionar metas</a>{% endif %}
             </div>
         </div>
     </div>
+    {% empty %}
+    {% if periodo %}<div class="col-12"><div class="panel text-center py-4">No hay delegaciones con metas para este criterio de búsqueda.</div></div>{% endif %}
     {% endfor %}
 </div>
 {% endblock %}

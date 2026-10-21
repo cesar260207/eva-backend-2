@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block title %}Auditoría | SGR{% endblock %}
+{% block content %}
+<div class="mb-4">
+    <div class="page-kicker">Administración · <a href="{% url 'mantenedores' %}" class="text-reset">Mantenedores</a></div>
+    <h1 class="page-title">Auditoría de cambios</h1>
+    <p class="page-intro mb-0">Historial de operaciones críticas. Los registros son de solo lectura: no se pueden modificar ni eliminar (RNF-008).</p>
+</div>
+<div class="panel">
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-md-3"><input class="form-control" type="search" name="q" value="{{ filtros.q }}" placeholder="Buscar por identificador o usuario"></div>
+        <div class="col-md-2">
+            <select class="form-select" name="evento" aria-label="Evento">
+                <option value="">Todos los eventos</option>
+                {% for evento in eventos_disponibles %}<option value="{{ evento }}" {% if filtros.evento == evento %}selected{% endif %}>{{ evento }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" name="entidad" aria-label="Entidad">
+                <option value="">Todas las entidades</option>
+                {% for entidad in entidades_disponibles %}<option value="{{ entidad }}" {% if filtros.entidad == entidad %}selected{% endif %}>{{ entidad }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2"><input class="form-control" type="date" name="desde" value="{{ filtros.desde }}" aria-label="Desde"></div>
+        <div class="col-md-2"><input class="form-control" type="date" name="hasta" value="{{ filtros.hasta }}" aria-label="Hasta"></div>
+        <div class="col-md-1"><button class="btn btn-outline-sgr w-100" type="submit">Buscar</button></div>
+    </form>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Fecha</th><th>Usuario</th><th>Evento</th><th>Entidad</th><th>Identificador</th><th>Valor anterior</th><th>Valor nuevo</th></tr></thead>
+            <tbody>
+            {% for evento in eventos %}
+                <tr>
+                    <td class="text-nowrap">{{ evento.fecha|date:'d-m-Y H:i' }}</td>
+                    <td>{{ evento.funcionario|default:evento.usuario_maestro|default:'-' }}</td>
+                    <td>{{ evento.evento }}</td>
+                    <td>{{ evento.entidad }}</td>
+                    <td>{{ evento.identificador_registro }}</td>
+                    <td class="small">{{ evento.valor_anterior|default:'-'|truncatechars:60 }}</td>
+                    <td class="small">{{ evento.valor_nuevo|default:'-'|truncatechars:60 }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7" class="text-center py-4">No hay eventos para este criterio de búsqueda.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if page_obj.has_other_pages %}
+    <nav class="d-flex justify-content-between align-items-center" aria-label="Paginación">
+        <span class="small text-muted">Página {{ page_obj.number }} de {{ paginator.num_pages }} ({{ paginator.count }} eventos)</span>
+        <div class="d-flex gap-2">
+            {% if page_obj.has_previous %}<a class="btn btn-sm btn-outline-sgr" href="?{{ consulta_sin_pagina }}&page={{ page_obj.previous_page_number }}">Anterior</a>{% endif %}
+            {% if page_obj.has_next %}<a class="btn btn-sm btn-outline-sgr" href="?{{ consulta_sin_pagina }}&page={{ page_obj.next_page_number }}">Siguiente</a>{% endif %}
+        </div>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,97 +1,103 @@
-﻿import uuid
+import uuid
 from datetime import datetime
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.http import Http404
 from django.db import transaction
-from django.db.models import Avg, Count, Q
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.utils import timezone
 
-from .forms import (
-    ActividadForm, CatalogoItemForm, CompromisoForm, DelegacionForm,
-    EvidenciaForm, EvidenciaMantenedorForm, MetaMedicionForm, PerfilUsuarioForm, PeriodoMedicionForm,
-)
-from .models import (
-    Actividad, Auditoria, CatalogoItem, Compromiso, Delegacion, Evidencia,
-    HistorialCompromiso, MetaMedicion, PerfilUsuario, PeriodoMedicion,
-)
+from .forms import ActividadForm, CompromisoForm, EvidenciaForm
+from .informes import PLAZOS, filtrar_actividades, filtrar_compromisos, resumen_por_responsable, situacion_de_plazo
+from .medicion import periodo_vigente, promedio_general, resultados_por_delegacion
+from .models import Actividad, Auditoria, Compromiso, Delegacion, Periodo, Validacion
+from .permisos import ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICADOR, funcionario_de, puede_ver_todo, registrar_acceso_denegado, tiene_rol
 
-
-# Ocho mantenedores: dos por cada integrante de un equipo de cuatro personas.
-# El CRUD efectivo se administra desde Django Admin, tal como exige la pauta;
-# estas vistas entregan la navegación, búsqueda ORM y los controles visuales.
-MANTENEDORES = {
-    'delegaciones': {'titulo': 'Delegaciones', 'descripcion': 'Unidades territoriales y su estado operativo.', 'modelo': Delegacion, 'campos': ('nombre', 'territorio', 'enfasis', 'activa'), 'busqueda': ('nombre__icontains', 'territorio__icontains', 'enfasis__icontains')},
-    'perfiles': {'titulo': 'Perfiles de usuario', 'descripcion': 'Roles, cargos y ámbitos de acceso del sistema.', 'modelo': PerfilUsuario, 'campos': ('usuario', 'rol', 'delegacion', 'cargo'), 'busqueda': ('usuario__username__icontains', 'cargo__icontains', 'rol__icontains')},
-    'catalogo': {'titulo': 'Catálogo de ítems', 'descripcion': 'Actividades, servicios e ítems de medición normalizados.', 'modelo': CatalogoItem, 'campos': ('categoria', 'codigo', 'nombre', 'area', 'activo'), 'busqueda': ('codigo__icontains', 'nombre__icontains', 'area__icontains')},
-    'periodos': {'titulo': 'Períodos de medición', 'descripcion': 'Ventanas temporales y parámetros de evaluación.', 'modelo': PeriodoMedicion, 'campos': ('nombre', 'inicio', 'termino', 'estado'), 'busqueda': ('nombre__icontains', 'estado__icontains')},
-    'actividades': {'titulo': 'Actividades', 'descripcion': 'Registros territoriales ingresados por funcionarios.', 'modelo': Actividad, 'campos': ('codigo', 'delegacion', 'funcionario', 'fecha', 'estado'), 'busqueda': ('codigo__icontains', 'descripcion__icontains', 'item_medicion__icontains')},
-    'evidencias': {'titulo': 'Evidencias', 'descripcion': 'Archivos de respaldo asociados a actividades.', 'modelo': Evidencia, 'campos': ('actividad', 'archivo', 'aprobada', 'revisada_por', 'creada'), 'busqueda': ('actividad__codigo__icontains', 'comentario__icontains')},
-    'compromisos': {'titulo': 'Compromisos', 'descripcion': 'Acuerdos territoriales, responsables y plazos.', 'modelo': Compromiso, 'campos': ('folio', 'delegacion', 'responsable', 'eje', 'estado', 'fecha_comprometida'), 'busqueda': ('folio__icontains', 'descripcion__icontains', 'solicitante__icontains')},
-    'metas': {'titulo': 'Metas de medición', 'descripcion': 'Objetivos e indicadores de cumplimiento por delegación.', 'modelo': MetaMedicion, 'campos': ('delegacion', 'nombre', 'objetivo', 'avance', 'activa'), 'busqueda': ('nombre__icontains', 'delegacion__nombre__icontains')},
-}
+# Decisión de la revisión -> método de Validacion que la aplica a cada evidencia pendiente.
+DECISIONES = {'aprobar': 'aprobar_evidencia', 'rechazar': 'rechazar_evidencia', 'corregir': 'solicitar_correccion'}
 
 
-def _etiqueta_campo(campo):
-    return campo.replace('_', ' ').capitalize()
-
-
-def _valor_mantenedor(objeto, campo):
-    valor = getattr(objeto, campo)
-    if isinstance(valor, bool):
-        return 'Sí' if valor else 'No'
-    return str(valor) if valor is not None else '—'
-
-
-def _perfil(user):
-    if not user.is_authenticated:
-        return None
-    return PerfilUsuario.objects.select_related('delegacion').filter(usuario=user).first()
-
-
-def _puede_ver_todo(user):
-    perfil = _perfil(user)
-    return user.is_superuser or perfil and perfil.rol in {'administrador', 'coordinador'}
-
-
-def _puede_administrar_perfiles(user):
-    perfil = _perfil(user)
-    return user.is_superuser or (perfil and perfil.rol == 'administrador')
+def _funcionario_requerido(request):
+    """Funcionario del usuario con sesión; si no tiene, avisa. Quien registra o revisa necesita uno
+    porque queda como autor de la actividad o como verificador de la evidencia."""
+    funcionario = funcionario_de(request.user)
+    if funcionario is None:
+        messages.error(request, 'Tu cuenta no tiene un funcionario asociado. Pide a un administrador que lo cree.')
+    return funcionario
 
 
 def _actividades_autorizadas(user):
-    queryset = Actividad.objects.select_related('delegacion', 'funcionario')
-    if _puede_ver_todo(user):
-        return queryset
-    perfil = _perfil(user)
-    if perfil and perfil.delegacion_id:
-        return queryset.filter(delegacion=perfil.delegacion)
-    return queryset.filter(funcionario=user)
+    """Actividades que el usuario puede ver: todas si es administrador o coordinador; las de su
+    delegación si tiene una; todas si es verificador sin delegación; si no, solo las que registró."""
+    actividades = Actividad.objects.select_related('delegacion', 'funcionario_autor', 'item__periodo', 'catalogo').order_by('-fecha', '-creada')
+    if puede_ver_todo(user):
+        return actividades
+    funcionario = funcionario_de(user)
+    if funcionario is None:
+        return actividades.none()
+    if funcionario.delegacion_id:
+        return actividades.filter(delegacion_id=funcionario.delegacion_id)
+    if tiene_rol(user, VERIFICADOR):
+        return actividades
+    return actividades.filter(funcionario_autor=funcionario)
 
 
-def _puede_validar(user):
-    perfil = _perfil(user)
-    return _puede_ver_todo(user) or bool(perfil and perfil.rol == 'verificador')
+def _compromisos_autorizados(user):
+    """Compromisos que el usuario puede ver: todos si es administrador o coordinador;
+    solo los de su delegación si tiene una asignada (CU-29.1)."""
+    compromisos = Compromiso.objects.select_related('delegacion', 'funcionario_responsable')
+    if puede_ver_todo(user):
+        return compromisos
+    funcionario = funcionario_de(user)
+    if funcionario is None:
+        return compromisos.none()
+    if funcionario.delegacion_id:
+        return compromisos.filter(delegacion_id=funcionario.delegacion_id)
+    return compromisos
 
 
-def _bloqueo_actividad(user, actividad, puede_ver_todo):
-    """Motivo por el que `user` no puede modificar ni eliminar la actividad, o None.
+def _obtener_autorizado(request, autorizados, entidad, **filtro):
+    """Registro que el usuario puede ver o 404. Si existe pero queda fuera de su ámbito, el intento
+    queda en la auditoría (CU-26.1)."""
+    try:
+        return autorizados.get(**filtro)
+    except ObjectDoesNotExist:
+        if autorizados.model.objects.filter(**filtro).exists():
+            registrar_acceso_denegado(request, entidad, str(next(iter(filtro.values()))), 'fuera del ámbito')
+        raise Http404(f'{entidad} no encontrada.') from None
 
-    Una actividad aprobada queda cerrada para todos: ya suma en
-    MetaMedicion.avance_calculado y cambiarla alteraría ese avance sin revisión.
+
+def _recordar_filtros(request, lista):
+    """Guarda en la sesión los filtros con que se miró una lista, para volver a ella tal como estaba."""
+    request.session[f'filtros_{lista}'] = request.GET.urlencode()
+
+
+def _url_de_lista(request, lista):
+    """URL de la lista con los últimos filtros usados (la lista sin filtros si no hay)."""
+    filtros = request.session.get(f'filtros_{lista}', '')
+    return f'{reverse(lista)}?{filtros}' if filtros else reverse(lista)
+
+
+MENSAJE_SOLO_AUTOR = 'Solo quien registró la actividad o la coordinación puede modificarla.'
+
+
+def _bloqueo_actividad(funcionario, actividad, ve_todo):
+    """Motivo por el que el funcionario no puede modificar ni eliminar la actividad, o None.
+
+    Una actividad aprobada queda cerrada para todos: ya suma al avance de las metas y cambiarla
+    alteraría ese avance sin revisión. Tampoco se modifica si su período está cerrado (RN-013).
     """
     if actividad.estado == 'aprobada':
-        return 'Actividad aprobada: ya suma al avance de las metas y no se modifica.'
-    if not (puede_ver_todo or actividad.funcionario_id == user.pk):
-        return 'Solo quien registró la actividad o la coordinación puede modificarla.'
+        return 'Actividad aprobada: ya suma al avance de las metas y no se modifica. Para corregirla, un verificador debe anular su aprobación.'
+    if actividad.item_id and actividad.item.periodo.estado == 'cerrado':
+        return 'El período de la actividad está cerrado: no se modifica.'
+    if not (ve_todo or (funcionario and actividad.funcionario_autor_id == funcionario.pk)):
+        return MENSAJE_SOLO_AUTOR
     return None
-
-
-def _codigo_actividad():
-    return f'EVD-{datetime.now():%Y%m%d}-{uuid.uuid4().hex[:6].upper()}'
 
 
 def _calcular_estado_compromiso(compromiso):
@@ -103,6 +109,8 @@ def _calcular_estado_compromiso(compromiso):
         return 'En proceso', 'primary'
     if compromiso.vencido:
         return 'Alerta Roja por Vencimiento', 'danger'
+    if compromiso.proximo_a_vencer:
+        return 'Próximo a vencer', 'warning'
     return 'Pendiente', 'warning'
 
 
@@ -113,16 +121,12 @@ def _decorar_compromiso(compromiso):
 
 def index(request):
     ejes = [nombre for nombre, _ in Compromiso.EJES]
-    delegaciones = list(Delegacion.objects.filter(activa=True).values_list('nombre', flat=True))
+    delegaciones = list(Delegacion.objects.filter(estado=True).values_list('nombre', flat=True))
     compromisos = list(Compromiso.objects.select_related('delegacion'))
     for compromiso in compromisos:
         _decorar_compromiso(compromiso)
     alertas = sum(1 for item in compromisos if item.estado_display == 'Alerta Roja por Vencimiento')
-    promedio = MetaMedicion.objects.filter(activa=True).aggregate(promedio=Avg('avance'))['promedio']
-    metas_activas = list(MetaMedicion.objects.filter(activa=True))
-    cumplimiento_promedio = round(
-        sum(meta.cumplimiento for meta in metas_activas) / len(metas_activas), 1
-    ) if metas_activas else 0
+    cumplimiento_promedio = promedio_general(resultados_por_delegacion(periodo_vigente()))
     return render(request, 'delegaciones_app/index.html', {
         'ejes': ejes,
         'delegaciones': delegaciones,
@@ -132,9 +136,10 @@ def index(request):
     })
 
 
+@login_required
 def solicitudes(request):
     query = request.GET.get('q', '').strip()
-    compromisos = Compromiso.objects.select_related('delegacion')
+    compromisos = _compromisos_autorizados(request.user)
     if query:
         compromisos = compromisos.filter(Q(folio__icontains=query) | Q(descripcion__icontains=query) | Q(delegacion__nombre__icontains=query))
     compromisos = list(compromisos)
@@ -145,15 +150,16 @@ def solicitudes(request):
         'solicitudes': compromisos,
         'query': query,
         'total': len(compromisos),
-        'pendientes': sum(1 for item in compromisos if item.estado_display == 'Pendiente'),
+        'pendientes': sum(1 for item in compromisos if item.estado_display in ('Pendiente', 'Próximo a vencer')),
         'en_proceso': sum(1 for item in compromisos if item.estado_display == 'En proceso'),
         'alertas': sum(1 for item in compromisos if item.estado_display == 'Alerta Roja por Vencimiento'),
     }
     return render(request, 'delegaciones_app/solicitudes.html', contexto)
 
 
+@login_required
 def delegacion_detalle(request, nombre):
-    compromisos = list(Compromiso.objects.select_related('delegacion').filter(delegacion__nombre=nombre))
+    compromisos = list(_compromisos_autorizados(request.user).filter(delegacion__nombre=nombre))
     for compromiso in compromisos:
         _decorar_compromiso(compromiso)
 
@@ -163,120 +169,188 @@ def delegacion_detalle(request, nombre):
     })
 
 
+@login_required
 def actividad_nueva(request):
-    if not request.user.is_authenticated:
-        return redirect('login')
-    form = ActividadForm(request.POST or None, user=request.user)
+    funcionario = _funcionario_requerido(request)
+    if funcionario is None:
+        return redirect('inicio')
+    form = ActividadForm(request.POST or None, user=request.user, compromisos=_compromisos_autorizados(request.user))
     if request.method == 'POST' and form.is_valid():
-        actividad = form.save(commit=False)
-        actividad.funcionario = request.user
-        actividad.codigo = _codigo_actividad()
-        actividad.estado = 'pendiente'
-        actividad.save()
-        Auditoria.objects.create(usuario=request.user, accion='crear', entidad='Actividad', identificador=actividad.codigo)
-        messages.success(request, f'Actividad creada con código {actividad.codigo}.')
-        return redirect('actividad_detalle', actividad.codigo)
+        with transaction.atomic():
+            actividad = funcionario.registrar_actividad(form.cleaned_data)
+            Auditoria.registrar_evento(
+                request.user, 'crear', 'Actividad', actividad.codigo_verificador, None,
+                {'delegacion': actividad.delegacion.nombre, 'item': str(actividad.item)},
+            )
+        messages.success(request, f'Actividad creada con código {actividad.codigo_verificador}.')
+        return redirect('actividad_detalle', actividad.codigo_verificador)
     return render(request, 'delegaciones_app/actividad_form.html', {'form': form, 'titulo': 'Registrar actividad'})
 
 
 @login_required
 def actividades(request):
+    _recordar_filtros(request, 'actividades')
     query = request.GET.get('q', '').strip()
-    registros = _actividades_autorizadas(request.user)
-    if query:
-        registros = registros.filter(Q(codigo__icontains=query) | Q(descripcion__icontains=query) | Q(item_medicion__icontains=query))
-    puede_ver_todo = _puede_ver_todo(request.user)
+    registros = filtrar_actividades(_actividades_autorizadas(request.user), request.GET)
+    ve_todo, funcionario = puede_ver_todo(request.user), funcionario_de(request.user)
     registros = list(registros)
     for actividad in registros:
-        actividad.bloqueo = _bloqueo_actividad(request.user, actividad, puede_ver_todo)
-    return render(request, 'delegaciones_app/actividades.html', {'actividades': registros, 'query': query, 'puede_crear': request.user.is_authenticated})
+        actividad.bloqueo = _bloqueo_actividad(funcionario, actividad, ve_todo)
+    return render(request, 'delegaciones_app/actividades.html', {
+        'actividades': registros, 'query': query, 'puede_crear': request.user.is_authenticated,
+        'filtros': request.GET, 'filtrado': any(request.GET.get(clave) for clave in ('q', 'delegacion', 'estado', 'periodo', 'desde', 'hasta')),
+        'delegaciones_filtro': Delegacion.objects.filter(estado=True), 'periodos_filtro': Periodo.objects.order_by('-fecha_inicio'),
+        'estados_filtro': Actividad.ESTADOS,
+    })
 
 
 @login_required
 def actividad_detalle(request, codigo):
-    actividad = get_object_or_404(_actividades_autorizadas(request.user), codigo=codigo)
+    actividades = _actividades_autorizadas(request.user).prefetch_related('evidencias__validaciones__funcionario_verificador')
+    actividad = _obtener_autorizado(request, actividades, 'Actividad', codigo_verificador=codigo)
     evidencia_form = EvidenciaForm(request.POST or None, request.FILES or None)
-    if request.method == 'POST' and evidencia_form.is_valid():
-        evidencia = evidencia_form.save(commit=False)
-        evidencia.actividad = actividad
-        evidencia.save()
-        actividad.estado = 'pendiente'
-        actividad.save(update_fields=['estado', 'actualizada'])
-        Auditoria.objects.create(usuario=request.user, accion='cargar_evidencia', entidad='Actividad', identificador=actividad.codigo)
-        messages.success(request, 'Evidencia cargada y enviada a revisión.')
-        return redirect('actividad_detalle', codigo=codigo)
-    return render(request, 'delegaciones_app/actividad_detalle.html', {'actividad': actividad, 'evidencia_form': evidencia_form, 'puede_validar': _puede_ver_todo(request.user) or _perfil(request.user) and _perfil(request.user).rol == 'verificador'})
+    if request.method == 'POST':
+        if actividad.estado == 'aprobada':
+            messages.error(request, 'Actividad aprobada: ya no admite nuevas evidencias.')
+            return redirect('actividad_detalle', codigo=codigo)
+        funcionario = _funcionario_requerido(request)
+        if funcionario is None:
+            return redirect('actividad_detalle', codigo=codigo)
+        if evidencia_form.is_valid():
+            with transaction.atomic():
+                evidencia = funcionario.subir_evidencia(actividad, evidencia_form.cleaned_data['archivo_vinculo'], evidencia_form.cleaned_data['comentario'])
+                Auditoria.registrar_evento(request.user, 'cargar_evidencia', 'Actividad', actividad.codigo_verificador, None, {'evidencia': evidencia.codigo_evidencia})
+            messages.success(request, 'Evidencia cargada y enviada a revisión.')
+            return redirect('actividad_detalle', codigo=codigo)
+    return render(request, 'delegaciones_app/actividad_detalle.html', {
+        'actividad': actividad,
+        'evidencia_form': evidencia_form,
+        'url_lista': _url_de_lista(request, 'actividades'),
+        'puede_validar': tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, VERIFICADOR),
+        'puede_anular': tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, VERIFICADOR) and actividad.estado == 'aprobada' and actividad.item.periodo.estado != 'cerrado',
+        'hay_pendientes': any(evidencia.estado_revision == 'pendiente' for evidencia in actividad.evidencias.all()),
+    })
 
 
 @login_required
 def revisar_actividad(request, codigo, decision):
-    if request.method != 'POST' or decision not in {'aprobar', 'rechazar'}:
+    """Aprueba, rechaza o pide corrección: una Validacion por cada evidencia pendiente (RN-009)."""
+    if request.method != 'POST' or decision not in DECISIONES:
         return redirect('actividad_detalle', codigo=codigo)
-    if not (_puede_ver_todo(request.user) or _perfil(request.user) and _perfil(request.user).rol == 'verificador'):
+    if not tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, VERIFICADOR):
+        registrar_acceso_denegado(request, 'Actividad', codigo)
         return redirect('actividad_detalle', codigo=codigo)
-    actividad = get_object_or_404(Actividad, codigo=codigo)
-    actividad.estado = 'aprobada' if decision == 'aprobar' else 'rechazada'
-    actividad.save(update_fields=['estado', 'actualizada'])
-    for evidencia in actividad.evidencias.all():
-        evidencia.aprobada = decision == 'aprobar'
-        evidencia.revisada_por = request.user
-        evidencia.save(update_fields=['aprobada', 'revisada_por'])
-    Auditoria.objects.create(usuario=request.user, accion=decision, entidad='Actividad', identificador=actividad.codigo)
-    messages.success(request, f'Actividad {actividad.codigo}: {actividad.get_estado_display()}.')
+    verificador = _funcionario_requerido(request)
+    if verificador is None:
+        return redirect('actividad_detalle', codigo=codigo)
+    actividad = _obtener_autorizado(request, _actividades_autorizadas(request.user), 'Actividad', codigo_verificador=codigo)
+    pendientes = list(actividad.evidencias.filter(estado_revision='pendiente'))
+    if not pendientes:
+        messages.error(request, 'La actividad no tiene evidencias pendientes de revisión.')
+        return redirect('actividad_detalle', codigo=codigo)
+    observacion = request.POST.get('observacion', '').strip()
+    estado_anterior = actividad.estado
+    try:
+        with transaction.atomic():
+            for evidencia in pendientes:
+                getattr(Validacion(evidencia=evidencia, funcionario_verificador=verificador), DECISIONES[decision])(observacion)
+            actividad.actualizar_indicadores()
+            Auditoria.registrar_evento(
+                request.user, decision, 'Actividad', actividad.codigo_verificador,
+                {'estado': estado_anterior}, {'estado': actividad.estado, 'observacion': observacion},
+            )
+    except ValidationError as error:
+        messages.error(request, ' '.join(error.messages))
+        return redirect('actividad_detalle', codigo=codigo)
+    messages.success(request, f'Actividad {actividad.codigo_verificador}: {actividad.get_estado_display()}.')
+    return redirect('actividad_detalle', codigo=codigo)
+
+
+@login_required
+def anular_actividad(request, codigo):
+    """Anula la aprobación de una actividad con un motivo; recalcula los indicadores (CU-07.2)."""
+    if request.method != 'POST':
+        return redirect('actividad_detalle', codigo=codigo)
+    if not tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, VERIFICADOR):
+        registrar_acceso_denegado(request, 'Actividad', codigo)
+        return redirect('actividad_detalle', codigo=codigo)
+    verificador = _funcionario_requerido(request)
+    if verificador is None:
+        return redirect('actividad_detalle', codigo=codigo)
+    actividad = _obtener_autorizado(request, _actividades_autorizadas(request.user), 'Actividad', codigo_verificador=codigo)
+    motivo = request.POST.get('motivo', '').strip()
+    try:
+        with transaction.atomic():
+            actividad.anular_aprobacion(motivo, verificador)
+            Auditoria.registrar_evento(
+                request.user, 'anular_aprobacion', 'Actividad', actividad.codigo_verificador,
+                {'estado': 'aprobada'}, {'estado': actividad.estado, 'motivo': motivo},
+            )
+    except ValidationError as error:
+        messages.error(request, ' '.join(error.messages))
+    else:
+        messages.success(request, f'Se anuló la aprobación de {actividad.codigo_verificador}: ya no suma al avance.')
     return redirect('actividad_detalle', codigo=codigo)
 
 
 @login_required
 def actividad_editar(request, codigo):
-    actividad = get_object_or_404(_actividades_autorizadas(request.user), codigo=codigo)
-    bloqueo = _bloqueo_actividad(request.user, actividad, _puede_ver_todo(request.user))
+    actividad = _obtener_autorizado(request, _actividades_autorizadas(request.user), 'Actividad', codigo_verificador=codigo)
+    bloqueo = _bloqueo_actividad(funcionario_de(request.user), actividad, puede_ver_todo(request.user))
     if bloqueo:
+        if bloqueo == MENSAJE_SOLO_AUTOR:
+            registrar_acceso_denegado(request, 'Actividad', codigo, 'no es el autor')
         messages.error(request, bloqueo)
         return redirect('actividad_detalle', codigo=codigo)
     estado_anterior = actividad.estado
-    form = ActividadForm(request.POST or None, instance=actividad, user=request.user)
+    form = ActividadForm(request.POST or None, instance=actividad, user=request.user, compromisos=_compromisos_autorizados(request.user))
     if request.method == 'POST' and form.is_valid():
         actividad = form.save(commit=False)
-        if estado_anterior == 'rechazada':
-            # Corregir una actividad rechazada la devuelve a la cola de revisión.
+        # Corregir una actividad rechazada o con corrección solicitada la devuelve a la cola de revisión.
+        devuelta_a_revision = estado_anterior in {'rechazada', 'correccion'}
+        if devuelta_a_revision:
             actividad.estado = 'pendiente'
-        actividad.save()
-        Auditoria.objects.create(
-            usuario=request.user,
-            accion='editar',
-            entidad='Actividad',
-            identificador=actividad.codigo,
-            detalle={'campos': form.changed_data, 'estado_anterior': estado_anterior, 'estado': actividad.estado},
-        )
-        messages.success(request, f'Actividad {actividad.codigo} actualizada.')
-        return redirect('actividad_detalle', codigo=actividad.codigo)
+        try:
+            with transaction.atomic():
+                actividad.save()
+                if devuelta_a_revision:
+                    actividad.evidencias.exclude(estado_revision='aprobada').update(estado_revision='pendiente')
+                Auditoria.registrar_evento(
+                    request.user, 'editar', 'Actividad', actividad.codigo_verificador,
+                    {'estado': estado_anterior}, {'campos': form.changed_data, 'estado': actividad.estado},
+                )
+        except ValidationError as error:
+            form.add_error(None, error)
+        else:
+            messages.success(request, f'Actividad {actividad.codigo_verificador} actualizada.')
+            return redirect('actividad_detalle', codigo=actividad.codigo_verificador)
     return render(request, 'delegaciones_app/actividad_form.html', {
         'form': form,
-        'titulo': f'Modificar actividad {actividad.codigo}',
+        'titulo': f'Modificar actividad {actividad.codigo_verificador}',
         'actividad': actividad,
     })
 
 
 @login_required
 def actividad_eliminar(request, codigo):
-    actividad = get_object_or_404(_actividades_autorizadas(request.user), codigo=codigo)
-    bloqueo = _bloqueo_actividad(request.user, actividad, _puede_ver_todo(request.user))
+    actividad = _obtener_autorizado(request, _actividades_autorizadas(request.user), 'Actividad', codigo_verificador=codigo)
+    bloqueo = _bloqueo_actividad(funcionario_de(request.user), actividad, puede_ver_todo(request.user))
     if bloqueo:
+        if bloqueo == MENSAJE_SOLO_AUTOR:
+            registrar_acceso_denegado(request, 'Actividad', codigo, 'no es el autor')
         messages.error(request, bloqueo)
         return redirect('actividad_detalle', codigo=codigo)
     # Evidencia usa on_delete=CASCADE: borrar la actividad borra también sus evidencias.
     total_evidencias = actividad.evidencias.count()
     if request.method == 'POST':
-        Auditoria.objects.create(
-            usuario=request.user,
-            accion='eliminar',
-            entidad='Actividad',
-            identificador=actividad.codigo,
-            detalle={'delegacion': actividad.delegacion.nombre, 'evidencias_eliminadas': total_evidencias},
-        )
-        actividad.delete()
+        with transaction.atomic():
+            Auditoria.registrar_evento(
+                request.user, 'eliminar', 'Actividad', actividad.codigo_verificador,
+                {'delegacion': actividad.delegacion.nombre, 'evidencias_eliminadas': total_evidencias},
+            )
+            actividad.delete()
         messages.success(request, f'Actividad {codigo} eliminada junto con {total_evidencias} evidencia(s).')
-        return redirect('actividades')
+        return redirect(_url_de_lista(request, 'actividades'))
     return render(request, 'delegaciones_app/actividad_confirmar_eliminar.html', {
         'actividad': actividad,
         'total_evidencias': total_evidencias,
@@ -284,250 +358,23 @@ def actividad_eliminar(request, codigo):
 
 
 @login_required
-def delegaciones_crud(request):
-    if not _puede_ver_todo(request.user):
-        return redirect('inicio')
-    query = request.GET.get('q', '').strip()
-    delegaciones = Delegacion.objects.all()
-    if query:
-        delegaciones = delegaciones.filter(
-            Q(nombre__icontains=query)
-            | Q(territorio__icontains=query)
-            | Q(enfasis__icontains=query)
-        )
-    return render(request, 'delegaciones_app/delegaciones_crud.html', {
-        'delegaciones': delegaciones,
-        'query': query,
-    })
-
-
-@login_required
-def delegacion_cambiar_estado(request, pk):
-    if request.method != 'POST' or not _puede_ver_todo(request.user):
-        return redirect('delegaciones_crud')
-    delegacion = get_object_or_404(Delegacion, pk=pk)
-    delegacion.activa = not delegacion.activa
-    delegacion.save(update_fields=['activa'])
-    Auditoria.objects.create(
-        usuario=request.user,
-        accion='activar' if delegacion.activa else 'desactivar',
-        entidad='Delegacion',
-        identificador=str(delegacion.pk),
-    )
-    messages.success(
-        request,
-        f'Delegacion {delegacion.nombre}: {"activa" if delegacion.activa else "inactiva"}.',
-    )
-    return redirect('delegaciones_crud')
-
-
-@login_required
-def catalogo_lista(request):
-    if not _puede_ver_todo(request.user):
-        return redirect('inicio')
-    query = request.GET.get('q', '').strip()
-    registros = CatalogoItem.objects.all()
-    if query:
-        registros = registros.filter(
-            Q(codigo__icontains=query)
-            | Q(nombre__icontains=query)
-            | Q(area__icontains=query)
-            | Q(categoria__icontains=query)
-        )
-    return render(request, 'delegaciones_app/catalogo_lista.html', {
-        'registros': registros,
-        'query': query,
-    })
-
-
-@login_required
-def catalogo_form(request, pk=None):
-    if not _puede_ver_todo(request.user):
-        return redirect('inicio')
-    instancia = get_object_or_404(CatalogoItem, pk=pk) if pk else None
-    form = CatalogoItemForm(request.POST or None, instance=instancia)
-    if request.method == 'POST' and form.is_valid():
-        objeto = form.save()
-        Auditoria.objects.create(
-            usuario=request.user,
-            accion='editar' if instancia else 'crear',
-            entidad='CatalogoItem',
-            identificador=str(objeto.pk),
-            detalle={'codigo': objeto.codigo, 'nombre': objeto.nombre},
-        )
-        messages.success(request, f'Elemento de catalogo "{objeto.nombre}" guardado.')
-        return redirect('catalogo_lista')
-    return render(request, 'delegaciones_app/catalogo_form.html', {
-        'form': form,
-        'titulo': 'Modificar elemento' if instancia else 'Agregar elemento al catalogo',
-        'instancia': instancia,
-    })
-
-
-@login_required
-def catalogo_eliminar(request, pk):
-    if not _puede_ver_todo(request.user):
-        return redirect('inicio')
-    objeto = get_object_or_404(CatalogoItem, pk=pk)
-    if request.method == 'POST':
-        nombre, identificador = objeto.nombre, str(objeto.pk)
-        Auditoria.objects.create(
-            usuario=request.user,
-            accion='eliminar',
-            entidad='CatalogoItem',
-            identificador=identificador,
-            detalle={'codigo': objeto.codigo, 'nombre': nombre},
-        )
-        objeto.delete()
-        messages.success(request, f'Elemento de catalogo "{nombre}" eliminado.')
-        return redirect('catalogo_lista')
-    return render(request, 'delegaciones_app/catalogo_confirmar_eliminar.html', {
-        'objeto': objeto,
-    })
-
-
-@login_required
-def evidencia_lista(request):
-    if not _puede_ver_todo(request.user):
-        return redirect('inicio')
-    query = request.GET.get('q', '').strip()
-    registros = Evidencia.objects.select_related('actividad', 'revisada_por').order_by('-creada')
-    if query:
-        registros = registros.filter(
-            Q(actividad__codigo__icontains=query)
-            | Q(comentario__icontains=query)
-        )
-    return render(request, 'delegaciones_app/evidencia_lista.html', {
-        'registros': registros,
-        'query': query,
-    })
-
-
-@login_required
-def evidencia_form(request, pk=None):
-    if not _puede_ver_todo(request.user):
-        return redirect('inicio')
-    instancia = get_object_or_404(Evidencia, pk=pk) if pk else None
-    # Al editar sin subir un archivo nuevo, el FileField conserva el actual.
-    form = EvidenciaMantenedorForm(
-        request.POST or None, request.FILES or None,
-        instance=instancia, puede_validar=_puede_validar(request.user),
-    )
-    if request.method == 'POST' and form.is_valid():
-        objeto = form.save(commit=False)
-        if 'aprobada' in form.changed_data:
-            objeto.revisada_por = request.user if objeto.aprobada is not None else None
-        objeto.save()
-        Auditoria.objects.create(
-            usuario=request.user,
-            accion='editar' if instancia else 'crear',
-            entidad='Evidencia',
-            identificador=str(objeto.pk),
-            detalle={'actividad': objeto.actividad.codigo, 'archivo': objeto.archivo.name},
-        )
-        messages.success(request, f'Evidencia de la actividad {objeto.actividad.codigo} guardada.')
-        return redirect('evidencia_lista')
-    return render(request, 'delegaciones_app/evidencia_form.html', {
-        'form': form,
-        'titulo': 'Modificar evidencia' if instancia else 'Agregar evidencia',
-        'instancia': instancia,
-    })
-
-
-@login_required
-def evidencia_eliminar(request, pk):
-    if not _puede_ver_todo(request.user):
-        return redirect('inicio')
-    objeto = get_object_or_404(Evidencia.objects.select_related('actividad'), pk=pk)
-    if request.method == 'POST':
-        Auditoria.objects.create(
-            usuario=request.user,
-            accion='eliminar',
-            entidad='Evidencia',
-            identificador=str(objeto.pk),
-            detalle={'actividad': objeto.actividad.codigo, 'archivo': objeto.archivo.name},
-        )
-        objeto.delete()
-        messages.success(request, f'Evidencia de la actividad {objeto.actividad.codigo} eliminada.')
-        return redirect('evidencia_lista')
-    return render(request, 'delegaciones_app/evidencia_confirmar_eliminar.html', {
-        'objeto': objeto,
-    })
-
-
-@login_required
-def mantenedores(request):
-    """Índice de los ocho mantenedores requeridos para el equipo."""
-    if not _puede_ver_todo(request.user):
-        return redirect('inicio')
-    return render(request, 'delegaciones_app/mantenedores.html', {
-        'mantenedores': [dict(configuracion, slug=slug) for slug, configuracion in MANTENEDORES.items()],
-        'puede_administrar_perfiles': _puede_administrar_perfiles(request.user),
-    })
-
-
-@login_required
-def mantenedor_lista(request, slug):
-    if not _puede_ver_todo(request.user):
-        return redirect('inicio')
-    try:
-        configuracion = MANTENEDORES[slug]
-    except KeyError as error:
-        from django.http import Http404
-        raise Http404('Mantenedor no encontrado.') from error
-
-    query = request.GET.get('q', '').strip()
-    registros = configuracion['modelo'].objects.all()
-    if query:
-        filtros = Q()
-        for campo in configuracion['busqueda']:
-            filtros |= Q(**{campo: query})
-        registros = registros.filter(filtros)
-    registros = registros.select_related()
-    modelo = configuracion['modelo']
-    app_label, model_name = modelo._meta.app_label, modelo._meta.model_name
-    filas = [
-        {'pk': registro.pk, 'valores': [_valor_mantenedor(registro, campo) for campo in configuracion['campos']]}
-        for registro in registros
-    ]
-    return render(request, 'delegaciones_app/mantenedor_lista.html', {
-        'mantenedor': configuracion,
-        'query': query,
-        'columnas': [_etiqueta_campo(campo) for campo in configuracion['campos']],
-        'filas': filas,
-        'url_agregar': reverse(f'admin:{app_label}_{model_name}_add'),
-        'url_editar_base': f'/admin/{app_label}/{model_name}/',
-    })
-
-
-@login_required
-def delegacion_form(request, pk=None):
-    if not _puede_ver_todo(request.user):
-        return redirect('inicio')
-    delegacion = get_object_or_404(Delegacion, pk=pk) if pk else None
-    form = DelegacionForm(request.POST or None, instance=delegacion)
-    if request.method == 'POST' and form.is_valid():
-        objeto = form.save()
-        Auditoria.objects.create(usuario=request.user, accion='editar' if pk else 'crear', entidad='Delegacion', identificador=str(objeto.pk))
-        messages.success(request, 'Delegación guardada correctamente.')
-        return redirect('delegaciones_crud')
-    return render(request, 'delegaciones_app/delegacion_form.html', {'form': form, 'titulo': 'Editar delegación' if pk else 'Nueva delegación'})
-
-
-@login_required
 def compromiso_nuevo(request):
-    perfil = _perfil(request.user)
-    if not (_puede_ver_todo(request.user) or perfil and perfil.rol in {'delegado', 'funcionario'}):
+    if not tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO):
+        registrar_acceso_denegado(request, 'Compromiso', None, 'rol insuficiente')
+        return redirect('inicio')
+    funcionario = _funcionario_requerido(request)
+    if funcionario is None:
         return redirect('inicio')
     form = CompromisoForm(request.POST or None, user=request.user)
     if request.method == 'POST' and form.is_valid():
         compromiso = form.save(commit=False)
-        if perfil and perfil.rol in {'delegado', 'funcionario'}:
-            compromiso.responsable = request.user
+        if not puede_ver_todo(request.user):
+            compromiso.funcionario_responsable = funcionario
         compromiso.folio = f'AGR-{datetime.now():%Y%m%d}-{uuid.uuid4().hex[:5].upper()}'
-        compromiso.save()
-        HistorialCompromiso.objects.create(compromiso=compromiso, autor=request.user, estado_anterior='', estado_nuevo=compromiso.estado, observacion='Creación del compromiso')
-        Auditoria.objects.create(usuario=request.user, accion='crear', entidad='Compromiso', identificador=compromiso.folio)
+        with transaction.atomic():
+            compromiso.save()
+            compromiso.registrar_historial(funcionario, '', 'Creación del compromiso')
+            Auditoria.registrar_evento(request.user, 'crear', 'Compromiso', compromiso.folio, None, {'delegacion': compromiso.delegacion.nombre})
         messages.success(request, f'Compromiso creado con folio {compromiso.folio}.')
         return redirect('agenda')
     return render(request, 'delegaciones_app/compromiso_form.html', {'form': form, 'titulo': 'Nuevo compromiso'})
@@ -536,49 +383,49 @@ def compromiso_nuevo(request):
 @login_required
 def compromiso_estado(request, pk, estado):
     if request.method != 'POST' or estado not in {'ingresado', 'pendiente', 'proceso', 'realizado'}:
-        return redirect('agenda')
-    perfil = _perfil(request.user)
-    queryset = Compromiso.objects.all()
-    if perfil and perfil.delegacion_id and not _puede_ver_todo(request.user):
-        queryset = queryset.filter(delegacion=perfil.delegacion)
-    compromiso = get_object_or_404(queryset, pk=pk)
+        return redirect(_url_de_lista(request, 'agenda'))
+    funcionario = _funcionario_requerido(request)
+    if funcionario is None:
+        return redirect(_url_de_lista(request, 'agenda'))
+    compromiso = _obtener_autorizado(request, _compromisos_autorizados(request.user), 'Compromiso', pk=pk)
     anterior = compromiso.estado
-    compromiso.estado = estado
-    compromiso.save(update_fields=['estado'])
-    HistorialCompromiso.objects.create(compromiso=compromiso, autor=request.user, estado_anterior=anterior, estado_nuevo=estado)
-    Auditoria.objects.create(usuario=request.user, accion='cambio_estado', entidad='Compromiso', identificador=compromiso.folio, detalle={'anterior': anterior, 'nuevo': estado})
-    messages.success(request, f'El compromiso {compromiso.folio} cambió a {compromiso.get_estado_display()}.')
-    return redirect('agenda')
+    observacion = request.POST.get('observacion', '').strip()
+    try:
+        with transaction.atomic():
+            compromiso.set_estado(estado, funcionario, observacion or None)
+            nuevo = {'estado': estado, 'observacion': observacion} if observacion else estado
+            Auditoria.registrar_evento(request.user, 'cambio_estado', 'Compromiso', compromiso.folio, anterior, nuevo)
+    except ValidationError as error:
+        messages.error(request, ' '.join(error.messages))
+    else:
+        messages.success(request, f'El compromiso {compromiso.folio} cambió a {compromiso.get_estado_display()}.')
+    return redirect(_url_de_lista(request, 'agenda'))
 
 
-def _puede_editar_compromiso(user, compromiso):
-    perfil = _perfil(user)
-    if _puede_ver_todo(user):
+def _puede_editar_compromiso(user, funcionario, compromiso):
+    if puede_ver_todo(user):
         return True
-    return bool(perfil and perfil.rol in {'delegado', 'funcionario'} and compromiso.responsable_id == user.pk)
+    return bool(funcionario and tiene_rol(user, DELEGADO, FUNCIONARIO) and compromiso.funcionario_responsable_id == funcionario.pk)
 
 
 @login_required
 def compromiso_editar(request, pk):
     compromiso = get_object_or_404(Compromiso, pk=pk)
-    if not _puede_editar_compromiso(request.user, compromiso):
+    if not _puede_editar_compromiso(request.user, funcionario_de(request.user), compromiso):
+        registrar_acceso_denegado(request, 'Compromiso', compromiso.folio, 'no es el responsable')
         messages.error(request, 'No tienes permiso para modificar este compromiso.')
-        return redirect('agenda')
-    estado_anterior = compromiso.estado
+        return redirect(_url_de_lista(request, 'agenda'))
     form = CompromisoForm(request.POST or None, instance=compromiso, user=request.user)
     if request.method == 'POST' and form.is_valid():
-        compromiso = form.save()
-        if compromiso.estado != estado_anterior:
-            HistorialCompromiso.objects.create(
-                compromiso=compromiso, autor=request.user,
-                estado_anterior=estado_anterior, estado_nuevo=compromiso.estado,
-            )
-        Auditoria.objects.create(
-            usuario=request.user, accion='editar', entidad='Compromiso',
-            identificador=compromiso.folio, detalle={'campos': form.changed_data},
-        )
-        messages.success(request, f'Compromiso {compromiso.folio} actualizado.')
-        return redirect('agenda')
+        try:
+            with transaction.atomic():
+                compromiso = form.save()
+                Auditoria.registrar_evento(request.user, 'editar', 'Compromiso', compromiso.folio, None, {'campos': form.changed_data})
+        except ValidationError as error:
+            form.add_error(None, error)
+        else:
+            messages.success(request, f'Compromiso {compromiso.folio} actualizado.')
+            return redirect(_url_de_lista(request, 'agenda'))
     return render(request, 'delegaciones_app/compromiso_form.html', {
         'form': form,
         'titulo': f'Modificar compromiso {compromiso.folio}',
@@ -587,116 +434,53 @@ def compromiso_editar(request, pk):
 
 
 @login_required
-@login_required
 def compromiso_eliminar(request, pk):
-    if not _puede_ver_todo(request.user):
+    if not puede_ver_todo(request.user):
+        registrar_acceso_denegado(request, 'Compromiso', str(pk), 'rol insuficiente')
         messages.error(request, 'Solo administración o coordinación puede eliminar compromisos.')
         return redirect('agenda')
     compromiso = get_object_or_404(Compromiso, pk=pk)
+    motivo = compromiso.motivo_no_eliminable()
     if request.method == 'POST':
         folio = compromiso.folio
-        Auditoria.objects.create(
-            usuario=request.user, accion='eliminar', entidad='Compromiso',
-            identificador=folio, detalle={'delegacion': compromiso.delegacion.nombre},
-        )
-        compromiso.delete()
-        messages.success(request, f'Compromiso {folio} eliminado.')
-        return redirect('agenda')
+        try:
+            with transaction.atomic():
+                compromiso.delete()
+                Auditoria.registrar_evento(request.user, 'eliminar', 'Compromiso', folio, {'delegacion': compromiso.delegacion.nombre})
+        except ValidationError as error:
+            messages.error(request, ' '.join(error.messages))
+        else:
+            messages.success(request, f'Compromiso {folio} eliminado.')
+        return redirect(_url_de_lista(request, 'agenda'))
     return render(request, 'delegaciones_app/compromiso_confirmar_eliminar.html', {
         'compromiso': compromiso,
+        'bloqueo': motivo,
     })
 
 
 @login_required
-def meta_lista(request):
-    if not _puede_ver_todo(request.user):
-        return redirect('inicio')
-    query = request.GET.get('q', '').strip()
-    registros = MetaMedicion.objects.select_related('delegacion').order_by('delegacion__nombre', 'nombre')
-    if query:
-        registros = registros.filter(
-            Q(nombre__icontains=query)
-            | Q(delegacion__nombre__icontains=query)
-        )
-    return render(request, 'delegaciones_app/meta_lista.html', {
-        'registros': registros,
-        'query': query,
-    })
-
-
-@login_required
-def meta_form(request, pk=None):
-    if not _puede_ver_todo(request.user):
-        return redirect('inicio')
-    instancia = get_object_or_404(MetaMedicion, pk=pk) if pk else None
-    form = MetaMedicionForm(request.POST or None, instance=instancia)
-    if request.method == 'POST' and form.is_valid():
-        meta = form.save()
-        Auditoria.objects.create(
-            usuario=request.user,
-            accion='editar' if instancia else 'crear',
-            entidad='MetaMedicion',
-            identificador=str(meta.pk),
-            detalle={'nombre': meta.nombre, 'delegacion': meta.delegacion.nombre, 'campos': form.changed_data},
-        )
-        messages.success(request, f'Meta "{meta.nombre}" guardada correctamente.')
-        return redirect('metas_lista')
-    return render(request, 'delegaciones_app/meta_form.html', {
-        'form': form,
-        'titulo': 'Modificar meta' if instancia else 'Agregar meta',
-        'instancia': instancia,
-    })
-
-
-@login_required
-def meta_eliminar(request, pk):
-    if not _puede_ver_todo(request.user):
-        return redirect('inicio')
-    meta = get_object_or_404(MetaMedicion.objects.select_related('delegacion'), pk=pk)
-    if request.method == 'POST':
-        nombre, identificador = meta.nombre, str(meta.pk)
-        Auditoria.objects.create(
-            usuario=request.user, accion='eliminar', entidad='MetaMedicion',
-            identificador=identificador, detalle={'nombre': nombre, 'delegacion': meta.delegacion.nombre},
-        )
-        meta.delete()
-        messages.success(request, f'Meta "{nombre}" eliminada.')
-        return redirect('metas_lista')
-    return render(request, 'delegaciones_app/meta_confirmar_eliminar.html', {
-        'objeto': meta,
-    })
-
-
 def agenda(request):
-    perfil = _perfil(request.user) if request.user.is_authenticated else None
-    compromisos = Compromiso.objects.select_related('delegacion', 'responsable').all()
-    if perfil and perfil.delegacion_id and not _puede_ver_todo(request.user):
-        compromisos = compromisos.filter(delegacion=perfil.delegacion)
+    _recordar_filtros(request, 'agenda')
     delegacion_id = request.GET.get('delegacion')
     estado = request.GET.get('estado')
     query = request.GET.get('q', '').strip()
-    if delegacion_id:
-        compromisos = compromisos.filter(delegacion_id=delegacion_id)
-    if estado:
-        compromisos = compromisos.filter(estado=estado)
-    if query:
-        compromisos = compromisos.filter(
-            Q(folio__icontains=query)
-            | Q(descripcion__icontains=query)
-            | Q(solicitante__icontains=query)
-            | Q(delegacion__nombre__icontains=query)
-        )
-    compromisos = list(compromisos)
+    compromisos = list(filtrar_compromisos(_compromisos_autorizados(request.user), request.GET))
     for compromiso in compromisos:
-        compromiso.estado_display = 'Vencido' if compromiso.vencido else compromiso.get_estado_display()
-        compromiso.estado_class = 'danger' if compromiso.vencido else ('success' if compromiso.estado == 'realizado' else 'warning')
+        compromiso.estado_display, compromiso.estado_class = situacion_de_plazo(compromiso)
+    resumen_responsables, resumen_total = resumen_por_responsable(compromisos)
     return render(request, 'delegaciones_app/agenda.html', {
         'compromisos': compromisos,
-        'delegaciones_filtro': Delegacion.objects.filter(activa=True),
+        'delegaciones_filtro': Delegacion.objects.filter(estado=True),
         'estado_filtro': estado or '',
         'delegacion_filtro': delegacion_id or '',
+        'filtros': request.GET,
+        'resumen_responsables': resumen_responsables,
+        'resumen_total': resumen_total,
+        'plazos_filtro': PLAZOS,
         'query': query,
         'proximos': sum(1 for item in compromisos if item.estado != 'realizado' and not item.vencido),
+        'por_vencer': sum(1 for item in compromisos if item.proximo_a_vencer),
+        'dias_alerta': settings.COMPROMISO_DIAS_ALERTA,
         'vencidos': sum(1 for item in compromisos if item.vencido),
         'realizados': sum(1 for item in compromisos if item.estado == 'realizado'),
     })
@@ -716,204 +500,4 @@ def institucional(request):
         'poblacion': '250.141',
         'urbano': '89,14 %',
         'rural': '10,86 %',
-    })
-
-
-@login_required
-def perfiles_usuario(request):
-    if not _puede_administrar_perfiles(request.user):
-        return redirect('inicio')
-
-    query = request.GET.get('q', '').strip()
-    perfiles = PerfilUsuario.objects.select_related('usuario', 'delegacion').order_by('usuario__username')
-
-    if query:
-        perfiles = perfiles.filter(
-            Q(usuario__username__icontains=query)
-            | Q(usuario__first_name__icontains=query)
-            | Q(usuario__last_name__icontains=query)
-            | Q(usuario__email__icontains=query)
-            | Q(rol__icontains=query)
-            | Q(delegacion__nombre__icontains=query)
-            | Q(cargo__icontains=query)
-        )
-
-    conteos_por_rol = {
-        fila['rol']: fila['total']
-        for fila in PerfilUsuario.objects.values('rol').annotate(total=Count('pk'))
-    }
-    resumen_roles = [
-        {'nombre': etiqueta, 'total': conteos_por_rol.get(codigo, 0)}
-        for codigo, etiqueta in PerfilUsuario.ROLES
-    ]
-
-    return render(request, 'delegaciones_app/perfiles_usuario.html', {
-        'perfiles': perfiles,
-        'query': query,
-        'total_perfiles': perfiles.count(),
-        'resumen_roles': resumen_roles,
-    })
-
-
-@login_required
-def perfil_usuario_form(request, pk=None):
-    if not _puede_administrar_perfiles(request.user):
-        return redirect('inicio')
-    instancia = get_object_or_404(PerfilUsuario.objects.select_related('usuario'), pk=pk) if pk else None
-    form = PerfilUsuarioForm(request.POST or None, instance=instancia)
-    if request.method == 'POST' and form.is_valid():
-        cambia_su_acceso = (
-            instancia
-            and instancia.usuario_id == request.user.pk
-            and (form.cleaned_data['rol'] != instancia.rol or not form.cleaned_data['usuario_activo'])
-        )
-        if cambia_su_acceso:
-            form.add_error(None, 'No puedes quitarte el rol administrador ni desactivar tu propia cuenta.')
-        else:
-            perfil = form.save()
-            Auditoria.objects.create(
-                usuario=request.user,
-                accion='editar' if instancia else 'crear',
-                entidad='PerfilUsuario',
-                identificador=str(perfil.pk),
-                detalle={
-                    'username': perfil.usuario.username,
-                    'rol': perfil.rol,
-                    'delegacion': perfil.delegacion.nombre if perfil.delegacion else None,
-                    'campos': form.changed_data,
-                },
-            )
-            messages.success(request, f'Perfil de {perfil.usuario.username} guardado correctamente.')
-            return redirect('perfiles_usuario')
-    return render(request, 'delegaciones_app/mantenedor_form.html', {
-        'form': form,
-        'titulo': 'Modificar perfil de usuario' if instancia else 'Agregar perfil de usuario',
-        'volver_url': reverse('perfiles_usuario'),
-        'ayuda': 'Al crear un perfil también se crea la cuenta de acceso. Al editar, deja la contraseña vacía para conservarla.',
-    })
-
-
-@login_required
-def perfil_usuario_eliminar(request, pk):
-    if not _puede_administrar_perfiles(request.user):
-        return redirect('inicio')
-    perfil = get_object_or_404(PerfilUsuario.objects.select_related('usuario', 'delegacion'), pk=pk)
-    if perfil.usuario_id == request.user.pk:
-        messages.error(request, 'No puedes eliminar tu propio perfil desde esta pantalla.')
-        return redirect('perfiles_usuario')
-    if request.method == 'POST':
-        usuario = perfil.usuario
-        identificador = str(perfil.pk)
-        detalle = {
-            'username': usuario.username,
-            'rol': perfil.rol,
-            'delegacion': perfil.delegacion.nombre if perfil.delegacion else None,
-            'cuenta_desactivada': True,
-        }
-        # Se conserva la cuenta para no romper actividades, compromisos ni auditorías
-        # que la referencian; al quitar su perfil y desactivarla ya no puede acceder.
-        with transaction.atomic():
-            usuario.is_active = False
-            usuario.save(update_fields=['is_active'])
-            Auditoria.objects.create(
-                usuario=request.user,
-                accion='eliminar',
-                entidad='PerfilUsuario',
-                identificador=identificador,
-                detalle=detalle,
-            )
-            perfil.delete()
-        messages.success(request, f'Perfil eliminado y cuenta {usuario.username} desactivada.')
-        return redirect('perfiles_usuario')
-    return render(request, 'delegaciones_app/mantenedor_confirmar_eliminar.html', {
-        'objeto': perfil,
-        'titulo': 'Eliminar perfil de usuario',
-        'volver_url': reverse('perfiles_usuario'),
-        'advertencia': f'Se eliminará el perfil y se desactivará la cuenta de {perfil.usuario.username}. La cuenta se conserva para mantener sus registros históricos.',
-    })
-
-
-@login_required
-def periodos_medicion(request):
-    if not _puede_ver_todo(request.user):
-        return redirect('inicio')
-
-    query = request.GET.get('q', '').strip()
-    todos_los_periodos = PeriodoMedicion.objects.all()
-    periodos = todos_los_periodos.order_by('-inicio', 'nombre')
-
-    if query:
-        periodos = periodos.filter(
-            Q(nombre__icontains=query)
-            | Q(estado__icontains=query)
-        )
-
-    resumen_estados = [
-        {
-            'nombre': etiqueta,
-            'total': todos_los_periodos.filter(estado=codigo).count(),
-        }
-        for codigo, etiqueta in PeriodoMedicion.ESTADOS
-    ]
-    periodo_abierto = todos_los_periodos.filter(
-        estado='abierto'
-    ).order_by('-inicio').first()
-
-    return render(request, 'delegaciones_app/periodos_medicion.html', {
-        'periodos': periodos,
-        'query': query,
-        'total_periodos': todos_los_periodos.count(),
-        'resumen_estados': resumen_estados,
-        'periodo_abierto': periodo_abierto,
-    })
-
-
-@login_required
-def periodo_medicion_form(request, pk=None):
-    if not _puede_ver_todo(request.user):
-        return redirect('inicio')
-    instancia = get_object_or_404(PeriodoMedicion, pk=pk) if pk else None
-    form = PeriodoMedicionForm(request.POST or None, instance=instancia)
-    if request.method == 'POST' and form.is_valid():
-        periodo = form.save()
-        Auditoria.objects.create(
-            usuario=request.user,
-            accion='editar' if instancia else 'crear',
-            entidad='PeriodoMedicion',
-            identificador=str(periodo.pk),
-            detalle={'nombre': periodo.nombre, 'estado': periodo.estado, 'campos': form.changed_data},
-        )
-        messages.success(request, f'Período "{periodo.nombre}" guardado correctamente.')
-        return redirect('periodos_medicion')
-    return render(request, 'delegaciones_app/mantenedor_form.html', {
-        'form': form,
-        'titulo': 'Modificar período de medición' if instancia else 'Agregar período de medición',
-        'volver_url': reverse('periodos_medicion'),
-        'ayuda': 'El término debe ser igual o posterior al inicio. El umbral se expresa entre 0 y 100%.',
-    })
-
-
-@login_required
-def periodo_medicion_eliminar(request, pk):
-    if not _puede_ver_todo(request.user):
-        return redirect('inicio')
-    periodo = get_object_or_404(PeriodoMedicion, pk=pk)
-    if request.method == 'POST':
-        identificador, nombre = str(periodo.pk), periodo.nombre
-        with transaction.atomic():
-            Auditoria.objects.create(
-                usuario=request.user,
-                accion='eliminar',
-                entidad='PeriodoMedicion',
-                identificador=identificador,
-                detalle={'nombre': nombre},
-            )
-            periodo.delete()
-        messages.success(request, f'Período "{nombre}" eliminado.')
-        return redirect('periodos_medicion')
-    return render(request, 'delegaciones_app/mantenedor_confirmar_eliminar.html', {
-        'objeto': periodo,
-        'titulo': 'Eliminar período de medición',
-        'volver_url': reverse('periodos_medicion'),
-        'advertencia': 'Esta acción eliminará el período de la base de datos y no se puede deshacer.',
     })

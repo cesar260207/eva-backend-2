@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+{% load l10n %}
+
+{% block title %}Mi ficha | Municipalidad de La Serena{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+    <div>
+        <div class="page-kicker">EP-02 · HU-06 · RF-008</div>
+        <h1 class="page-title mb-2">Mi ficha personal</h1>
+        <p class="page-intro mb-0">Tus metas, tu avance y el estado de tus evidencias y compromisos.</p>
+    </div>
+</div>
+
+<div class="panel mb-4">
+    <div class="row g-3">
+        <div class="col-md-3"><div class="section-label">Funcionario</div><strong>{{ funcionario.nombre }}</strong></div>
+        <div class="col-md-3"><div class="section-label">Cargo</div><strong>{{ funcionario.cargo }}</strong></div>
+        <div class="col-md-3"><div class="section-label">Delegación</div><strong>{{ funcionario.delegacion|default:'Alcance global' }}</strong></div>
+        <div class="col-md-3"><div class="section-label">Roles</div><strong>{{ roles|join:', '|default:'-' }}</strong></div>
+    </div>
+</div>
+
+<div class="panel mb-4">
+    <form class="row g-2" method="get">
+        <div class="col-md-9">
+            <select class="form-select" name="periodo" aria-label="Período">
+                {% for opcion in periodos %}<option value="{{ opcion.pk }}" {% if opcion.pk == periodo.pk %}selected{% endif %}>{{ opcion.nombre }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3"><button class="btn btn-outline-sgr w-100" type="submit">Ver período</button></div>
+    </form>
+</div>
+
+{% if not periodo %}
+<div class="alert alert-info">Todavía no tienes metas asignadas. Un coordinador puede asignarlas desde Administración.</div>
+{% else %}
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="metric h-100"><div class="card-body">
+            <div class="text-muted">Cumplimiento ponderado</div>
+            <h3>{{ cumplimiento_total }}%</h3>
+            <span class="badge bg-{{ estado_total_class }}">{{ estado_total }}</span>
+        </div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="metric navy h-100"><div class="card-body">
+            <div class="text-muted">Meta esperada al día · {{ hoy|date:'d-m-Y' }}</div>
+            <h3>{{ esperado }}%</h3>
+            <small>{{ periodo.nombre }}</small>
+        </div></div>
+    </div>
+    <div class="col-md-4">
+        <div class="metric coral h-100"><div class="card-body">
+            <div class="text-muted">Diferencia con lo esperado</div>
+            <h3>{% if diferencia_total != None %}{{ diferencia_total }} puntos{% else %}-{% endif %}</h3>
+            <small>Umbral colectivo: {{ periodo.umbral_minimo }}%</small>
+        </div></div>
+    </div>
+</div>
+
+<div class="panel mb-4">
+    <div class="section-label mb-2">Metas del período</div>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Ítem</th><th>Meta</th><th>Avance</th><th>% de cumplimiento</th><th>Ponderación</th><th>Diferencia</th><th>Estado</th></tr></thead>
+            <tbody>
+            {% for fila in filas %}
+                <tr class="{% if fila.desviacion %}table-{{ fila.estado_class }}{% endif %}">
+                    <td><strong>{{ fila.item }}</strong>{% if fila.cumplida %} <span class="badge bg-success">Cumplida</span>{% endif %}</td>
+                    <td>{{ fila.objetivo|floatformat:'-2' }} {{ fila.unidad }}</td>
+                    <td>{{ fila.avance|floatformat:'-2' }}</td>
+                    <td>{{ fila.cumplimiento }}%</td>
+                    <td>{{ fila.ponderacion }}</td>
+                    <td>{% if fila.diferencia != None %}{{ fila.diferencia }} puntos{% else %}-{% endif %}</td>
+                    <td><span class="badge bg-{{ fila.estado_class }} rounded-pill">{{ fila.estado }}</span></td>
+                </tr>
+                <tr>
+                    <td colspan="7" class="border-top-0 pt-0">
+                        <details>
+                            <summary class="small text-muted">Ver detalle del cálculo y de las actividades que aportan</summary>
+                            {% if fila.formula %}
+                            <ul class="small mt-2 mb-2">{% for linea in fila.formula %}<li>{{ linea }}</li>{% endfor %}</ul>
+                            {% else %}
+                            <p class="small text-muted mt-2">Todavía no hay un cálculo para esta meta.</p>
+                            {% endif %}
+                            <div class="small">
+                                <strong>Actividades aprobadas que aportan ({{ fila.actividades|length }}):</strong>
+                                {% for actividad in fila.actividades %}<a class="ms-2" href="{% url 'actividad_detalle' actividad.codigo_verificador %}">{{ actividad.codigo_verificador }}</a>{% empty %} ninguna todavía.{% endfor %}
+                            </div>
+                        </details>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7" class="text-center py-4">No tienes metas en este período.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="panel mb-4">
+    <div class="section-label mb-2">Mi actividad reciente</div>
+    {% if reciente %}
+    <div class="row g-3">
+        <div class="col-md-3"><div class="text-muted small">Último registro</div><strong>{{ reciente.ultimo|date:'d-m-Y' }}</strong></div>
+        <div class="col-md-3"><div class="text-muted small">Días sin ingreso</div><strong>{{ reciente.dias_sin_ingreso }}</strong></div>
+        <div class="col-md-3"><div class="text-muted small">Registros en el período</div><strong>{{ reciente.cantidad }}</strong></div>
+        <div class="col-md-3"><div class="text-muted small">Promedio diario</div><strong>{{ reciente.promedio_diario }}</strong></div>
+    </div>
+    {% else %}
+    <p class="mb-0 text-muted">Todavía no has registrado actividades en este período.</p>
+    {% endif %}
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="panel h-100">
+            <div class="section-label mb-2">Estado de mis evidencias</div>
+            <ul class="list-unstyled mb-0">
+                {% for fila in evidencias %}<li class="d-flex justify-content-between border-bottom py-2"><span>{{ fila.etiqueta }}</span><strong>{{ fila.total }}</strong></li>{% endfor %}
+            </ul>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="panel h-100">
+            <div class="section-label mb-2">Mis compromisos como responsable</div>
+            <ul class="list-unstyled mb-3">
+                <li class="d-flex justify-content-between border-bottom py-2"><span>Vigentes</span><strong>{{ compromisos.vigentes }}</strong></li>
+                <li class="d-flex justify-content-between border-bottom py-2"><span>Próximos a vencer</span><strong>{{ compromisos.por_vencer }}</strong></li>
+                <li class="d-flex justify-content-between border-bottom py-2"><span>Vencidos</span><strong>{{ compromisos.vencidos }}</strong></li>
+                <li class="d-flex justify-content-between py-2"><span>Realizados</span><strong>{{ compromisos.realizados }}</strong></li>
+            </ul>
+            <a class="btn btn-sm btn-outline-sgr" href="{% url 'agenda' %}">Ir a la agenda</a>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block title %}Alertas | Municipalidad de La Serena{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+    <div>
+        <div class="page-kicker">EP-05 · RF-037</div>
+        <h1 class="page-title mb-2">Alertas</h1>
+        <p class="page-intro mb-0">Vencimientos, evidencias pendientes, ausencia de registros y avance bajo lo esperado, dentro de tu ámbito.</p>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4"><div class="metric coral h-100"><div class="card-body"><div class="text-muted">Urgentes</div><h3>{{ peligro }}</h3></div></div></div>
+    <div class="col-md-4"><div class="metric h-100"><div class="card-body"><div class="text-muted">Por atender</div><h3>{{ advertencia }}</h3></div></div></div>
+    <div class="col-md-4"><div class="metric navy h-100"><div class="card-body"><div class="text-muted">Reglas</div><small>Compromisos: aviso {{ dias_alerta }} días antes del plazo. Registros: aviso tras {{ dias_sin_registro }} días sin ingreso.</small></div></div></div>
+</div>
+
+<div class="panel">
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Tipo</th><th>Motivo</th><th>Responsable</th><th>Fecha</th><th></th></tr></thead>
+            <tbody>
+            {% for alerta in alertas %}
+                <tr>
+                    <td><span class="badge bg-{{ alerta.nivel }}">{{ alerta.etiqueta }}</span></td>
+                    <td>{{ alerta.motivo }}</td>
+                    <td>{{ alerta.responsable }}</td>
+                    <td>{{ alerta.fecha|date:'d-m-Y'|default:'-' }}</td>
+                    <td><a class="btn btn-sm btn-outline-sgr" href="{{ alerta.url }}">Ver</a></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5" class="text-center py-4">No hay alertas por ahora.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

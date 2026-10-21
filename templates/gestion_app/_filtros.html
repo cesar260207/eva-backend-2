@@ -1,0 +1,14 @@
+<div class="panel mb-4">
+    <form class="row g-2" method="get">
+        <div class="col-md-6"><input class="form-control" type="search" name="q" value="{{ query }}" placeholder="Buscar delegación"></div>
+        <div class="col-md-3">
+            <select class="form-select" name="periodo" aria-label="Período">
+                {% for opcion in periodos %}<option value="{{ opcion.pk }}" {% if opcion.pk == periodo.pk %}selected{% endif %}>{{ opcion.nombre }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3"><button class="btn btn-outline-sgr w-100" type="submit">Buscar</button></div>
+    </form>
+</div>
+{% if not periodo %}
+<div class="alert alert-info">Todavía no hay indicadores calculados. Se generan al guardar una meta y al validar evidencias.</div>
+{% endif %}
