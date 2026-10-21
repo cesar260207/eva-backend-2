@@ -2048,3 +2048,84 @@ class FiltrosYInformesTests(BaseOperacion):
 		self.assertEqual(self.client.get(reverse('informe')).status_code, 302)
 		self.assertEqual(self.client.get(reverse('informe'), {'formato': 'csv'}).status_code, 302)
 		self.assertFalse(Auditoria.objects.filter(evento='exportar').exists())
+
+
+class ResumenYActividadRecienteVistasTests(BaseOperacion):
+    """CU-12, CU-14, CU-06, CU-20 (RF-021, RF-030, RF-033). Resumen colectivo, actividad reciente e informes que los exportan."""
+
+    def setUp(self):
+        super().setUp()
+        self.rural_user = crear_funcionario('rural-res', 'funcionario', cargo=self.cargo, delegacion=self.rural)
+        self._compromiso(folio='RES-1')
+        realizado = self._compromiso(folio='RES-2')
+        realizado.estado = 'realizado'
+        realizado.save()
+        self._compromiso(responsable=self.rural_user, delegacion=self.rural, folio='RES-3')
+        self._actividad()
+        self._actividad(solicitud_problema='Otra')
+        self._actividad(autor=self.rural_user, delegacion=self.rural, solicitud_problema='Rural')
+
+    def test_la_agenda_muestra_el_resumen_por_responsable(self):
+        """CU-12 Agenda compartida (RF-021). El panel totaliza lo que se ve en la agenda."""
+        self.client.force_login(self.coordinador)
+        respuesta = self.client.get(reverse('agenda'))
+        self.assertContains(respuesta, 'Compromisos por responsable y estado')
+        filas = {f['nombre']: f for f in respuesta.context['resumen_responsables']}
+        self.assertEqual((filas['funcionario-op']['total'], filas['funcionario-op']['realizado'], filas['rural-res']['total']), (2, 1, 1))
+        self.assertEqual(respuesta.context['resumen_total']['total'], 3)
+
+    def test_el_resumen_sigue_el_filtro_de_la_agenda(self):
+        """CU-12.1 Filtrar agenda compartida (RF-021). Al filtrar por delegación los totales cambian con el detalle."""
+        self.client.force_login(self.coordinador)
+        respuesta = self.client.get(reverse('agenda'), {'delegacion': self.rural.pk})
+        self.assertEqual(len(respuesta.context['compromisos']), 1)
+        self.assertEqual(respuesta.context['resumen_total']['total'], 1)
+
+    def test_quien_tiene_delegacion_solo_ve_su_resumen(self):
+        """CU-26.1 Denegar acceso por ámbito (RF-021). El resumen no incluye otras delegaciones."""
+        self.client.force_login(self.rural_user)
+        respuesta = self.client.get(reverse('agenda'))
+        self.assertEqual([f['nombre'] for f in respuesta.context['resumen_responsables']], ['rural-res'])
+
+    def test_el_informe_de_resumen_trae_el_total(self):
+        """CU-20.1 Consolidar datos filtrados (RF-021, RF-033). El informe repite el resumen de la agenda."""
+        self.client.force_login(self.coordinador)
+        respuesta = self.client.get(reverse('informe'), {'tipo': 'resumen'})
+        self.assertContains(respuesta, 'Informe de resumen de compromisos por responsable')
+        self.assertEqual(respuesta.context['filas'][-1][0], 'Total')
+        csv_respuesta = self.client.get(reverse('informe'), {'tipo': 'resumen', 'formato': 'csv'})
+        self.assertTrue(csv_respuesta.content.decode('utf-8').startswith('﻿Responsable;Ingresado'))
+
+    def test_la_ficha_muestra_la_actividad_reciente_propia(self):
+        """CU-06 Seguimiento de avance (RF-030). Último ingreso, días sin ingreso, registros y promedio diario."""
+        Meta.objects.create(item=self.item, funcionario=self.funcionario.funcionario, valor_objetivo=3)
+        self.client.force_login(self.funcionario)
+        respuesta = self.client.get(reverse('ficha_personal'))
+        self.assertContains(respuesta, 'Mi actividad reciente')
+        self.assertEqual(respuesta.context['reciente']['cantidad'], 2)
+        self.assertEqual(respuesta.context['reciente']['dias_sin_ingreso'], 0)
+
+    def test_la_ficha_sin_actividades_lo_dice(self):
+        """CU-06 Seguimiento de avance (RF-030). Sin registros no hay cifras inventadas."""
+        sin_registros = crear_funcionario('sin-registros', 'funcionario', cargo=self.cargo, delegacion=self.centro)
+        Meta.objects.create(item=self.item, funcionario=sin_registros.funcionario, valor_objetivo=3)
+        self.client.force_login(sin_registros)
+        respuesta = self.client.get(reverse('ficha_personal'))
+        self.assertIsNone(respuesta.context['reciente'])
+        self.assertContains(respuesta, 'Todavía no has registrado actividades')
+
+    def test_el_informe_de_actividad_reciente_respeta_el_ambito(self):
+        """CU-20.2 Restringir por ámbito de permisos (RF-030, RF-033). Un funcionario ve solo su delegación."""
+        self.client.force_login(self.coordinador)
+        todos = self.client.get(reverse('informe'), {'tipo': 'reciente', 'periodo': self.periodo.pk})
+        self.assertEqual({fila[0] for fila in todos.context['filas']}, {'funcionario-op', 'rural-res'})
+        self.client.force_login(self.rural_user)
+        propio = self.client.get(reverse('informe'), {'tipo': 'reciente', 'periodo': self.periodo.pk})
+        self.assertEqual([fila[0] for fila in propio.context['filas']], ['rural-res'])
+
+    def test_el_informe_de_actividad_reciente_exporta_csv_y_queda_auditado(self):
+        """CU-30 Auditoría de cambios (RF-033, RF-036). La exportación deja su registro."""
+        self.client.force_login(self.coordinador)
+        respuesta = self.client.get(reverse('informe'), {'tipo': 'reciente', 'formato': 'csv'})
+        self.assertTrue(respuesta.content.decode('utf-8').startswith('﻿Funcionario;Delegación;Registros'))
+        self.assertTrue(Auditoria.objects.filter(evento='exportar', identificador_registro='reciente').exists())

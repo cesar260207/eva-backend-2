@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from .forms import ActividadForm, CompromisoForm, EvidenciaForm
-from .informes import PLAZOS, filtrar_actividades, filtrar_compromisos, situacion_de_plazo
+from .informes import PLAZOS, filtrar_actividades, filtrar_compromisos, resumen_por_responsable, situacion_de_plazo
 from .medicion import periodo_vigente, promedio_general, resultados_por_delegacion
 from .models import Actividad, Auditoria, Compromiso, Delegacion, Periodo, Validacion
 from .permisos import ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICADOR, funcionario_de, puede_ver_todo, registrar_acceso_denegado, tiene_rol
@@ -467,12 +467,15 @@ def agenda(request):
     compromisos = list(filtrar_compromisos(_compromisos_autorizados(request.user), request.GET))
     for compromiso in compromisos:
         compromiso.estado_display, compromiso.estado_class = situacion_de_plazo(compromiso)
+    resumen_responsables, resumen_total = resumen_por_responsable(compromisos)
     return render(request, 'delegaciones_app/agenda.html', {
         'compromisos': compromisos,
         'delegaciones_filtro': Delegacion.objects.filter(estado=True),
         'estado_filtro': estado or '',
         'delegacion_filtro': delegacion_id or '',
         'filtros': request.GET,
+        'resumen_responsables': resumen_responsables,
+        'resumen_total': resumen_total,
         'plazos_filtro': PLAZOS,
         'query': query,
         'proximos': sum(1 for item in compromisos if item.estado != 'realizado' and not item.vencido),

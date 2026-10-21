@@ -1,12 +1,13 @@
 """Pruebas unitarias de los compromisos de la agenda colectiva: validación, estados, plazos, historial y filtros (EP-04)."""
 from datetime import timedelta
+from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from .forms import CompromisoForm
-from .informes import filas_de_compromisos, filtrar_compromisos, situacion_de_plazo
+from .informes import filas_de_compromisos, filas_de_resumen, filtrar_compromisos, resumen_por_responsable, situacion_de_plazo
 from .models import Compromiso, HistorialCompromiso
 from .pruebas_base import EscenarioBase, crear_funcionario
 
@@ -305,3 +306,68 @@ class FiltrosAgendaUnitTests(CompromisoBase):
         self.assertIn('Situación del plazo', columnas)
         fila = dict(zip(columnas, filas[0]))
         self.assertEqual((fila['Folio'], fila['Responsable'], fila['Situación del plazo'], fila['Estado']), ('AG-1', 'autor-base', 'Vencido', 'Ingresado'))
+
+
+class ResumenColectivoUnitTests(CompromisoBase):
+    """CU-12 Agenda compartida y CU-14 Seguimiento de compromisos (RF-021): resumen por responsable y estado."""
+
+    def setUp(self):
+        super().setUp()
+        self.otro = crear_funcionario('beatriz-resp', 'funcionario', cargo=self.cargo, delegacion=self.centro).funcionario
+        self.nuevo_compromiso(dias=30, folio='R1', estado='realizado')
+        self.nuevo_compromiso(dias=30, folio='R2', estado='proceso')
+        self.nuevo_compromiso(dias=-3, folio='R3', estado='pendiente')
+        self.nuevo_compromiso(dias=30, folio='R4', funcionario_responsable=self.otro, estado='realizado')
+
+    def _resumen(self, **filtros):
+        return resumen_por_responsable(filtrar_compromisos(Compromiso.objects.select_related('funcionario_responsable'), filtros))
+
+    def test_totaliza_por_responsable_y_estado(self):
+        """CU-12 Agenda compartida (RF-021). Una fila por responsable con la cantidad en cada estado."""
+        filas, _ = self._resumen()
+        por_nombre = {f['nombre']: f for f in filas}
+        autor = por_nombre['autor-base']
+        self.assertEqual((autor['ingresado'], autor['pendiente'], autor['proceso'], autor['realizado'], autor['total']), (0, 1, 1, 1, 3))
+        self.assertEqual((por_nombre['beatriz-resp']['realizado'], por_nombre['beatriz-resp']['total']), (1, 1))
+
+    def test_porcentaje_realizado_y_pendiente(self):
+        """CU-14 Seguimiento de compromisos (RF-021). El pendiente es todo lo que aún no está realizado."""
+        filas, _ = self._resumen()
+        autor = {f['nombre']: f for f in filas}['autor-base']
+        self.assertEqual((autor['pct_realizado'], autor['pct_pendiente']), (Decimal('33.33'), Decimal('66.67')))
+
+    def test_la_fila_total_suma_a_todos_los_responsables(self):
+        """CU-12 Agenda compartida (RF-021). Los totales coinciden con el detalle."""
+        filas, total = self._resumen()
+        self.assertEqual(total['total'], sum(f['total'] for f in filas))
+        self.assertEqual((total['total'], total['realizado'], total['pct_realizado'], total['pct_pendiente']), (4, 2, Decimal('50.00'), Decimal('50.00')))
+
+    def test_cuenta_los_vencidos_de_cada_responsable(self):
+        """CU-14 Seguimiento de compromisos (RF-021, RF-019). El vencido sin realizar se destaca."""
+        filas, total = self._resumen()
+        self.assertEqual({f['nombre']: f['vencidos'] for f in filas}, {'autor-base': 1, 'beatriz-resp': 0})
+        self.assertEqual(total['vencidos'], 1)
+
+    def test_los_responsables_salen_en_orden_alfabetico(self):
+        """CU-12 Agenda compartida (RF-021). Orden estable por nombre."""
+        filas, _ = self._resumen()
+        self.assertEqual([f['nombre'] for f in filas], ['autor-base', 'beatriz-resp'])
+
+    def test_el_resumen_respeta_el_filtro_aplicado(self):
+        """CU-12.1 Filtrar agenda compartida (RF-021). Los totales coinciden con el detalle filtrado."""
+        filas, total = self._resumen(estado='realizado')
+        self.assertEqual(total['total'], filtrar_compromisos(Compromiso.objects.all(), {'estado': 'realizado'}).count())
+        self.assertEqual({f['nombre']: f['total'] for f in filas}, {'autor-base': 1, 'beatriz-resp': 1})
+
+    def test_sin_compromisos_los_porcentajes_son_cero(self):
+        """CU-12.2 Consulta sin coincidencias en agenda (RF-021). Sin datos no hay división por cero."""
+        filas, total = self._resumen(q='no existe este texto')
+        self.assertEqual(filas, [])
+        self.assertEqual((total['total'], total['pct_realizado'], total['pct_pendiente']), (0, Decimal('0.00'), Decimal('0.00')))
+
+    def test_las_filas_del_informe_terminan_con_el_total(self):
+        """CU-20.1 Consolidar datos filtrados (RF-021, RF-033). Columnas y filas listas para exportar."""
+        columnas, filas = filas_de_resumen(Compromiso.objects.select_related('funcionario_responsable'))
+        self.assertEqual(columnas[0], 'Responsable')
+        self.assertEqual(filas[-1][0], 'Total')
+        self.assertEqual(filas[-1][columnas.index('Total')], 4)

@@ -1,6 +1,7 @@
 """Filtros e informes compartidos por las listas (actividades, agenda) y por los informes exportables (RF-032, RF-033)."""
 import csv
 from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 
 from django.conf import settings
 from django.db.models import Q
@@ -9,7 +10,10 @@ from django.utils import timezone
 
 from .models import Actividad, Compromiso
 
-TIPOS_INFORME = [('actividades', 'Actividades'), ('compromisos', 'Compromisos'), ('cumplimiento', 'Cumplimiento por delegación')]
+TIPOS_INFORME = [
+    ('actividades', 'Actividades'), ('compromisos', 'Compromisos'), ('resumen', 'Resumen de compromisos por responsable'),
+    ('reciente', 'Actividad reciente por funcionario'), ('cumplimiento', 'Cumplimiento por delegación'),
+]
 PLAZOS = [('vencidos', 'Vencidos'), ('por_vencer', 'Próximos a vencer')]
 
 
@@ -104,6 +108,57 @@ def filas_de_compromisos(compromisos):
         [c.folio, c.delegacion.nombre, c.eje, c.solicitante, c.funcionario_responsable.nombre if c.funcionario_responsable_id else '',
          c.fecha_comprometida.strftime('%d-%m-%Y'), c.get_estado_display(), situacion_de_plazo(c)[0], c.descripcion]
         for c in compromisos
+    ]
+    return columnas, filas
+
+
+ESTADOS_DEL_RESUMEN = ('ingresado', 'pendiente', 'proceso', 'realizado')
+
+
+def _porcentaje(parte, total):
+    return (Decimal(parte) * 100 / Decimal(total)).quantize(Decimal('0.01')) if total else Decimal('0.00')
+
+
+def resumen_por_responsable(compromisos):
+    """RF-021: compromisos totalizados por responsable y estado, con el porcentaje realizado y el pendiente.
+
+    Cuenta exactamente los compromisos que recibe, así que los totales coinciden con el detalle filtrado.
+    «Pendiente» es todo lo que aún no está realizado. Devuelve (filas por responsable, fila de totales).
+    """
+    por_responsable = {}
+    total = {'nombre': 'Total', **{estado: 0 for estado in ESTADOS_DEL_RESUMEN}, 'vencidos': 0, 'total': 0}
+    for compromiso in compromisos:
+        fila = por_responsable.setdefault(
+            compromiso.funcionario_responsable_id,
+            {'nombre': compromiso.funcionario_responsable.nombre, **{estado: 0 for estado in ESTADOS_DEL_RESUMEN}, 'vencidos': 0, 'total': 0},
+        )
+        for destino in (fila, total):
+            destino[compromiso.estado] += 1
+            destino['total'] += 1
+            destino['vencidos'] += 1 if compromiso.vencido else 0
+    filas = sorted(por_responsable.values(), key=lambda fila: fila['nombre'])
+    for fila in (*filas, total):
+        fila['pct_realizado'] = _porcentaje(fila['realizado'], fila['total'])
+        fila['pct_pendiente'] = Decimal('100.00') - fila['pct_realizado'] if fila['total'] else Decimal('0.00')
+    return filas, total
+
+
+def filas_de_resumen(compromisos):
+    """Columnas y filas planas del resumen de compromisos por responsable (la última fila es el total)."""
+    columnas = ['Responsable', 'Ingresado', 'Pendiente', 'En proceso', 'Realizado', 'Vencidos', 'Total', 'Realizado (%)', 'Pendiente (%)']
+    filas, total = resumen_por_responsable(compromisos)
+    return columnas, [
+        [f['nombre'], f['ingresado'], f['pendiente'], f['proceso'], f['realizado'], f['vencidos'], f['total'], f['pct_realizado'], f['pct_pendiente']]
+        for f in (*filas, total)
+    ]
+
+
+def filas_de_actividad_reciente(resultados):
+    """Columnas y filas planas de la actividad reciente por funcionario."""
+    columnas = ['Funcionario', 'Delegación', 'Registros', 'Último registro', 'Días sin ingreso', 'Promedio diario']
+    filas = [
+        [r['nombre'], r['delegacion'], r['cantidad'], r['ultimo'].strftime('%d-%m-%Y'), r['dias_sin_ingreso'], r['promedio_diario'] if r['promedio_diario'] is not None else '']
+        for r in resultados
     ]
     return columnas, filas
 

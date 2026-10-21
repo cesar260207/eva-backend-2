@@ -5,7 +5,8 @@ from django.utils import timezone
 
 from delegaciones_app import medicion
 from delegaciones_app.informes import (
-    TIPOS_INFORME, filas_de_actividades, filas_de_compromisos, filas_de_cumplimiento, filtrar_actividades, filtrar_compromisos, respuesta_csv,
+    TIPOS_INFORME, filas_de_actividad_reciente, filas_de_actividades, filas_de_compromisos, filas_de_cumplimiento, filas_de_resumen,
+    filtrar_actividades, filtrar_compromisos, respuesta_csv,
 )
 from delegaciones_app.medicion import periodo_vigente, periodos_con_indicadores, promedio_general, resultados_por_delegacion
 from delegaciones_app.models import Actividad, Auditoria, Compromiso, Delegacion, MedicionDelegacion, Periodo
@@ -72,6 +73,8 @@ def ficha_personal(request):
     if periodo:
         contexto.update(medicion.ficha_personal(funcionario, periodo))
         contexto['evidencias'] = medicion.resumen_de_evidencias(funcionario, periodo)
+        propias = medicion.actividad_reciente(Actividad.objects.filter(funcionario_autor=funcionario), periodo)
+        contexto['reciente'] = propias[0] if propias else None
     return render(request, 'gestion_app/ficha.html', contexto)
 
 
@@ -83,11 +86,16 @@ def informe(request):
     """
     tipo = request.GET.get('tipo') if request.GET.get('tipo') in dict(TIPOS_INFORME) else 'actividades'
     formato = request.GET.get('formato')
-    periodo = periodo_vigente(request.GET.get('periodo')) if tipo == 'cumplimiento' else None
+    periodo = periodo_vigente(request.GET.get('periodo')) if tipo in ('cumplimiento', 'reciente') else None
     if tipo == 'actividades':
         columnas, filas = filas_de_actividades(filtrar_actividades(_actividades_autorizadas(request.user), request.GET))
     elif tipo == 'compromisos':
         columnas, filas = filas_de_compromisos(filtrar_compromisos(_compromisos_autorizados(request.user), request.GET))
+    elif tipo == 'resumen':
+        columnas, filas = filas_de_resumen(filtrar_compromisos(_compromisos_autorizados(request.user), request.GET))
+    elif tipo == 'reciente':
+        actividades = filtrar_actividades(_actividades_autorizadas(request.user), {**request.GET.dict(), 'periodo': ''})
+        columnas, filas = filas_de_actividad_reciente(medicion.actividad_reciente(actividades, periodo))
     else:
         resultados = resultados_por_delegacion(periodo, '')
         if request.GET.get('delegacion', '').isdigit():
@@ -103,7 +111,7 @@ def informe(request):
         'tipo': tipo, 'nombre_tipo': dict(TIPOS_INFORME)[tipo], 'tipos': TIPOS_INFORME, 'columnas': columnas, 'filas': filas, 'filtros': request.GET,
         'imprimir': formato == 'imprimir', 'consulta': parametros.urlencode(), 'hoy': timezone.localdate(),
         'delegaciones_filtro': Delegacion.objects.filter(estado=True), 'periodos_filtro': Periodo.objects.order_by('-fecha_inicio'),
-        'estados_filtro': Actividad.ESTADOS if tipo == 'actividades' else Compromiso.ESTADOS,
+        'estados_filtro': Actividad.ESTADOS if tipo in ('actividades', 'reciente') else Compromiso.ESTADOS,
         'periodo_informe': periodo,
     })
 

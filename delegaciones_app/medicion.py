@@ -5,7 +5,7 @@ aquí solo se agrupan y se presentan.
 """
 from decimal import Decimal
 
-from django.db.models import Count
+from django.db.models import Count, Max
 from django.utils import timezone
 
 from .models import Compromiso, Delegacion, Evidencia, Indicador, Meta, Periodo
@@ -159,4 +159,33 @@ def resumen_de_compromisos(funcionario):
         'total': len(compromisos), 'vencidos': vencidos, 'por_vencer': por_vencer, 'realizados': realizados,
         'vigentes': len(compromisos) - vencidos - por_vencer - realizados,
     }
+
+
+def actividad_reciente(actividades, periodo=None, hoy=None):
+    """RF-030: por funcionario, cantidad de registros, fecha del último ingreso, días sin ingreso y promedio diario.
+
+    `actividades` ya viene limitado al ámbito del usuario. Con un período, solo cuentan las de ese período y el
+    promedio diario se calcula sobre los días transcurridos de él (mínimo uno).
+    """
+    hoy = hoy or timezone.localdate()
+    if periodo:
+        actividades = actividades.filter(item__periodo=periodo)
+    dias = max(periodo.dias_computables - periodo.calcular_dias_restantes(hoy), 1) if periodo else None
+    datos = (
+        actividades.order_by('funcionario_autor__nombre')
+        .values('funcionario_autor', 'funcionario_autor__nombre', 'funcionario_autor__delegacion__nombre')
+        .annotate(cantidad=Count('pk'), ultimo=Max('creada'))
+    )
+    resultados = []
+    for fila in datos:
+        ultimo = timezone.localtime(fila['ultimo']).date()
+        resultados.append({
+            'nombre': fila['funcionario_autor__nombre'],
+            'delegacion': fila['funcionario_autor__delegacion__nombre'] or 'Alcance global',
+            'cantidad': fila['cantidad'],
+            'ultimo': ultimo,
+            'dias_sin_ingreso': (hoy - ultimo).days,
+            'promedio_diario': (Decimal(fila['cantidad']) / dias).quantize(Decimal('0.01')) if dias else None,
+        })
+    return resultados
 

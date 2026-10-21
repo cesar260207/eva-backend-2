@@ -8,8 +8,9 @@ from django.test import TestCase
 from django.utils import timezone
 
 from . import medicion
+from .informes import filas_de_actividad_reciente
 from .models import (
-    Auditoria, Compromiso, Delegacion, Indicador, ItemMedible, Meta, ParametroVersionado, Periodo, Validacion,
+    Actividad, Auditoria, Compromiso, Delegacion, Indicador, ItemMedible, Meta, ParametroVersionado, Periodo, Validacion,
 )
 from .pruebas_base import EscenarioBase, crear_funcionario
 
@@ -335,3 +336,71 @@ class FichaPersonalUnitTests(MedicionBase):
         self.nuevo_compromiso(dias=-5, folio='C-REALIZADO', estado='realizado')
         resumen = medicion.resumen_de_compromisos(self.autor)
         self.assertEqual(resumen, {'total': 4, 'vencidos': 1, 'por_vencer': 1, 'realizados': 1, 'vigentes': 1})
+
+
+class ActividadRecienteUnitTests(MedicionBase):
+    """CU-06 Seguimiento de avance (RF-030): fecha del último ingreso, días sin ingreso, cantidad y promedio diario por funcionario."""
+
+    def setUp(self):
+        super().setUp()
+        self.otro = crear_funcionario('otro-reciente', 'funcionario', cargo=self.cargo, delegacion=self.rural).funcionario
+        for numero in range(5):
+            self.nueva_actividad(solicitud_problema=f'Propia {numero}')
+        self.nueva_actividad(funcionario_autor=self.otro, delegacion=self.rural, solicitud_problema='Ajena')
+
+    def _filas(self, periodo=None, hoy=None, **filtros):
+        actividades = Actividad.objects.filter(**filtros)
+        return {f['nombre']: f for f in medicion.actividad_reciente(actividades, periodo, hoy)}
+
+    def test_cuenta_los_registros_de_cada_funcionario(self):
+        """CU-06 Seguimiento de avance (RF-030). Una fila por funcionario con su cantidad."""
+        filas = self._filas()
+        self.assertEqual((filas['autor-base']['cantidad'], filas['otro-reciente']['cantidad']), (5, 1))
+
+    def test_informa_la_fecha_del_ultimo_ingreso_y_los_dias_sin_ingreso(self):
+        """CU-06 Seguimiento de avance (RF-030). El último ingreso es la fecha de registro, no la de la actividad."""
+        hoy = timezone.localdate()
+        fila = self._filas(hoy=hoy + timedelta(days=4))['autor-base']
+        self.assertEqual((fila['ultimo'], fila['dias_sin_ingreso']), (hoy, 4))
+        self.assertEqual(self._filas(hoy=hoy)['autor-base']['dias_sin_ingreso'], 0)
+
+    def test_el_promedio_diario_usa_los_dias_transcurridos_del_periodo(self):
+        """CU-06 Seguimiento de avance (RF-030). 5 registros en 10 días son 0,50 por día."""
+        fila = self._filas(periodo=self.periodo, hoy=date(2026, 9, 10))['autor-base']
+        self.assertEqual(fila['promedio_diario'], Decimal('0.50'))
+
+    def test_el_promedio_no_divide_por_cero_antes_del_inicio_del_periodo(self):
+        """CU-06 Seguimiento de avance (RF-030). Antes de empezar se cuenta al menos un día."""
+        fila = self._filas(periodo=self.periodo, hoy=date(2026, 8, 1))['autor-base']
+        self.assertEqual(fila['promedio_diario'], Decimal('5.00'))
+
+    def test_sin_periodo_no_hay_promedio(self):
+        """CU-06 Seguimiento de avance (RF-030). El promedio necesita un período de referencia."""
+        self.assertIsNone(self._filas()['autor-base']['promedio_diario'])
+
+    def test_solo_cuentan_las_actividades_del_periodo(self):
+        """CU-06 Seguimiento de avance (RF-030). Un ítem de otro período no suma."""
+        agosto = Periodo.objects.create(nombre='Agosto 2026', fecha_inicio=date(2026, 8, 1), fecha_termino=date(2026, 8, 31), estado='abierto')
+        item = ItemMedible.objects.create(cargo=self.cargo, periodo=agosto, nombre='Agosto', ponderacion=100)
+        self.nueva_actividad(item=item, fecha=timezone.make_aware(datetime(2026, 8, 5, 9, 0)), solicitud_problema='De agosto')
+        self.assertEqual(self._filas(periodo=self.periodo)['autor-base']['cantidad'], 5)
+        self.assertEqual(self._filas(periodo=agosto)['autor-base']['cantidad'], 1)
+
+    def test_nombra_la_delegacion_o_el_alcance_global(self):
+        """CU-06 Seguimiento de avance (RF-030). Quien no tiene delegación figura con alcance global."""
+        coordinador = crear_funcionario('coord-reciente', 'coordinador', cargo=self.cargo).funcionario
+        self.nueva_actividad(funcionario_autor=coordinador, solicitud_problema='Del coordinador')
+        filas = self._filas()
+        self.assertEqual((filas['otro-reciente']['delegacion'], filas['coord-reciente']['delegacion']), ('Rural', 'Alcance global'))
+
+    def test_sin_actividades_no_hay_filas(self):
+        """CU-06 Seguimiento de avance (RF-030). Un funcionario sin registros no aparece."""
+        self.assertEqual(medicion.actividad_reciente(Actividad.objects.none()), [])
+
+    def test_las_filas_del_informe_traen_los_datos_formateados(self):
+        """CU-20.1 Consolidar datos filtrados (RF-030, RF-033). Fecha legible y promedio con dos decimales."""
+        resultados = medicion.actividad_reciente(Actividad.objects.filter(funcionario_autor=self.autor), self.periodo, date(2026, 9, 10))
+        columnas, filas = filas_de_actividad_reciente(resultados)
+        fila = dict(zip(columnas, filas[0]))
+        self.assertEqual((fila['Funcionario'], fila['Delegación'], fila['Registros'], fila['Promedio diario']), ('autor-base', 'Centro', 5, Decimal('0.50')))
+        self.assertEqual(fila['Último registro'], timezone.localdate().strftime('%d-%m-%Y'))

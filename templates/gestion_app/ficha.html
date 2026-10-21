@@ -99,6 +99,20 @@
     </div>
 </div>
 
+<div class="panel mb-4">
+    <div class="section-label mb-2">Mi actividad reciente</div>
+    {% if reciente %}
+    <div class="row g-3">
+        <div class="col-md-3"><div class="text-muted small">Último registro</div><strong>{{ reciente.ultimo|date:'d-m-Y' }}</strong></div>
+        <div class="col-md-3"><div class="text-muted small">Días sin ingreso</div><strong>{{ reciente.dias_sin_ingreso }}</strong></div>
+        <div class="col-md-3"><div class="text-muted small">Registros en el período</div><strong>{{ reciente.cantidad }}</strong></div>
+        <div class="col-md-3"><div class="text-muted small">Promedio diario</div><strong>{{ reciente.promedio_diario }}</strong></div>
+    </div>
+    {% else %}
+    <p class="mb-0 text-muted">Todavía no has registrado actividades en este período.</p>
+    {% endif %}
+</div>
+
 <div class="row g-4">
     <div class="col-lg-6">
         <div class="panel h-100">
