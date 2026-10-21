@@ -257,6 +257,17 @@ class Actividad(VersionOptimistaMixin, models.Model):
 		return [Indicador.generar(meta) for meta in metas if meta.funcionario.delegacion_id in (None, self.delegacion_id)]
 
 
+def validar_tamano_evidencia(archivo):
+	"""CU-09.2 y RNF-017: rechaza el archivo que supera el tamaño máximo configurado (por defecto 5 MB)."""
+	try:
+		tamano = archivo.size
+	except (OSError, ValueError):
+		return  # archivo ya guardado y ausente del disco, o campo vacío: no hay nada que medir
+	maximo_mb = settings.EVIDENCIA_TAMANO_MAXIMO_MB
+	if tamano > maximo_mb * 1024 * 1024:
+		raise ValidationError(f'El archivo pesa {tamano / 1024 / 1024:.1f} MB y el máximo permitido es {maximo_mb} MB.')
+
+
 EXTENSIONES_EVIDENCIA = ['jpg', 'jpeg', 'png', 'pdf']
 
 
@@ -265,7 +276,7 @@ class Evidencia(models.Model):
 	codigo_evidencia = models.CharField(max_length=60, unique=True, editable=False)
 	actividad = models.ForeignKey(Actividad, on_delete=models.CASCADE, related_name='evidencias')
 	funcionario_autor = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='evidencias')
-	archivo_vinculo = models.FileField(upload_to='evidencias/%Y/%m/', max_length=255, validators=[FileExtensionValidator(EXTENSIONES_EVIDENCIA)])
+	archivo_vinculo = models.FileField(upload_to='evidencias/%Y/%m/', max_length=255, validators=[FileExtensionValidator(EXTENSIONES_EVIDENCIA), validar_tamano_evidencia])
 	fecha_carga = models.DateTimeField(default=timezone.now)
 	metadatos = models.JSONField(null=True, blank=True)
 	estado_revision = models.CharField(max_length=20, choices=ESTADOS_REVISION, default='pendiente')
@@ -391,8 +402,43 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 
 	@property
 	def vencido(self):
-		from django.utils import timezone
 		return self.estado != 'realizado' and self.fecha_comprometida < timezone.localdate()
+
+	@property
+	def dias_para_vencer(self):
+		return (self.fecha_comprometida - timezone.localdate()).days
+
+	@property
+	def proximo_a_vencer(self):
+		"""RF-019: no está realizado y vence dentro de los días de alerta configurados (por defecto 3)."""
+		return self.estado != 'realizado' and 0 <= self.dias_para_vencer <= settings.COMPROMISO_DIAS_ALERTA
+
+	def estados_permitidos(self):
+		"""RF-018: transiciones controladas. Se avanza hacia adelante (se pueden saltar etapas) y un
+		compromiso realizado solo se reabre a «en proceso»."""
+		orden = [estado for estado, _ in self.ESTADOS]
+		siguientes = ['proceso'] if self.estado == 'realizado' else orden[orden.index(self.estado) + 1:]
+		etiquetas = dict(self.ESTADOS)
+		return [(estado, etiquetas[estado]) for estado in siguientes]
+
+	def validar_transicion(self, estado):
+		etiquetas = dict(self.ESTADOS)
+		if estado not in etiquetas:
+			raise ValidationError(f'Estado de compromiso no válido: {estado}.')
+		if estado not in [permitido for permitido, _ in self.estados_permitidos()]:
+			raise ValidationError(f'Transición no permitida: de «{etiquetas[self.estado]}» a «{etiquetas[estado]}».')
+
+	def motivo_no_eliminable(self):
+		"""CU-14.2: un incumplimiento (vencido y sin realizar) se conserva con su historial de seguimiento."""
+		if self.vencido:
+			return 'El compromiso está vencido sin realizarse: se conserva con su historial de seguimiento.'
+		return None
+
+	def delete(self, *args, **kwargs):
+		motivo = self.motivo_no_eliminable()
+		if motivo:
+			raise ValidationError(motivo)
+		return super().delete(*args, **kwargs)
 
 	def registrar_historial(self, autor, estado_anterior, observacion=None):
 		HistorialCompromiso.objects.create(
@@ -402,8 +448,7 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 
 	@transaction.atomic
 	def set_estado(self, estado, autor, observacion=None):
-		if estado not in dict(self.ESTADOS):
-			raise ValidationError(f'Estado de compromiso no válido: {estado}.')
+		self.validar_transicion(estado)
 		anterior = self.estado
 		self.estado = estado
 		self.save(update_fields=['estado'])
@@ -422,6 +467,7 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 	def cerrar_compromiso(self, resolucion, autor):
 		if not (resolucion or '').strip():
 			raise ValidationError('Cerrar un compromiso exige una resolución.')
+		self.validar_transicion('realizado')
 		anterior = self.estado
 		self.estado = 'realizado'
 		self.observacion = resolucion

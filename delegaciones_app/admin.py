@@ -328,6 +328,12 @@ class CompromisoAdmin(AdminAuditado):
     list_select_related = ['delegacion', 'funcionario_responsable']
     inlines = [HistorialCompromisoInline]
 
+    def has_delete_permission(self, request, obj=None):
+        # CU-14.2: un incumplimiento se conserva con su historial.
+        if obj is not None and obj.motivo_no_eliminable():
+            return False
+        return super().has_delete_permission(request, obj)
+
 
 @admin.register(HistorialCompromiso)
 class HistorialCompromisoAdmin(AdminAuditado):

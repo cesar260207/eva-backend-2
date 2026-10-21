@@ -21,13 +21,14 @@ from django.http import HttpResponse
 from django.views import View
 
 from .crud import MANTENEDORES
+from .models import validar_tamano_evidencia
 from .permisos import RolRequeridoMixin, roles_de, rol_requerido, tiene_rol
 from .models import (
 	Actividad, Auditoria, Cargo, Catalogo, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
 	HistorialCompromiso, Indicador, ItemMedible, MedicionDelegacion, Meta, ParametroVersionado, Periodo,
 	Rol, UsuarioMaestro, Validacion,
 )
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from django.utils import timezone
 
@@ -826,7 +827,7 @@ class BaseOperacion(TestCase):
 	def _compromiso(self, responsable=None, delegacion=None, folio='LS-OP-1'):
 		return Compromiso.objects.create(
 			folio=folio, delegacion=delegacion or self.centro, funcionario_responsable=(responsable or self.funcionario).funcionario,
-			solicitante='Junta de vecinos', territorio='Centro', descripcion='Poda de arboles', fecha_comprometida=date(2026, 12, 31), origen='externo',
+			solicitante='Junta de vecinos', territorio='Centro', descripcion='Poda de arboles', fecha_comprometida=timezone.localdate() + timedelta(days=60), origen='externo',
 		)
 
 
@@ -1564,3 +1565,163 @@ class AuditoriaTests(BaseOperacion):
 		self.assertNotContains(self.client.get(reverse('mantenedores')), reverse('auditoria_consulta'))
 		self.client.force_login(crear_funcionario('admin-aud2', 'administrador', cargo=self.cargo))
 		self.assertContains(self.client.get(reverse('mantenedores')), reverse('auditoria_consulta'))
+
+
+class EvidenciaTamanoTests(BaseOperacion):
+	"""Lote 2 (CU-09.2, RNF-017): las evidencias que superan el tamaño máximo configurado se rechazan con su motivo."""
+
+	def _pdf(self, megabytes):
+		return SimpleUploadedFile('respaldo.pdf', b'0' * int(megabytes * 1024 * 1024), content_type='application/pdf')
+
+	@override_settings(EVIDENCIA_TAMANO_MAXIMO_MB=1)
+	def test_el_validador_acepta_hasta_el_maximo_y_rechaza_lo_que_lo_supera(self):
+		validar_tamano_evidencia(self._pdf(1))
+		with self.assertRaises(ValidationError) as error:
+			validar_tamano_evidencia(self._pdf(1.5))
+		self.assertIn('1.5 MB', error.exception.messages[0])
+		self.assertIn('máximo permitido es 1 MB', error.exception.messages[0])
+
+	def test_el_maximo_por_defecto_es_de_5_megabytes(self):
+		validar_tamano_evidencia(self._pdf(5))
+		with self.assertRaises(ValidationError):
+			validar_tamano_evidencia(self._pdf(5.5))
+
+	def test_un_archivo_guardado_que_falta_en_el_disco_no_se_mide(self):
+		actividad = self._actividad()
+		evidencia = self._evidencia(actividad)
+		self.assertIsNone(validar_tamano_evidencia(evidencia.archivo_vinculo))
+
+	@override_settings(EVIDENCIA_TAMANO_MAXIMO_MB=1)
+	def test_el_formulario_de_evidencia_informa_el_motivo_del_rechazo(self):
+		actividad = self._actividad()
+		self.client.force_login(self.funcionario)
+		respuesta = self.client.post(reverse('actividad_detalle', args=[actividad.codigo_verificador]), {'archivo_vinculo': self._pdf(1.5), 'comentario': ''})
+		self.assertIn('archivo_vinculo', respuesta.context['evidencia_form'].errors)
+		self.assertContains(respuesta, 'máximo permitido es 1 MB')
+		self.assertFalse(Evidencia.objects.exists())
+
+	@override_settings(EVIDENCIA_TAMANO_MAXIMO_MB=1)
+	def test_subir_evidencia_rechaza_un_archivo_demasiado_pesado(self):
+		with self.assertRaises(ValidationError):
+			self.funcionario.funcionario.subir_evidencia(self._actividad(), self._pdf(1.5))
+
+
+class CompromisoReglasTests(BaseOperacion):
+	"""Lote 2 (CU-13, CU-14.2, RF-018, RF-019): transiciones controladas, alerta de vencimiento y conservación de incumplimientos."""
+
+	def _con_plazo(self, dias, estado='pendiente', folio=None):
+		compromiso = self._compromiso(folio=folio or f'PLAZO-{dias}-{estado}')
+		compromiso.fecha_comprometida = timezone.localdate() + timedelta(days=dias)
+		compromiso.estado = estado
+		compromiso.save()
+		return compromiso
+
+	def test_proximo_a_vencer_dentro_de_los_dias_de_alerta(self):
+		casos = [(0, 'pendiente', True), (3, 'pendiente', True), (4, 'pendiente', False), (-1, 'pendiente', False), (2, 'realizado', False)]
+		for dias, estado, esperado in casos:
+			compromiso = self._con_plazo(dias, estado)
+			self.assertEqual(compromiso.proximo_a_vencer, esperado, (dias, estado))
+
+	@override_settings(COMPROMISO_DIAS_ALERTA=7)
+	def test_los_dias_de_alerta_son_configurables(self):
+		self.assertTrue(self._con_plazo(7).proximo_a_vencer)
+		self.assertFalse(self._con_plazo(8).proximo_a_vencer)
+
+	def test_vencido_y_proximo_a_vencer_son_excluyentes(self):
+		vencido = self._con_plazo(-2)
+		self.assertTrue(vencido.vencido)
+		self.assertFalse(vencido.proximo_a_vencer)
+		self.assertFalse(self._con_plazo(1).vencido)
+
+	def test_estados_permitidos_avanzan_y_un_realizado_solo_se_reabre_a_en_proceso(self):
+		esperado = {
+			'ingresado': ['pendiente', 'proceso', 'realizado'], 'pendiente': ['proceso', 'realizado'],
+			'proceso': ['realizado'], 'realizado': ['proceso'],
+		}
+		for estado, permitidos in esperado.items():
+			compromiso = self._con_plazo(30, estado, folio=f'TR-{estado}')
+			self.assertEqual([valor for valor, _ in compromiso.estados_permitidos()], permitidos, estado)
+
+	def test_una_transicion_no_permitida_se_rechaza_y_no_deja_historial(self):
+		compromiso = self._con_plazo(30, 'proceso')
+		with self.assertRaises(ValidationError) as error:
+			compromiso.set_estado('pendiente', self.funcionario.funcionario)
+		self.assertIn('Transición no permitida', error.exception.messages[0])
+		with self.assertRaises(ValidationError):
+			compromiso.set_estado('inexistente', self.funcionario.funcionario)
+		self.assertEqual(Compromiso.objects.get(pk=compromiso.pk).estado, 'proceso')
+		self.assertFalse(compromiso.historial.exists())
+
+	def test_reabrir_un_realizado_guarda_la_observacion_en_el_historial(self):
+		compromiso = self._con_plazo(30, 'realizado')
+		compromiso.set_estado('proceso', self.funcionario.funcionario, 'Se detectó un error en el cierre')
+		registro = compromiso.historial.get()
+		self.assertEqual((registro.estado_anterior, registro.estado_nuevo, registro.observacion), ('realizado', 'proceso', 'Se detectó un error en el cierre'))
+
+	def test_cerrar_un_compromiso_ya_realizado_se_rechaza(self):
+		with self.assertRaises(ValidationError):
+			self._con_plazo(30, 'realizado').cerrar_compromiso('Otra resolución', self.funcionario.funcionario)
+
+	def test_un_incumplimiento_no_se_elimina_pero_uno_vigente_o_realizado_si(self):
+		vencido = self._con_plazo(-5)
+		self.assertIn('se conserva con su historial', vencido.motivo_no_eliminable())
+		with self.assertRaises(ValidationError):
+			vencido.delete()
+		self.assertTrue(Compromiso.objects.filter(pk=vencido.pk).exists())
+		vigente, realizado = self._con_plazo(30), self._con_plazo(-5, 'realizado', folio='REALIZADO-VENCIDO')
+		self.assertIsNone(vigente.motivo_no_eliminable())
+		vigente.delete()
+		realizado.delete()
+		self.assertFalse(Compromiso.objects.filter(pk__in=[vigente.pk, realizado.pk]).exists())
+
+	def test_la_vista_de_eliminar_explica_por_que_no_se_puede(self):
+		vencido = self._con_plazo(-5)
+		self.client.force_login(self.coordinador)
+		self.assertContains(self.client.get(reverse('compromiso_eliminar', args=[vencido.pk])), 'se conserva con su historial')
+		respuesta = self.client.post(reverse('compromiso_eliminar', args=[vencido.pk]), follow=True)
+		self.assertContains(respuesta, 'se conserva con su historial')
+		self.assertTrue(Compromiso.objects.filter(pk=vencido.pk).exists())
+		self.assertFalse(Auditoria.objects.filter(evento='eliminar', entidad='Compromiso').exists())
+
+	def test_la_agenda_destaca_los_proximos_a_vencer_y_cuenta_cada_grupo(self):
+		self._con_plazo(2, folio='POR-VENCER')
+		self._con_plazo(-3, folio='YA-VENCIDO')
+		self._con_plazo(40, 'realizado', folio='YA-REALIZADO')
+		self.client.force_login(self.coordinador)
+		respuesta = self.client.get(reverse('agenda'))
+		self.assertContains(respuesta, '1 compromiso próximo a vencer')
+		self.assertContains(respuesta, 'Próximo a vencer')
+		contexto = respuesta.context
+		self.assertEqual((contexto['por_vencer'], contexto['vencidos'], contexto['realizados'], contexto['proximos']), (1, 1, 1, 1))
+		estados = {c.folio: c.estado_display for c in contexto['compromisos']}
+		self.assertEqual(estados, {'POR-VENCER': 'Próximo a vencer', 'YA-VENCIDO': 'Vencido', 'YA-REALIZADO': 'Realizado'})
+
+	def test_la_agenda_ofrece_solo_las_transiciones_permitidas(self):
+		compromiso = self._con_plazo(30, 'proceso')
+		self.client.force_login(self.coordinador)
+		respuesta = self.client.get(reverse('agenda'))
+		self.assertContains(respuesta, reverse('compromiso_estado', args=[compromiso.pk, 'realizado']))
+		self.assertNotContains(respuesta, reverse('compromiso_estado', args=[compromiso.pk, 'pendiente']))
+
+	def test_el_cambio_de_estado_desde_la_vista_guarda_la_observacion_y_rechaza_lo_no_permitido(self):
+		compromiso = self._con_plazo(30, 'proceso')
+		self.client.force_login(self.coordinador)
+		self.client.post(reverse('compromiso_estado', args=[compromiso.pk, 'realizado']), {'observacion': 'Entregado a la junta de vecinos'})
+		compromiso.refresh_from_db()
+		self.assertEqual(compromiso.estado, 'realizado')
+		self.assertEqual(compromiso.historial.get().observacion, 'Entregado a la junta de vecinos')
+		auditoria = Auditoria.objects.get(evento='cambio_estado', identificador_registro=compromiso.folio)
+		self.assertEqual(json.loads(auditoria.valor_nuevo), {'estado': 'realizado', 'observacion': 'Entregado a la junta de vecinos'})
+
+		respuesta = self.client.post(reverse('compromiso_estado', args=[compromiso.pk, 'pendiente']), follow=True)
+		self.assertContains(respuesta, 'Transición no permitida')
+		self.assertEqual(Compromiso.objects.get(pk=compromiso.pk).estado, 'realizado')
+
+	def test_el_admin_no_ofrece_eliminar_un_incumplimiento(self):
+		cargar_demo()
+		self.assertTrue(self.client.login(username='admin.demo', password=CLAVE_DEMO))
+		vencido = Compromiso.objects.filter(estado='pendiente').first()
+		realizado = Compromiso.objects.filter(estado='realizado').first()
+		self.assertTrue(vencido.vencido)
+		self.assertEqual(self.client.get(reverse('admin:delegaciones_app_compromiso_delete', args=[vencido.pk])).status_code, 403)
+		self.assertEqual(self.client.get(reverse('admin:delegaciones_app_compromiso_delete', args=[realizado.pk])).status_code, 200)

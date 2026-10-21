@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
@@ -95,6 +96,8 @@ def _calcular_estado_compromiso(compromiso):
         return 'En proceso', 'primary'
     if compromiso.vencido:
         return 'Alerta Roja por Vencimiento', 'danger'
+    if compromiso.proximo_a_vencer:
+        return 'Próximo a vencer', 'warning'
     return 'Pendiente', 'warning'
 
 
@@ -134,7 +137,7 @@ def solicitudes(request):
         'solicitudes': compromisos,
         'query': query,
         'total': len(compromisos),
-        'pendientes': sum(1 for item in compromisos if item.estado_display == 'Pendiente'),
+        'pendientes': sum(1 for item in compromisos if item.estado_display in ('Pendiente', 'Próximo a vencer')),
         'en_proceso': sum(1 for item in compromisos if item.estado_display == 'En proceso'),
         'alertas': sum(1 for item in compromisos if item.estado_display == 'Alerta Roja por Vencimiento'),
     }
@@ -340,10 +343,12 @@ def compromiso_estado(request, pk, estado):
         return redirect('agenda')
     compromiso = _obtener_autorizado(request, _compromisos_autorizados(request.user), 'Compromiso', pk=pk)
     anterior = compromiso.estado
+    observacion = request.POST.get('observacion', '').strip()
     try:
         with transaction.atomic():
-            compromiso.set_estado(estado, funcionario)
-            Auditoria.registrar_evento(request.user, 'cambio_estado', 'Compromiso', compromiso.folio, anterior, estado)
+            compromiso.set_estado(estado, funcionario, observacion or None)
+            nuevo = {'estado': estado, 'observacion': observacion} if observacion else estado
+            Auditoria.registrar_evento(request.user, 'cambio_estado', 'Compromiso', compromiso.folio, anterior, nuevo)
     except ValidationError as error:
         messages.error(request, ' '.join(error.messages))
     else:
@@ -389,15 +394,21 @@ def compromiso_eliminar(request, pk):
         messages.error(request, 'Solo administración o coordinación puede eliminar compromisos.')
         return redirect('agenda')
     compromiso = get_object_or_404(Compromiso, pk=pk)
+    motivo = compromiso.motivo_no_eliminable()
     if request.method == 'POST':
         folio = compromiso.folio
-        with transaction.atomic():
-            Auditoria.registrar_evento(request.user, 'eliminar', 'Compromiso', folio, {'delegacion': compromiso.delegacion.nombre})
-            compromiso.delete()
-        messages.success(request, f'Compromiso {folio} eliminado.')
+        try:
+            with transaction.atomic():
+                compromiso.delete()
+                Auditoria.registrar_evento(request.user, 'eliminar', 'Compromiso', folio, {'delegacion': compromiso.delegacion.nombre})
+        except ValidationError as error:
+            messages.error(request, ' '.join(error.messages))
+        else:
+            messages.success(request, f'Compromiso {folio} eliminado.')
         return redirect('agenda')
     return render(request, 'delegaciones_app/compromiso_confirmar_eliminar.html', {
         'compromiso': compromiso,
+        'bloqueo': motivo,
     })
 
 
@@ -420,8 +431,13 @@ def agenda(request):
         )
     compromisos = list(compromisos)
     for compromiso in compromisos:
-        compromiso.estado_display = 'Vencido' if compromiso.vencido else compromiso.get_estado_display()
-        compromiso.estado_class = 'danger' if compromiso.vencido else ('success' if compromiso.estado == 'realizado' else 'warning')
+        if compromiso.vencido:
+            compromiso.estado_display, compromiso.estado_class = 'Vencido', 'danger'
+        elif compromiso.proximo_a_vencer:
+            compromiso.estado_display, compromiso.estado_class = 'Próximo a vencer', 'warning'
+        else:
+            compromiso.estado_display = compromiso.get_estado_display()
+            compromiso.estado_class = 'success' if compromiso.estado == 'realizado' else 'warning'
     return render(request, 'delegaciones_app/agenda.html', {
         'compromisos': compromisos,
         'delegaciones_filtro': Delegacion.objects.filter(estado=True),
@@ -429,6 +445,8 @@ def agenda(request):
         'delegacion_filtro': delegacion_id or '',
         'query': query,
         'proximos': sum(1 for item in compromisos if item.estado != 'realizado' and not item.vencido),
+        'por_vencer': sum(1 for item in compromisos if item.proximo_a_vencer),
+        'dias_alerta': settings.COMPROMISO_DIAS_ALERTA,
         'vencidos': sum(1 for item in compromisos if item.vencido),
         'realizados': sum(1 for item in compromisos if item.estado == 'realizado'),
     })

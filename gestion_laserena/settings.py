@@ -155,3 +155,8 @@ MEDIA_ROOT = BASE_DIR / 'media'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'inicio'
 LOGOUT_REDIRECT_URL = 'inicio'
+
+# Reglas configurables sin tocar el código (RNF-015): tamaño máximo de una evidencia en MB (RNF-017)
+# y días de anticipación con que un compromiso se marca como próximo a vencer (RF-019).
+EVIDENCIA_TAMANO_MAXIMO_MB = env.int('EVIDENCIA_TAMANO_MAXIMO_MB', default=5)
+COMPROMISO_DIAS_ALERTA = env.int('COMPROMISO_DIAS_ALERTA', default=3)
