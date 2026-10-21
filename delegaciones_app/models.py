@@ -568,7 +568,7 @@ class Periodo(models.Model):
 			raise ValidationError('Solo se puede iniciar un período en borrador.')
 		# RN-001: al iniciar, los ítems de cada cargo deben sumar exactamente 100 %.
 		sumas = self.items.values('cargo', 'cargo__nombre').annotate(total=Sum('ponderacion'))
-		incompletos = [f"{fila['cargo__nombre']} ({fila['total']} %)" for fila in sumas if fila['total'] != 100]
+		incompletos = [f"{fila['cargo__nombre']} ({Decimal(fila['total']).quantize(DOS_DECIMALES)} %)" for fila in sumas if fila['total'] != 100]
 		if incompletos:
 			raise ValidationError('Las ponderaciones de cada cargo deben sumar 100 %: ' + ', '.join(incompletos))
 		self.estado = 'abierto'
@@ -693,7 +693,7 @@ class ItemMedible(ControlPeriodoCerradoMixin, models.Model):
 			otros = ItemMedible.objects.filter(cargo_id=self.cargo_id, periodo_id=self.periodo_id).exclude(pk=self.pk)
 			total = (otros.aggregate(total=Sum('ponderacion'))['total'] or 0) + self.ponderacion
 			if total > 100:
-				raise ValidationError({'ponderacion': f'Las ponderaciones del cargo en el período sumarían {total} %; no pueden superar 100 %.'})
+				raise ValidationError({'ponderacion': f'Las ponderaciones del cargo en el período sumarían {Decimal(total).quantize(DOS_DECIMALES)} %; no pueden superar 100 %.'})
 
 
 class Catalogo(models.Model):

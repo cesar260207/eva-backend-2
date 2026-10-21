@@ -23,6 +23,7 @@ from django.views import View
 from .crud import MANTENEDORES
 from .informes import filtrar_actividades, filtrar_compromisos
 from .models import validar_tamano_evidencia
+from .pruebas_base import crear_funcionario
 from .permisos import RolRequeridoMixin, roles_de, rol_requerido, tiene_rol
 from .models import (
 	Actividad, Auditoria, Cargo, Catalogo, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
@@ -32,16 +33,6 @@ from .models import (
 from datetime import datetime, timedelta
 from decimal import Decimal
 from django.utils import timezone
-
-
-def crear_funcionario(username, *roles, cargo=None, delegacion=None):
-	"""Usuario de Django con su Funcionario y roles (la migración 0010 crea los seis roles del sistema)."""
-	usuario = User.objects.create_user(username, password='clave-segura')
-	cargo = cargo or Cargo.objects.get_or_create(nombre='Profesional territorial')[0]
-	funcionario = Funcionario.objects.create(usuario=usuario, identificador_institucional=username, nombre=username, cargo=cargo, delegacion=delegacion)
-	for rol in roles:
-		FuncionarioRol.objects.create(funcionario=funcionario, rol=Rol.objects.get(nombre_rol=rol))
-	return usuario
 
 
 class OrganizacionAccesoTests(TestCase):
