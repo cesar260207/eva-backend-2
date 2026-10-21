@@ -1,6 +1,6 @@
 # Checklist de la entrega
 
-Este documento resume la pauta compartida por el equipo. El proyecto se migró al modelo de 17 clases y se revisó en local. El servidor EC2 corresponde a la versión anterior del modelo y está pendiente de actualizar (ver la sección de despliegue del README.md y la sección «EC2» más abajo).
+Este documento resume la pauta compartida por el equipo. El proyecto se migró al modelo de 17 clases, se revisó en local y se desplegó en EC2 el 21-10-2026 (ver la sección «EC2» y el README.md).
 
 ## Requisito de equipo
 
@@ -50,7 +50,7 @@ Este documento resume la pauta compartida por el equipo. El proyecto se migró a
 - [x] Crear/preparar instancia EC2 Linux con Python, venv, Django, Git, servidor web y base de datos compatible.
 - [x] Clonar desde el repositorio GitHub, configurar variables de entorno, instalar dependencias, migrar y cargar datos (versión anterior del modelo).
 - [x] Verificar aplicación y phpMyAdmin desde EC2.
-- [ ] Actualizar el servidor al modelo de 17 clases: respaldo con `mysqldump`, anotar el commit actual, `git pull`, `pip install`, `migrate`, `calcular_indicadores`, `collectstatic`, reiniciar Gunicorn y verificar. Las migraciones `0011` a `0013` aún no se ensayaron sobre MySQL.
+- [x] Actualizar el servidor al modelo de 17 clases (21-10-2026): respaldo con `mysqldump`, ensayo previo de las migraciones sobre una copia de la base, `git pull`, `migrate`, `calcular_indicadores`, `collectstatic` y reinicio de Gunicorn. Los conteos de registros coincidieron antes y después y las pantallas se verificaron en el navegador.
 
 ## Pruebas
 
@@ -75,3 +75,5 @@ Este documento resume la pauta compartida por el equipo. El proyecto se migró a
 - Despliegue real en EC2: Amazon Linux 2023, MySQL 8.4 (no MariaDB), Gunicorn como servicio systemd, Nginx como proxy inverso y phpMyAdmin con PHP-FPM protegido con doble autenticación.
 - La base local con XAMPP/MariaDB 10.4 no era compatible con Django 5.2; por eso la base definitiva es MySQL 8.4 en la EC2.
 - XAMPP reportó un error de checksum de Aria al configurar privilegios de un usuario de aplicación local; `gestion_user` quedó sin privilegios sobre la base.
+- El despliegue del modelo de 17 clases se ensayó primero sobre una copia de la base real: las migraciones `0007` a `0014` se aplicaron sin errores sobre MySQL 8.4. En el servidor quedan dos respaldos de la base anteriores al cambio.
+- La migración creó delegados provisionales inactivos para las delegaciones sin funcionarios y el período «Período 11-2026»; conviene revisarlos y reemplazarlos desde los mantenedores.
