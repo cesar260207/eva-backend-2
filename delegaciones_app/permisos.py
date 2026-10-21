@@ -15,6 +15,9 @@ FUNCIONARIO = 'funcionario'
 VERIFICADOR = 'verificador'
 CONSULTA = 'consulta'
 
+# Los permisos consultan estos nombres: no se renombran ni se eliminan desde el mantenedor de roles.
+ROLES_DEL_SISTEMA = (ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICADOR, CONSULTA)
+
 MENSAJE_SIN_PERMISO = 'No tienes permiso para acceder a esta sección.'
 
 

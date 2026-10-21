@@ -589,6 +589,11 @@ class Periodo(models.Model):
 		self.dias_computables = (self.fecha_termino - self.fecha_inicio).days + 1
 		super().save(*args, **kwargs)
 
+	def delete(self, *args, **kwargs):
+		if self._estado_guardado() == 'cerrado':
+			self.verificar_editable('cerrado')
+		return super().delete(*args, **kwargs)
+
 	def iniciar_periodo(self):
 		if self.estado != 'borrador':
 			raise ValidationError('Solo se puede iniciar un período en borrador.')

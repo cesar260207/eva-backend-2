@@ -1,5 +1,5 @@
 ﻿from django.urls import path
-from . import views
+from . import crud, views
 
 urlpatterns = [
     path('', views.index, name='inicio'),
@@ -16,33 +16,13 @@ urlpatterns = [
     path('actividad/<str:codigo>/editar/', views.actividad_editar, name='actividad_editar'),
     path('actividad/<str:codigo>/eliminar/', views.actividad_eliminar, name='actividad_eliminar'),
     path('actividad/<str:codigo>/<str:decision>/', views.revisar_actividad, name='revisar_actividad'),
-    path('administracion/delegaciones/', views.delegaciones_crud, name='delegaciones_crud'),
-    path('administracion/perfiles/', views.perfiles_usuario, name='perfiles_usuario'),
-    path('administracion/perfiles/nuevo/', views.perfil_usuario_form, name='perfil_usuario_nuevo'),
-    path('administracion/perfiles/<int:pk>/editar/', views.perfil_usuario_form, name='perfil_usuario_editar'),
-    path('administracion/perfiles/<int:pk>/eliminar/', views.perfil_usuario_eliminar, name='perfil_usuario_eliminar'),
-    path('administracion/periodos/', views.periodos_medicion, name='periodos_medicion'),
-    path('administracion/periodos/nuevo/', views.periodo_medicion_form, name='periodo_medicion_nuevo'),
-    path('administracion/periodos/<int:pk>/editar/', views.periodo_medicion_form, name='periodo_medicion_editar'),
-    path('administracion/periodos/<int:pk>/eliminar/', views.periodo_medicion_eliminar, name='periodo_medicion_eliminar'),
-    path('administracion/', views.mantenedores, name='mantenedores'),
-    path('administracion/delegaciones/nueva/', views.delegacion_form, name='delegacion_nueva'),
-    path('administracion/delegaciones/<int:pk>/editar/', views.delegacion_form, name='delegacion_editar'),
-    path('administracion/delegaciones/<int:pk>/estado/', views.delegacion_cambiar_estado, name='delegacion_cambiar_estado'),
-    path('administracion/catalogo/', views.catalogo_lista, name='catalogo_lista'),
-    path('administracion/catalogo/nuevo/', views.catalogo_form, name='catalogo_nuevo'),
-    path('administracion/catalogo/<int:pk>/editar/', views.catalogo_form, name='catalogo_editar'),
-    path('administracion/catalogo/<int:pk>/eliminar/', views.catalogo_eliminar, name='catalogo_eliminar'),
-    path('administracion/evidencias/', views.evidencia_lista, name='evidencia_lista'),
-    path('administracion/evidencias/nueva/', views.evidencia_form, name='evidencia_nueva'),
-    path('administracion/evidencias/<int:pk>/editar/', views.evidencia_form, name='evidencia_editar'),
-    path('administracion/evidencias/<int:pk>/eliminar/', views.evidencia_eliminar, name='evidencia_eliminar'),
-    path('administracion/metas/', views.meta_lista, name='metas_lista'),
-    path('administracion/metas/nueva/', views.meta_form, name='meta_nueva'),
-    path('administracion/metas/<int:pk>/editar/', views.meta_form, name='meta_editar'),
-    path('administracion/metas/<int:pk>/eliminar/', views.meta_eliminar, name='meta_eliminar'),
-    # Las rutas especificas de cada CRUD deben ir antes de esta ruta generica.
-    path('administracion/<slug:slug>/', views.mantenedor_lista, name='mantenedor_lista'),
+    # Mantenedores de las tablas maestras (ver crud.py).
+    path('administracion/', crud.indice, name='mantenedores'),
+    path('administracion/periodos/<int:pk>/estado/<str:accion>/', crud.PeriodoAccion.as_view(), name='periodo_accion'),
+    path('administracion/<slug:slug>/', crud.MantenedorLista.as_view(), name='mantenedor_lista'),
+    path('administracion/<slug:slug>/nuevo/', crud.MantenedorNuevo.as_view(), name='mantenedor_nuevo'),
+    path('administracion/<slug:slug>/<int:pk>/editar/', crud.MantenedorEditar.as_view(), name='mantenedor_editar'),
+    path('administracion/<slug:slug>/<int:pk>/eliminar/', crud.MantenedorEliminar.as_view(), name='mantenedor_eliminar'),
     path('territorio/', views.institucional, name='institucional'),
     path('delegacion/<str:nombre>/', views.delegacion_detalle, name='delegacion_detalle'),
 ]

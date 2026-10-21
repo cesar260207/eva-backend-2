@@ -6,12 +6,13 @@
         <div class="page-kicker">Confirmación requerida</div>
         <h1 class="page-title mb-4">{{ titulo }}</h1>
         <div class="panel">
-            <p>¿Confirmas eliminar <strong>{{ objeto }}</strong>?</p>
+            <p>{{ pregunta }} <strong>{{ objeto }}</strong>?</p>
+            {% if bloqueo %}<div class="alert alert-danger">{{ bloqueo }}</div>{% endif %}
             {% if advertencia %}<div class="alert alert-warning">{{ advertencia }}</div>{% endif %}
             <form method="post" class="d-flex justify-content-end gap-2">
                 {% csrf_token %}
                 <a href="{{ volver_url }}" class="btn btn-light">Cancelar</a>
-                <button class="btn btn-danger" type="submit">Confirmar eliminación</button>
+                {% if not bloqueo %}<button class="btn {% if peligro %}btn-danger{% else %}btn-sgr{% endif %}" type="submit">{{ boton }}</button>{% endif %}
             </form>
         </div>
     </div>

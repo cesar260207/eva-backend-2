@@ -15,10 +15,10 @@ from django.db import IntegrityError, transaction
 from django.http import HttpResponse
 from django.views import View
 
-from .forms import EvidenciaMantenedorForm
+from .crud import MANTENEDORES
 from .permisos import RolRequeridoMixin, roles_de, rol_requerido, tiene_rol
 from .models import (
-	Actividad, Auditoria, Cargo, Catalogo, CatalogoItem, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
+	Actividad, Auditoria, Cargo, Catalogo, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
 	HistorialCompromiso, Indicador, ItemMedible, Meta, MetaMedicion, ParametroVersionado, PerfilUsuario, Periodo,
 	PeriodoMedicion, Rol, UsuarioMaestro, Validacion,
 )
@@ -35,41 +35,6 @@ class SGRMVPTests(TestCase):
 		PerfilUsuario.objects.create(usuario=self.coordinador, rol='coordinador')
 		self.funcionario = User.objects.create_user('funcionario', password='clave-segura')
 		PerfilUsuario.objects.create(usuario=self.funcionario, rol='funcionario', delegacion=self.delegacion)
-
-	def test_coordinador_puede_administrar_delegaciones(self):
-		self.client.force_login(self.coordinador)
-		response = self.client.post(reverse('delegacion_nueva'), {'nombre': 'La Antena', 'territorio': 'Oriente', 'enfasis': 'Participacion', 'activa': 'on'})
-		self.assertRedirects(response, reverse('delegaciones_crud'))
-		self.assertTrue(Delegacion.objects.filter(nombre='La Antena').exists())
-
-	def test_funcionario_no_puede_administrar_delegaciones(self):
-		self.client.force_login(self.funcionario)
-		response = self.client.get(reverse('delegaciones_crud'))
-		self.assertRedirects(response, reverse('inicio'))
-
-	def test_coordinador_visualiza_los_ocho_mantenedores(self):
-		self.client.force_login(self.coordinador)
-		response = self.client.get(reverse('mantenedores'))
-		self.assertContains(response, 'Ocho mantenedores')
-		# Perfiles es exclusivo del Administrador (CU-26, RNF-005): el coordinador ve la tarjeta deshabilitada.
-		self.assertContains(response, 'Disponible para administradores')
-		for slug in ('delegaciones', 'catalogo', 'periodos', 'actividades', 'evidencias', 'compromisos', 'metas'):
-			response = self.client.get(reverse('mantenedor_lista', args=[slug]))
-			self.assertEqual(response.status_code, 200, slug)
-			self.assertContains(response, 'Agregar')
-			self.assertContains(response, 'Buscar')
-
-	def test_coordinador_no_puede_entrar_a_perfiles(self):
-		self.client.force_login(self.coordinador)
-		response = self.client.get(reverse('perfiles_usuario'))
-		self.assertRedirects(response, reverse('inicio'))
-
-	def test_administrador_entra_a_perfiles(self):
-		administrador = User.objects.create_user('administrador', password='clave-segura')
-		PerfilUsuario.objects.create(usuario=administrador, rol='administrador')
-		self.client.force_login(administrador)
-		response = self.client.get(reverse('perfiles_usuario'))
-		self.assertEqual(response.status_code, 200)
 
 	def test_actividad_genera_codigo_y_auditoria(self):
 		self.client.force_login(self.funcionario)
@@ -117,69 +82,6 @@ class SGRMVPTests(TestCase):
 		response = self.client.post(reverse('logout'))
 		self.assertRedirects(response, reverse('inicio'))
 		self.assertFalse('_auth_user_id' in self.client.session)
-
-
-class CatalogoCRUDTests(TestCase):
-	def setUp(self):
-		self.delegacion = Delegacion.objects.create(nombre='Centro', territorio='Centro', enfasis='Atencion territorial')
-		self.coordinador = User.objects.create_user('coordinador-catalogo', password='clave-segura')
-		PerfilUsuario.objects.create(usuario=self.coordinador, rol='coordinador')
-		self.funcionario = User.objects.create_user('funcionario-catalogo', password='clave-segura')
-		PerfilUsuario.objects.create(usuario=self.funcionario, rol='funcionario', delegacion=self.delegacion)
-		self.client.force_login(self.coordinador)
-
-	def test_ruta_catalogo_muestra_su_lista_y_busca(self):
-		CatalogoItem.objects.create(categoria='servicio', codigo='SRV-01', nombre='Orientacion vecinal')
-		CatalogoItem.objects.create(categoria='actividad', codigo='ACT-02', nombre='Operativo rural')
-
-		response = self.client.get(reverse('mantenedor_lista', args=['catalogo']), {'q': 'SRV-01'})
-
-		self.assertEqual(response.status_code, 200)
-		self.assertTemplateUsed(response, 'delegaciones_app/catalogo_lista.html')
-		self.assertContains(response, 'Orientacion vecinal')
-		self.assertNotContains(response, 'Operativo rural')
-
-	def test_crear_item_y_registrar_auditoria(self):
-		response = self.client.post(reverse('catalogo_nuevo'), {
-			'categoria': 'servicio', 'codigo': 'SRV-NUEVO', 'nombre': 'Atencion comunitaria',
-			'area': 'Territorio', 'activo': 'on',
-		})
-
-		self.assertRedirects(response, reverse('catalogo_lista'))
-		item = CatalogoItem.objects.get(categoria='servicio', codigo='SRV-NUEVO')
-		self.assertTrue(Auditoria.objects.filter(entidad='CatalogoItem', identificador=str(item.pk), accion='crear').exists())
-
-	def test_formulario_rechaza_categoria_y_codigo_duplicados(self):
-		CatalogoItem.objects.create(categoria='servicio', codigo='SRV-DUP', nombre='Existente')
-
-		response = self.client.post(reverse('catalogo_nuevo'), {
-			'categoria': 'servicio', 'codigo': 'SRV-DUP', 'nombre': 'Duplicado',
-			'area': '', 'activo': 'on',
-		})
-
-		self.assertEqual(response.status_code, 200)
-		self.assertFalse(response.context['form'].is_valid())
-		self.assertTrue(response.context['form'].errors)
-		self.assertEqual(CatalogoItem.objects.filter(categoria='servicio', codigo='SRV-DUP').count(), 1)
-
-	def test_eliminar_requiere_confirmacion_post_y_audita(self):
-		item = CatalogoItem.objects.create(categoria='servicio', codigo='SRV-BORRAR', nombre='Temporal')
-
-		response = self.client.get(reverse('catalogo_eliminar', args=[item.pk]))
-		self.assertEqual(response.status_code, 200)
-		self.assertTrue(CatalogoItem.objects.filter(pk=item.pk).exists())
-
-		response = self.client.post(reverse('catalogo_eliminar', args=[item.pk]))
-		self.assertRedirects(response, reverse('catalogo_lista'))
-		self.assertFalse(CatalogoItem.objects.filter(pk=item.pk).exists())
-		self.assertTrue(Auditoria.objects.filter(entidad='CatalogoItem', identificador=str(item.pk), accion='eliminar').exists())
-
-	def test_funcionario_no_puede_entrar_al_mantenedor(self):
-		self.client.force_login(self.funcionario)
-
-		response = self.client.get(reverse('catalogo_lista'))
-
-		self.assertRedirects(response, reverse('inicio'))
 
 
 class ActividadCRUDTests(TestCase):
@@ -296,129 +198,6 @@ class ActividadCRUDTests(TestCase):
 		self.actividad.refresh_from_db()
 		self.assertEqual(self.actividad.descripcion, 'Ajustada por coordinacion')
 		self.assertEqual(self.actividad.funcionario, self.funcionario)
-
-	def test_tarjeta_de_mantenedores_enlaza_al_listado_de_actividades(self):
-		self.client.force_login(self.coordinador)
-
-		response = self.client.get(reverse('mantenedores'))
-
-		self.assertContains(response, f'href="{reverse("actividades")}"')
-		self.assertNotContains(response, f'href="{reverse("mantenedor_lista", args=["actividades"])}"')
-
-
-class EvidenciaCRUDTests(TestCase):
-	def setUp(self):
-		media = tempfile.mkdtemp()
-		self.addCleanup(shutil.rmtree, media, ignore_errors=True)
-		ajuste_media = override_settings(MEDIA_ROOT=media)
-		ajuste_media.enable()
-		self.addCleanup(ajuste_media.disable)
-
-		self.delegacion = Delegacion.objects.create(nombre='Centro', territorio='Centro', enfasis='Atencion territorial')
-		self.coordinador = User.objects.create_user('coordinador-evidencia', password='clave-segura')
-		PerfilUsuario.objects.create(usuario=self.coordinador, rol='coordinador')
-		self.funcionario = User.objects.create_user('funcionario-evidencia', password='clave-segura')
-		PerfilUsuario.objects.create(usuario=self.funcionario, rol='funcionario', delegacion=self.delegacion)
-		self.actividad = Actividad.objects.create(codigo='EVD-EVID-1', funcionario=self.funcionario, delegacion=self.delegacion, fecha=date(2026, 9, 1), tipo_atencion='Solicitud', descripcion='Primera', accion='Accion', item_medicion='Item')
-		self.aprobada = Actividad.objects.create(codigo='EVD-EVID-2', funcionario=self.funcionario, delegacion=self.delegacion, fecha=date(2026, 9, 2), tipo_atencion='Solicitud', descripcion='Segunda', accion='Accion', item_medicion='Item', estado='aprobada')
-		self.client.force_login(self.coordinador)
-
-	def _archivo(self, nombre='respaldo.pdf'):
-		return SimpleUploadedFile(nombre, b'%PDF-1.4 prueba', content_type='application/pdf')
-
-	def test_ruta_evidencias_muestra_su_lista_y_busca_por_codigo_y_comentario(self):
-		evidencia = Evidencia.objects.create(actividad=self.actividad, archivo='evidencias/uno.pdf', comentario='Acta de reunion vecinal')
-		Evidencia.objects.create(actividad=self.aprobada, archivo='evidencias/dos.pdf', comentario='Fotografia de operativo')
-
-		response = self.client.get(reverse('mantenedor_lista', args=['evidencias']), {'q': 'EVD-EVID-1'})
-
-		self.assertTemplateUsed(response, 'delegaciones_app/evidencia_lista.html')
-		self.assertContains(response, 'Acta de reunion vecinal')
-		self.assertNotContains(response, 'Fotografia de operativo')
-		for url in (reverse('evidencia_nueva'), reverse('evidencia_editar', args=[evidencia.pk]), reverse('evidencia_eliminar', args=[evidencia.pk])):
-			self.assertContains(response, url)
-
-		response = self.client.get(reverse('evidencia_lista'), {'q': 'operativo'})
-		self.assertContains(response, 'Fotografia de operativo')
-		self.assertNotContains(response, 'Acta de reunion vecinal')
-
-	def test_crear_evidencia_sube_archivo_y_audita_sin_cambiar_la_actividad(self):
-		response = self.client.post(reverse('evidencia_nueva'), {'actividad': self.aprobada.pk, 'archivo': self._archivo(), 'comentario': 'Respaldo inicial', 'aprobada': 'unknown'})
-
-		self.assertRedirects(response, reverse('evidencia_lista'))
-		evidencia = Evidencia.objects.get(comentario='Respaldo inicial')
-		self.assertEqual(evidencia.actividad, self.aprobada)
-		self.assertTrue(evidencia.archivo.name.endswith('.pdf'))
-		self.assertIsNone(evidencia.aprobada)
-		self.assertIsNone(evidencia.revisada_por)
-		self.assertTrue(Auditoria.objects.filter(entidad='Evidencia', identificador=str(evidencia.pk), accion='crear').exists())
-		self.aprobada.refresh_from_db()
-		self.assertEqual(self.aprobada.estado, 'aprobada')
-
-	def test_rechaza_extension_no_permitida(self):
-		archivo = SimpleUploadedFile('script.exe', b'MZ', content_type='application/octet-stream')
-
-		response = self.client.post(reverse('evidencia_nueva'), {'actividad': self.actividad.pk, 'archivo': archivo, 'comentario': '', 'aprobada': 'unknown'})
-
-		self.assertEqual(response.status_code, 200)
-		self.assertIn('archivo', response.context['form'].errors)
-		self.assertFalse(Evidencia.objects.exists())
-
-	def test_editar_sin_archivo_nuevo_conserva_el_actual(self):
-		evidencia = Evidencia.objects.create(actividad=self.actividad, archivo=self._archivo('original.pdf'), comentario='Antes')
-		archivo_original = evidencia.archivo.name
-		url = reverse('evidencia_editar', args=[evidencia.pk])
-		self.assertContains(self.client.get(url), 'enctype="multipart/form-data"')
-
-		response = self.client.post(url, {'actividad': self.actividad.pk, 'comentario': 'Despues', 'aprobada': 'unknown'})
-
-		self.assertRedirects(response, reverse('evidencia_lista'))
-		evidencia.refresh_from_db()
-		self.assertEqual(evidencia.archivo.name, archivo_original)
-		self.assertEqual(evidencia.comentario, 'Despues')
-		self.assertTrue(Auditoria.objects.filter(entidad='Evidencia', identificador=str(evidencia.pk), accion='editar').exists())
-
-	def test_validador_marca_revision_y_queda_como_revisor(self):
-		evidencia = Evidencia.objects.create(actividad=self.actividad, archivo='evidencias/revision.pdf')
-
-		self.client.post(reverse('evidencia_editar', args=[evidencia.pk]), {'actividad': self.actividad.pk, 'comentario': '', 'aprobada': 'true'})
-
-		evidencia.refresh_from_db()
-		self.assertTrue(evidencia.aprobada)
-		self.assertEqual(evidencia.revisada_por, self.coordinador)
-
-	def test_revision_solo_se_ofrece_a_quien_puede_validar(self):
-		self.assertIn('aprobada', EvidenciaMantenedorForm(puede_validar=True).fields)
-		self.assertNotIn('aprobada', EvidenciaMantenedorForm(puede_validar=False).fields)
-
-	def test_eliminar_requiere_confirmacion_post_y_audita(self):
-		evidencia = Evidencia.objects.create(actividad=self.actividad, archivo='evidencias/borrar.pdf')
-		url = reverse('evidencia_eliminar', args=[evidencia.pk])
-
-		response = self.client.get(url)
-		self.assertEqual(response.status_code, 200)
-		self.assertTrue(Evidencia.objects.filter(pk=evidencia.pk).exists())
-
-		response = self.client.post(url)
-		self.assertRedirects(response, reverse('evidencia_lista'))
-		self.assertFalse(Evidencia.objects.filter(pk=evidencia.pk).exists())
-		self.assertTrue(Actividad.objects.filter(pk=self.actividad.pk).exists())
-		self.assertTrue(Auditoria.objects.filter(entidad='Evidencia', identificador=str(evidencia.pk), accion='eliminar').exists())
-
-	def test_funcionario_y_verificador_no_pueden_usar_el_mantenedor(self):
-		evidencia = Evidencia.objects.create(actividad=self.actividad, archivo='evidencias/protegida.pdf', comentario='Original')
-		verificador = User.objects.create_user('verificador-evidencia', password='clave-segura')
-		PerfilUsuario.objects.create(usuario=verificador, rol='verificador')
-		urls = (reverse('evidencia_lista'), reverse('evidencia_nueva'), reverse('evidencia_editar', args=[evidencia.pk]), reverse('evidencia_eliminar', args=[evidencia.pk]))
-
-		for usuario in (self.funcionario, verificador):
-			self.client.force_login(usuario)
-			for url in urls:
-				self.assertRedirects(self.client.get(url), reverse('inicio'))
-			self.assertRedirects(self.client.post(reverse('evidencia_eliminar', args=[evidencia.pk])), reverse('inicio'))
-
-		self.assertTrue(Evidencia.objects.filter(pk=evidencia.pk, comentario='Original').exists())
-
 
 class AccesoAutenticadoTests(TestCase):
 	"""RNF-004 (acceso con identidad individual) y CU-29.1 (resultados limitados al ámbito)."""
@@ -961,3 +740,241 @@ class PermisosTests(TestCase):
 		self.assertEqual((sin_permiso.status_code, sin_permiso.url), (302, reverse('inicio')))
 		anonimo = self._llamar(vista, AnonymousUser())
 		self.assertEqual((anonimo.status_code, anonimo.url), (302, f"{reverse('login')}?next=/prueba/"))
+
+
+class MantenedoresTests(TestCase):
+	"""Etapa 5b: CRUD genérico de las ocho tablas maestras (se amplía con sus CU en la Etapa 6)."""
+
+	def setUp(self):
+		self.cargo = Cargo.objects.create(nombre='Profesional territorial')
+		self.centro = Delegacion.objects.create(nombre='Centro', ambito='Centro historico', enfasis='Atencion territorial')
+		self.admin = self._usuario('admin.crud', 'administrador')
+		self.coordinador = self._usuario('coord.crud', 'coordinador')
+		self.funcionario = self._usuario('func.crud', 'funcionario')
+		self.client.force_login(self.admin)
+
+	def _usuario(self, username, *roles):
+		usuario = User.objects.create_user(username, password='clave-segura')
+		funcionario = Funcionario.objects.create(usuario=usuario, identificador_institucional=username, nombre=username, cargo=self.cargo)
+		for rol in roles:
+			FuncionarioRol.objects.create(funcionario=funcionario, rol=Rol.objects.get(nombre_rol=rol))
+		return usuario
+
+	def _url(self, nombre, slug, *args):
+		return reverse(nombre, args=[slug, *args])
+
+	def _auditoria(self, evento, entidad):
+		return Auditoria.objects.filter(evento=evento, entidad=entidad)
+
+	def _periodo_con_item(self, ponderacion=100):
+		periodo = Periodo.objects.create(nombre='Septiembre 2026', fecha_inicio=date(2026, 9, 1), fecha_termino=date(2026, 9, 30))
+		return periodo, ItemMedible.objects.create(cargo=self.cargo, periodo=periodo, nombre='Atencion territorial', ponderacion=ponderacion)
+
+	def test_indice_deshabilita_los_mantenedores_exclusivos_del_administrador(self):
+		respuesta = self.client.get(reverse('mantenedores'))
+		self.assertContains(respuesta, 'Ver registros', count=8)
+		self.assertNotContains(respuesta, 'Disponible para administradores')
+		self.client.force_login(self.coordinador)
+		respuesta = self.client.get(reverse('mantenedores'))
+		self.assertContains(respuesta, 'Ver registros', count=6)
+		self.assertContains(respuesta, 'Disponible para administradores', count=2)
+
+	def test_las_ocho_listas_tienen_agregar_y_buscar(self):
+		self.assertEqual(len(MANTENEDORES), 8)
+		for slug in MANTENEDORES:
+			respuesta = self.client.get(reverse('mantenedor_lista', args=[slug]))
+			self.assertEqual(respuesta.status_code, 200, slug)
+			self.assertContains(respuesta, 'Agregar')
+			self.assertContains(respuesta, 'Buscar')
+
+	def test_acceso_segun_el_rol(self):
+		for slug in ('funcionarios', 'roles'):
+			self.client.force_login(self.coordinador)
+			self.assertRedirects(self.client.get(reverse('mantenedor_lista', args=[slug])), reverse('inicio'))
+		self.assertEqual(self.client.get(reverse('mantenedor_lista', args=['delegaciones'])).status_code, 200)
+		self.client.force_login(self.funcionario)
+		self.assertRedirects(self.client.get(reverse('mantenedores')), reverse('inicio'))
+		self.assertRedirects(self.client.get(reverse('mantenedor_lista', args=['catalogo'])), reverse('inicio'))
+		self.client.logout()
+		url = reverse('mantenedor_lista', args=['catalogo'])
+		self.assertRedirects(self.client.get(url), f"{reverse('login')}?next={url}")
+
+	def test_mantenedor_inexistente_es_404(self):
+		self.assertEqual(self.client.get('/administracion/inexistente/').status_code, 404)
+
+	def test_crear_y_editar_delegacion_deja_auditoria_con_valores(self):
+		self.client.post(self._url('mantenedor_nuevo', 'delegaciones'), {'nombre': 'Rural', 'ambito': 'Localidades rurales', 'enfasis': '', 'estado': 'on'})
+		rural = Delegacion.objects.get(nombre='Rural')
+		self.assertEqual(self._auditoria('crear', 'Delegacion').get().funcionario.usuario, self.admin)
+
+		self.client.post(self._url('mantenedor_editar', 'delegaciones', rural.pk), {'nombre': 'Rural', 'ambito': 'Sector rural', 'enfasis': '', 'estado': 'on'})
+		edicion = self._auditoria('editar', 'Delegacion').get()
+		self.assertEqual((edicion.valor_anterior, edicion.valor_nuevo), ('{"ambito": "Localidades rurales"}', '{"ambito": "Sector rural"}'))
+
+	def test_busqueda_filtra_la_lista(self):
+		Catalogo.objects.create(codigo='SRV-01', nombre='Orientacion vecinal', tipo='servicio')
+		Catalogo.objects.create(codigo='ACT-02', nombre='Operativo rural', tipo='actividad')
+		respuesta = self.client.get(reverse('mantenedor_lista', args=['catalogo']), {'q': 'SRV-01'})
+		self.assertContains(respuesta, 'Orientacion vecinal')
+		self.assertNotContains(respuesta, 'Operativo rural')
+
+	def test_catalogo_rechaza_codigo_duplicado(self):
+		Catalogo.objects.create(codigo='DUP', nombre='Existente', tipo='servicio')
+		respuesta = self.client.post(self._url('mantenedor_nuevo', 'catalogo'), {'codigo': 'DUP', 'nombre': 'Otro', 'tipo': 'atencion', 'activo': 'on'})
+		self.assertEqual(respuesta.status_code, 200)
+		self.assertIn('codigo', respuesta.context['form'].errors)
+		self.assertEqual(Catalogo.objects.filter(codigo='DUP').count(), 1)
+
+	def test_catalogo_se_desactiva_y_activa_sin_borrar_la_fila(self):
+		elemento = Catalogo.objects.create(codigo='SRV-BAJA', nombre='Servicio', tipo='servicio')
+		url = self._url('mantenedor_eliminar', 'catalogo', elemento.pk)
+		self.assertContains(self.client.get(url), 'Confirmar desactivación')
+		self.assertTrue(Catalogo.objects.get(pk=elemento.pk).activo)
+
+		self.assertRedirects(self.client.post(url), reverse('mantenedor_lista', args=['catalogo']))
+		self.assertFalse(Catalogo.objects.get(pk=elemento.pk).activo)
+		self.assertTrue(self._auditoria('desactivar', 'Catalogo').exists())
+
+		self.assertContains(self.client.get(url), 'Confirmar activación')
+		self.client.post(url)
+		self.assertTrue(Catalogo.objects.get(pk=elemento.pk).activo)
+
+	def test_roles_del_sistema_no_se_renombran_ni_se_eliminan(self):
+		consulta = Rol.objects.get(nombre_rol='consulta')
+		self.assertContains(self.client.get(self._url('mantenedor_eliminar', 'roles', consulta.pk)), 'rol del sistema')
+		self.client.post(self._url('mantenedor_eliminar', 'roles', consulta.pk))
+		self.client.post(self._url('mantenedor_editar', 'roles', consulta.pk), {'nombre_rol': 'otro'})
+		self.assertTrue(Rol.objects.filter(nombre_rol='consulta').exists())
+		self.assertFalse(Rol.objects.filter(nombre_rol='otro').exists())
+
+	def test_rol_nuevo_sin_uso_se_elimina_con_auditoria(self):
+		rol = Rol.objects.create(nombre_rol='pasante')
+		self.client.post(self._url('mantenedor_eliminar', 'roles', rol.pk))
+		self.assertFalse(Rol.objects.filter(pk=rol.pk).exists())
+		self.assertTrue(self._auditoria('eliminar', 'Rol').exists())
+
+	def test_rol_en_uso_no_se_elimina_y_explica_el_motivo(self):
+		rol = Rol.objects.create(nombre_rol='pasante')
+		FuncionarioRol.objects.create(funcionario=self.funcionario.funcionario, rol=rol)
+		respuesta = self.client.post(self._url('mantenedor_eliminar', 'roles', rol.pk), follow=True)
+		self.assertTrue(Rol.objects.filter(pk=rol.pk).exists())
+		self.assertContains(respuesta, 'No se puede eliminar')
+		self.assertFalse(self._auditoria('eliminar', 'Rol').exists())
+
+	def test_cargo_se_desactiva_en_vez_de_eliminarse(self):
+		self.client.post(self._url('mantenedor_eliminar', 'cargos', self.cargo.pk))
+		self.assertFalse(Cargo.objects.get(pk=self.cargo.pk).vigencia)
+
+	def test_funcionario_se_crea_con_cuenta_roles_y_auditoria_sin_contrasena(self):
+		datos = {'username': 'nuevo.func', 'nombre': 'Nuevo Funcionario', 'email': 'nuevo@laserena.cl', 'cargo': self.cargo.pk, 'delegacion': self.centro.pk, 'roles': [Rol.objects.get(nombre_rol='funcionario').pk], 'estado': 'on', 'password': 'Clave-segura-2026', 'password_confirm': 'Clave-segura-2026'}
+		self.client.post(self._url('mantenedor_nuevo', 'funcionarios'), datos)
+		funcionario = Funcionario.objects.get(identificador_institucional='nuevo.func')
+		self.assertTrue(funcionario.usuario.check_password('Clave-segura-2026'))
+		self.assertEqual((funcionario.delegacion, list(funcionario.roles.values_list('nombre_rol', flat=True))), (self.centro, ['funcionario']))
+		self.assertNotIn('Clave-segura-2026', self._auditoria('crear', 'Funcionario').get().valor_nuevo)
+
+	def test_funcionario_rechaza_usuario_repetido_y_contrasena_distinta(self):
+		datos = {'username': 'func.crud', 'nombre': 'Repetido', 'cargo': self.cargo.pk, 'roles': [Rol.objects.get(nombre_rol='consulta').pk], 'estado': 'on', 'password': 'Clave-segura-2026', 'password_confirm': 'Otra-clave-2026'}
+		formulario = self.client.post(self._url('mantenedor_nuevo', 'funcionarios'), datos).context['form']
+		self.assertIn('username', formulario.errors)
+		self.assertIn('password_confirm', formulario.errors)
+
+	def test_desactivar_funcionario_tambien_desactiva_su_cuenta(self):
+		funcionario = self.funcionario.funcionario
+		self.client.post(self._url('mantenedor_eliminar', 'funcionarios', funcionario.pk))
+		funcionario.refresh_from_db()
+		self.assertFalse(funcionario.estado)
+		self.assertFalse(User.objects.get(pk=self.funcionario.pk).is_active)
+
+	def test_administrador_no_puede_desactivarse_ni_quitarse_el_rol(self):
+		propio = self.admin.funcionario
+		self.client.post(self._url('mantenedor_eliminar', 'funcionarios', propio.pk))
+		self.assertTrue(Funcionario.objects.get(pk=propio.pk).estado)
+		datos = {'username': 'admin.crud', 'nombre': 'admin.crud', 'cargo': self.cargo.pk, 'roles': [Rol.objects.get(nombre_rol='consulta').pk], 'estado': 'on'}
+		formulario = self.client.post(self._url('mantenedor_editar', 'funcionarios', propio.pk), datos).context['form']
+		self.assertIn('roles', formulario.errors)
+		self.assertTrue(propio.roles.filter(nombre_rol='administrador').exists())
+
+	def test_periodo_se_crea_en_borrador_y_calcula_sus_dias(self):
+		self.client.post(self._url('mantenedor_nuevo', 'periodos'), {'nombre': 'Octubre 2026', 'fecha_inicio': '2026-10-01', 'fecha_termino': '2026-10-31', 'umbral_minimo': '80'})
+		periodo = Periodo.objects.get(nombre='Octubre 2026')
+		self.assertEqual((periodo.estado, periodo.dias_computables), ('borrador', 31))
+
+	def test_periodo_rechaza_termino_anterior_al_inicio(self):
+		formulario = self.client.post(self._url('mantenedor_nuevo', 'periodos'), {'nombre': 'Invalido', 'fecha_inicio': '2026-10-31', 'fecha_termino': '2026-10-01', 'umbral_minimo': '80'}).context['form']
+		self.assertTrue(formulario.non_field_errors())
+
+	def test_periodo_se_inicia_se_cierra_y_se_reabre_con_motivo(self):
+		periodo, item = self._periodo_con_item(ponderacion=60)
+		url = lambda accion: reverse('periodo_accion', args=[periodo.pk, accion])
+		self.assertContains(self.client.post(url('iniciar'), follow=True), 'deben sumar 100')
+		self.assertEqual(Periodo.objects.get(pk=periodo.pk).estado, 'borrador')
+
+		item.ponderacion = 100
+		item.save()
+		self.client.post(url('iniciar'))
+		self.client.post(url('cerrar'))
+		self.assertEqual(Periodo.objects.get(pk=periodo.pk).estado, 'cerrado')
+
+		self.assertContains(self.client.post(url('reabrir'), {'motivo': ''}, follow=True), 'exige un motivo')
+		self.client.post(url('reabrir'), {'motivo': 'Correccion de datos'})
+		self.assertEqual(Periodo.objects.get(pk=periodo.pk).estado, 'abierto')
+		for evento in ('iniciar_periodo', 'cerrar_periodo', 'reabrir_periodo'):
+			self.assertTrue(self._auditoria(evento, 'Periodo').exists(), evento)
+
+	def test_periodo_cerrado_no_se_edita_ni_se_elimina(self):
+		periodo, _ = self._periodo_con_item()
+		periodo.iniciar_periodo()
+		periodo.cerrar_periodo()
+		datos = {'nombre': 'Cambio', 'fecha_inicio': '2026-09-01', 'fecha_termino': '2026-09-30', 'umbral_minimo': '80'}
+		self.assertTrue(self.client.post(self._url('mantenedor_editar', 'periodos', periodo.pk), datos).context['form'].non_field_errors())
+		self.client.post(self._url('mantenedor_eliminar', 'periodos', periodo.pk))
+		self.assertTrue(Periodo.objects.filter(pk=periodo.pk, nombre='Septiembre 2026').exists())
+
+	def test_item_rechaza_ponderaciones_que_superan_100(self):
+		periodo, _ = self._periodo_con_item(ponderacion=70)
+		datos = {'cargo': self.cargo.pk, 'periodo': periodo.pk, 'nombre': 'Otro item', 'ponderacion': '40'}
+		formulario = self.client.post(self._url('mantenedor_nuevo', 'items'), datos).context['form']
+		self.assertIn('ponderacion', formulario.errors)
+
+	def test_item_con_metas_no_se_elimina(self):
+		_, item = self._periodo_con_item()
+		Meta.objects.create(item=item, funcionario=self.funcionario.funcionario, valor_objetivo=10)
+		respuesta = self.client.post(self._url('mantenedor_eliminar', 'items', item.pk), follow=True)
+		self.assertTrue(ItemMedible.objects.filter(pk=item.pk).exists())
+		self.assertContains(respuesta, 'No se puede eliminar')
+
+	def test_meta_rechaza_objetivo_cero_y_al_guardar_genera_su_indicador(self):
+		_, item = self._periodo_con_item()
+		datos = {'item': item.pk, 'funcionario': self.funcionario.funcionario.pk, 'valor_objetivo': '0', 'unidad': 'actividades', 'ponderador': '100'}
+		self.assertIn('valor_objetivo', self.client.post(self._url('mantenedor_nuevo', 'metas'), datos).context['form'].errors)
+		datos['valor_objetivo'] = '10'
+		self.client.post(self._url('mantenedor_nuevo', 'metas'), datos)
+		meta = Meta.objects.get()
+		self.assertEqual(Indicador.objects.filter(meta=meta).count(), 1)
+
+	def test_eliminar_meta_avisa_que_borra_sus_indicadores(self):
+		_, item = self._periodo_con_item()
+		meta = Meta.objects.create(item=item, funcionario=self.funcionario.funcionario, valor_objetivo=10)
+		Indicador.generar(meta)
+		self.assertContains(self.client.get(self._url('mantenedor_eliminar', 'metas', meta.pk)), '1 indicador(es)')
+		self.client.post(self._url('mantenedor_eliminar', 'metas', meta.pk))
+		self.assertFalse(Meta.objects.filter(pk=meta.pk).exists())
+		self.assertFalse(Indicador.objects.exists())
+
+	def test_los_formularios_de_alta_y_edicion_se_muestran(self):
+		periodo, item = self._periodo_con_item()
+		meta = Meta.objects.create(item=item, funcionario=self.funcionario.funcionario, valor_objetivo=10)
+		existentes = {
+			'delegaciones': self.centro, 'cargos': self.cargo, 'roles': Rol.objects.get(nombre_rol='consulta'),
+			'funcionarios': self.funcionario.funcionario, 'catalogo': Catalogo.objects.create(codigo='C-1', nombre='Elemento', tipo='servicio'),
+			'periodos': periodo, 'items': item, 'metas': meta,
+		}
+		for slug, objeto in existentes.items():
+			self.assertEqual(self.client.get(self._url('mantenedor_nuevo', slug)).status_code, 200, slug)
+			self.assertEqual(self.client.get(self._url('mantenedor_editar', slug, objeto.pk)).status_code, 200, slug)
+			self.assertEqual(self.client.get(self._url('mantenedor_eliminar', slug, objeto.pk)).status_code, 200, slug)
+
+	def test_los_avisos_se_muestran_en_pantalla(self):
+		respuesta = self.client.post(self._url('mantenedor_nuevo', 'cargos'), {'nombre': 'Cargo con aviso', 'vigencia': 'on'}, follow=True)
+		self.assertContains(respuesta, 'Se guardó: Cargo con aviso.')

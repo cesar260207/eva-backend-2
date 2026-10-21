@@ -27,7 +27,7 @@
                     <li class="nav-item"><a class="nav-link" href="{% url 'actividad_nueva' %}">Registrar actividad</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'dashboard' %}">Medición</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'actividades' %}">Actividades</a></li>
-                    {% if user.is_superuser or user.perfil.rol == 'administrador' or user.perfil.rol == 'coordinador' %}<li class="nav-item"><a class="nav-link" href="{% url 'mantenedores' %}">Administración</a></li>{% endif %}
+                    {% if puede_administrar %}<li class="nav-item"><a class="nav-link" href="{% url 'mantenedores' %}">Administración</a></li>{% endif %}
                     <li class="nav-item"><form method="post" action="{% url 'logout' %}" class="m-0"><button class="nav-link btn btn-link border-0" type="submit">Salir</button>{% csrf_token %}</form></li>
                     {% else %}<li class="nav-item"><a class="nav-link" href="{% url 'login' %}">Ingresar</a></li>{% endif %}
                 </ul>
@@ -38,6 +38,12 @@
     {% block page_header %}{% endblock %}
 
     <main class="container-fluid px-4 py-4 app-shell">
+        {% for message in messages %}
+        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+        </div>
+        {% endfor %}
         {% block content %}{% endblock %}
     </main>
 
