@@ -4,6 +4,7 @@ from django.db import models, transaction
 from django.db.models import Sum
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 import json
 import uuid
@@ -113,6 +114,21 @@ class Funcionario(models.Model):
 		self.cargo = nuevo_cargo
 		self.save(update_fields=['cargo'])
 
+	def registrar_actividad(self, datos):
+		actividad = Actividad(funcionario_autor=self, **datos)
+		if not actividad.delegacion_id:
+			actividad.delegacion_id = self.delegacion_id
+		actividad.generar_codigo_verificador()
+		actividad.full_clean(exclude=Actividad.CAMPOS_ANTIGUOS)
+		actividad.save()
+		return actividad
+
+	def subir_evidencia(self, actividad, archivo, comentario=None):
+		evidencia = Evidencia(actividad=actividad, funcionario_autor=self, archivo_vinculo=archivo, metadatos={'comentario': comentario} if comentario else None)
+		evidencia.full_clean(exclude=Evidencia.CAMPOS_ANTIGUOS)
+		actividad.vincular_evidencia(evidencia)
+		return evidencia
+
 
 class FuncionarioRol(models.Model):
 	funcionario = models.ForeignKey(Funcionario, on_delete=models.CASCADE)
@@ -199,48 +215,207 @@ class PeriodoMedicion(models.Model):
 		return self.nombre
 
 
-class Actividad(models.Model):
-	ESTADOS = [('borrador', 'Borrador'), ('pendiente', 'Pendiente de revisión'), ('aprobada', 'Aprobada'), ('rechazada', 'Rechazada')]
+class VersionOptimistaMixin:
+	"""RF-034 y RNF-003: control de concurrencia optimista con el campo version."""
+
+	MENSAJE_CONCURRENCIA = 'El registro fue modificado por otro usuario. Recarga la página y vuelve a intentarlo.'
+
+	def save(self, *args, **kwargs):
+		if self._state.adding:
+			return super().save(*args, **kwargs)
+		with transaction.atomic():
+			# Solo actualiza si nadie cambió la versión desde que se leyó el registro.
+			actualizados = type(self).objects.filter(pk=self.pk, version=self.version).update(version=models.F('version') + 1)
+			if not actualizados:
+				raise ValidationError(self.MENSAJE_CONCURRENCIA)
+			self.version += 1
+			if kwargs.get('update_fields') is not None:
+				kwargs['update_fields'] = {*kwargs['update_fields'], 'version'}
+			return super().save(*args, **kwargs)
+
+
+class Actividad(VersionOptimistaMixin, models.Model):
+	ESTADOS = [('borrador', 'Borrador'), ('pendiente', 'Pendiente de revisión'), ('aprobada', 'Aprobada'), ('rechazada', 'Rechazada'), ('correccion', 'Requiere corrección')]
+	# Campos antiguos que se eliminan en la Etapa 4. Desde la Etapa 3 admiten null para que
+	# los métodos del diseño no dependan de ellos; los formularios actuales los siguen exigiendo.
+	CAMPOS_ANTIGUOS = ['codigo', 'funcionario', 'fecha', 'tipo_atencion', 'descripcion', 'item_medicion']
 	codigo = models.CharField(max_length=32, unique=True, editable=False)
-	funcionario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='actividades')
+	funcionario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name='actividades')
+	# Ajuste: se conserva para filtrar y medir por delegación (también la de coordinadores sin delegación).
 	delegacion = models.ForeignKey(Delegacion, on_delete=models.PROTECT, related_name='actividades')
-	fecha = models.DateField()
-	tipo_atencion = models.CharField(max_length=100)
-	descripcion = models.TextField()
+	fecha = models.DateField(null=True)
+	tipo_atencion = models.CharField(max_length=100, null=True)
+	descripcion = models.TextField(null=True)
 	accion = models.TextField()
-	item_medicion = models.CharField(max_length=160)
+	item_medicion = models.CharField(max_length=160, null=True)
 	contacto = models.CharField(max_length=160, blank=True)
 	telefono = models.CharField(max_length=40, blank=True)
 	estado = models.CharField(max_length=20, choices=ESTADOS, default='pendiente')
+	# Ajuste 7: orden de listados.
 	creada = models.DateTimeField(auto_now_add=True)
 	actualizada = models.DateTimeField(auto_now=True)
+	# Campos del diseño.
+	codigo_verificador = models.CharField(max_length=50, unique=True, null=True, editable=False)
+	funcionario_autor = models.ForeignKey(Funcionario, on_delete=models.PROTECT, null=True, blank=True, related_name='actividades')
+	item = models.ForeignKey('ItemMedible', on_delete=models.PROTECT, null=True, blank=True, related_name='actividades')
+	catalogo = models.ForeignKey('Catalogo', on_delete=models.PROTECT, null=True, blank=True, related_name='actividades')
+	compromiso = models.ForeignKey('Compromiso', on_delete=models.SET_NULL, null=True, blank=True, related_name='actividades')
+	# Temporal: en la Etapa 4 reemplaza a fecha y toma su nombre.
+	fecha_hora = models.DateTimeField(null=True, blank=True)
+	solicitud_problema = models.TextField(null=True, blank=True)
+	contacto_nombre = models.CharField(max_length=255, null=True, blank=True)
+	contacto_telefono = models.CharField(max_length=20, null=True, blank=True)
+	version = models.PositiveIntegerField(default=1, editable=False)
 
 	class Meta:
 		ordering = ['-fecha', '-creada']
 
+	def __str__(self):
+		return f'{self.codigo} - {(self.solicitud_problema or self.descripcion or "")[:50]}'
+
+	def generar_codigo_verificador(self):
+		"""RN-010: código único; si ya existe el código antiguo, se usa el mismo."""
+		if not self.codigo_verificador:
+			self.codigo_verificador = self.codigo or f'EVD-{timezone.localdate():%Y%m%d}-{uuid.uuid4().hex[:6].upper()}'
+		return self.codigo_verificador
+
+	def clean(self):
+		super().clean()
+		if self.item_id:
+			periodo = self.item.periodo
+			periodo.verificar_editable()
+			if self.fecha_hora and not periodo.fecha_inicio <= timezone.localtime(self.fecha_hora).date() <= periodo.fecha_termino:
+				raise ValidationError({'fecha_hora': f'La fecha de la actividad debe estar dentro del período «{periodo}».'})
+
 	def save(self, *args, **kwargs):
+		self.generar_codigo_verificador()
 		if not self.codigo:
-			self.codigo = f'EVD-{timezone.localdate():%Y%m%d}-{uuid.uuid4().hex[:6].upper()}'
+			self.codigo = self.codigo_verificador
+		if not self._state.adding:
+			guardado = Actividad.objects.filter(pk=self.pk).values_list('codigo_verificador', flat=True).first()
+			if guardado and guardado != self.codigo_verificador:
+				raise ValidationError('El código verificador de una actividad no se puede modificar.')
 		super().save(*args, **kwargs)
 
-	def __str__(self):
-		return f'{self.codigo} - {self.descripcion[:50]}'
+	def cambiar_estado(self, nuevo_estado):
+		if nuevo_estado not in dict(self.ESTADOS):
+			raise ValidationError(f'Estado de actividad no válido: {nuevo_estado}.')
+		if self.estado == 'aprobada' and nuevo_estado != 'aprobada':
+			raise ValidationError('Una actividad aprobada ya suma al avance y no cambia de estado.')
+		self.estado = nuevo_estado
+		self.save(update_fields=['estado', 'actualizada'])
+
+	def vincular_evidencia(self, evidencia):
+		evidencia.actividad = self
+		evidencia.save()
+		evidencia.enviar_a_revision()
+
+
+EXTENSIONES_EVIDENCIA = ['jpg', 'jpeg', 'png', 'pdf']
 
 
 class Evidencia(models.Model):
+	ESTADOS_REVISION = [('pendiente', 'Pendiente de revisión'), ('aprobada', 'Aprobada'), ('rechazada', 'Rechazada'), ('correccion', 'Requiere corrección')]
+	CAMPOS_ANTIGUOS = ['archivo']
 	actividad = models.ForeignKey(Actividad, on_delete=models.CASCADE, related_name='evidencias')
-	archivo = models.FileField(upload_to='evidencias/%Y/%m/', validators=[FileExtensionValidator(['jpg', 'jpeg', 'png', 'pdf'])])
+	archivo = models.FileField(upload_to='evidencias/%Y/%m/', validators=[FileExtensionValidator(EXTENSIONES_EVIDENCIA)])
 	comentario = models.TextField(blank=True)
 	aprobada = models.BooleanField(null=True, blank=True)
 	revisada_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name='evidencias_revisadas')
 	creada = models.DateTimeField(auto_now_add=True)
+	# Campos del diseño.
+	codigo_evidencia = models.CharField(max_length=60, unique=True, null=True, editable=False)
+	funcionario_autor = models.ForeignKey(Funcionario, on_delete=models.PROTECT, null=True, blank=True, related_name='evidencias')
+	archivo_vinculo = models.FileField(upload_to='evidencias/%Y/%m/', max_length=255, null=True, blank=True, validators=[FileExtensionValidator(EXTENSIONES_EVIDENCIA)])
+	fecha_carga = models.DateTimeField(null=True, blank=True)
+	metadatos = models.JSONField(null=True, blank=True)
+	estado_revision = models.CharField(max_length=20, choices=ESTADOS_REVISION, default='pendiente')
 
 	def __str__(self):
-		archivo = self.archivo.name if self.archivo else 'sin archivo'
-		return f'{self.actividad.codigo} - {archivo}'
+		archivo = self.archivo_vinculo or self.archivo
+		return f'{self.actividad.codigo} - {archivo.name if archivo else "sin archivo"}'
+
+	def _siguiente_codigo(self):
+		prefijo = self.actividad.codigo_verificador
+		numero = Evidencia.objects.filter(actividad_id=self.actividad_id).exclude(codigo_evidencia=None).count() + 1
+		while Evidencia.objects.filter(codigo_evidencia=f'{prefijo}-{numero:02d}').exists():
+			numero += 1
+		return f'{prefijo}-{numero:02d}'
+
+	def save(self, *args, **kwargs):
+		if self._state.adding:
+			self.fecha_carga = self.fecha_carga or timezone.now()
+		else:
+			guardado = Evidencia.objects.filter(pk=self.pk).values_list('codigo_evidencia', flat=True).first()
+			if guardado and guardado != self.codigo_evidencia:
+				raise ValidationError('El código de una evidencia no se puede modificar.')
+		if not self.codigo_evidencia and self.actividad_id and self.actividad.codigo_verificador:
+			self.codigo_evidencia = self._siguiente_codigo()
+		super().save(*args, **kwargs)
+
+	def enviar_a_revision(self):
+		self.estado_revision = 'pendiente'
+		self.save(update_fields=['estado_revision'])
+		if self.actividad.estado != 'aprobada':
+			self.actividad.cambiar_estado('pendiente')
+
+	def descargar_archivo(self):
+		return self.archivo_vinculo.url if self.archivo_vinculo else None
+
+	def reemplazar_archivo(self, nuevo_archivo):
+		self.archivo_vinculo = nuevo_archivo
+		self.full_clean(exclude=self.CAMPOS_ANTIGUOS)
+		self.save()
+		self.enviar_a_revision()
 
 
-class Compromiso(models.Model):
+class Validacion(models.Model):
+	DECISIONES = [('aprobada', 'Aprobada'), ('rechazada', 'Rechazada'), ('correccion', 'Requiere corrección')]
+	evidencia = models.ForeignKey(Evidencia, on_delete=models.CASCADE, related_name='validaciones')
+	funcionario_verificador = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='validaciones')
+	decision = models.CharField(max_length=20, choices=DECISIONES)
+	fecha = models.DateTimeField(default=timezone.now)
+	observacion = models.TextField(null=True, blank=True)
+	resultado = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+	# Número de revisión de la evidencia (1.ª, 2.ª, ...).
+	version = models.PositiveIntegerField(default=1)
+
+	class Meta:
+		db_table = 'validacion'
+		ordering = ['-fecha']
+		verbose_name = 'validación'
+		verbose_name_plural = 'validaciones'
+
+	def __str__(self):
+		return f'{self.evidencia} - {self.get_decision_display()} (v{self.version})'
+
+	@transaction.atomic
+	def _decidir(self, decision, observacion):
+		"""RN-009: la decisión se refleja en la evidencia y en la actividad; solo «aprobada» aporta al avance."""
+		self.decision = decision
+		self.observacion = observacion
+		self.version = Validacion.objects.filter(evidencia_id=self.evidencia_id).count() + 1
+		self.save()
+		self.evidencia.estado_revision = decision
+		self.evidencia.save(update_fields=['estado_revision'])
+		self.evidencia.actividad.cambiar_estado(decision)
+		return self
+
+	def aprobar_evidencia(self, observacion=None):
+		return self._decidir('aprobada', observacion)
+
+	def rechazar_evidencia(self, motivo):
+		if not (motivo or '').strip():
+			raise ValidationError('El rechazo de una evidencia exige un motivo.')
+		return self._decidir('rechazada', motivo)
+
+	def solicitar_correccion(self, observacion):
+		if not (observacion or '').strip():
+			raise ValidationError('La solicitud de corrección exige una observación.')
+		return self._decidir('correccion', observacion)
+
+
+class Compromiso(VersionOptimistaMixin, models.Model):
 	ESTADOS = [('ingresado', 'Ingresado'), ('pendiente', 'Pendiente'), ('proceso', 'En proceso'), ('realizado', 'Realizado')]
 	EJES = [
 		('Seguridad', 'Seguridad'),
@@ -248,18 +423,28 @@ class Compromiso(models.Model):
 		('Gestión Social', 'Gestión Social'),
 		('Organizaciones Comunitarias', 'Organizaciones Comunitarias'),
 	]
+	ORIGENES = [('interno', 'Interno'), ('externo', 'Externo')]
+	# Ajuste 4: folio, eje, delegacion, descripcion y fecha_ingreso vienen de data/solicitudes.json.
 	folio = models.CharField(max_length=30, unique=True)
 	delegacion = models.ForeignKey(Delegacion, on_delete=models.PROTECT, related_name='compromisos')
-	responsable = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='compromisos')
-	solicitante = models.CharField(max_length=160)
-	territorio = models.CharField(max_length=160)
+	# Campo antiguo: se elimina en la Etapa 4.
+	responsable = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name='compromisos')
+	solicitante = models.CharField(max_length=255)
+	territorio = models.CharField(max_length=255)
 	eje = models.CharField(max_length=40, choices=EJES, default='Gestión Social')
 	descripcion = models.TextField()
 	fecha_comprometida = models.DateField()
 	fecha_ingreso = models.DateField(default=timezone.localdate)
 	estado = models.CharField(max_length=20, choices=ESTADOS, default='ingresado')
 	observacion = models.TextField(blank=True)
+	# Ajuste: orden de la agenda.
 	creado = models.DateTimeField(auto_now_add=True)
+	# Campos del diseño.
+	funcionario_responsable = models.ForeignKey(Funcionario, on_delete=models.PROTECT, null=True, blank=True, related_name='compromisos')
+	item = models.ForeignKey('ItemMedible', on_delete=models.PROTECT, null=True, blank=True, related_name='compromisos')
+	origen = models.CharField(max_length=255, choices=ORIGENES, null=True, blank=True)
+	area_apoyo = models.CharField(max_length=255, null=True, blank=True)
+	version = models.PositiveIntegerField(default=1, editable=False)
 
 	class Meta:
 		ordering = ['-fecha_comprometida', '-creado']
@@ -271,6 +456,40 @@ class Compromiso(models.Model):
 	def vencido(self):
 		from django.utils import timezone
 		return self.estado != 'realizado' and self.fecha_comprometida < timezone.localdate()
+
+	def _registrar_historial(self, autor, estado_anterior, observacion=None):
+		HistorialCompromiso.objects.create(
+			compromiso=self, autor_funcionario=autor,
+			estado_anterior=estado_anterior, estado_nuevo=self.estado, observacion=observacion or '',
+		)
+
+	@transaction.atomic
+	def set_estado(self, estado, autor, observacion=None):
+		if estado not in dict(self.ESTADOS):
+			raise ValidationError(f'Estado de compromiso no válido: {estado}.')
+		anterior = self.estado
+		self.estado = estado
+		self.save(update_fields=['estado'])
+		self._registrar_historial(autor, anterior, observacion)
+
+	@transaction.atomic
+	def derivar_compromiso(self, nuevo_responsable, autor):
+		if self.estado == 'realizado':
+			raise ValidationError('Un compromiso realizado no se puede derivar.')
+		anterior = self.funcionario_responsable
+		self.funcionario_responsable = nuevo_responsable
+		self.save(update_fields=['funcionario_responsable'])
+		self._registrar_historial(autor, self.estado, f'Derivado de {anterior or "sin responsable"} a {nuevo_responsable}.')
+
+	@transaction.atomic
+	def cerrar_compromiso(self, resolucion, autor):
+		if not (resolucion or '').strip():
+			raise ValidationError('Cerrar un compromiso exige una resolución.')
+		anterior = self.estado
+		self.estado = 'realizado'
+		self.observacion = resolucion
+		self.save(update_fields=['estado', 'observacion'])
+		self._registrar_historial(autor, anterior, resolucion)
 
 
 class MetaMedicion(models.Model):
@@ -571,6 +790,29 @@ class Indicador(ControlPeriodoCerradoMixin, models.Model):
 	def __str__(self):
 		return f'{self.meta} - {self.fecha_calculo:%Y-%m-%d}: {self.cumplimiento} %'
 
+	@classmethod
+	def generar(cls, meta, fecha=None):
+		indicador = cls(meta=meta, periodo=meta.item.periodo)
+		indicador.calcular_avance()
+		indicador.calcular_cumplimiento()
+		indicador.actualizar_semaforo(fecha)
+		indicador.save()
+		return indicador
+
+	def calcular_avance(self):
+		"""RN-003 y RN-009: actividades aprobadas del ítem en el período que tienen una validación aprobada."""
+		# Rango de instantes en hora de Chile; evita __date, que en MySQL exige tablas de zonas horarias.
+		desde = timezone.make_aware(datetime.combine(self.periodo.fecha_inicio, time.min))
+		hasta = timezone.make_aware(datetime.combine(self.periodo.fecha_termino + timedelta(days=1), time.min))
+		self.avance = Actividad.objects.filter(
+			item=self.meta.item,
+			estado='aprobada',
+			fecha_hora__gte=desde,
+			fecha_hora__lt=hasta,
+			evidencias__validaciones__decision='aprobada',
+		).distinct().count()
+		return self.avance
+
 	def calcular_cumplimiento(self):
 		"""RN-004 y RN-005: cumplimiento con tope configurable y cumplimiento ponderado."""
 		tope = Decimal(self.periodo.obtener_parametro('maximo_cumplimiento', '150'))
@@ -592,11 +834,14 @@ class Indicador(ControlPeriodoCerradoMixin, models.Model):
 
 class HistorialCompromiso(models.Model):
 	compromiso = models.ForeignKey(Compromiso, on_delete=models.CASCADE, related_name='historial')
-	autor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+	# Campo antiguo: se elimina en la Etapa 4.
+	autor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True)
 	estado_anterior = models.CharField(max_length=20)
 	estado_nuevo = models.CharField(max_length=20)
 	observacion = models.TextField(blank=True)
 	fecha = models.DateTimeField(auto_now_add=True)
+	# Temporal: en la Etapa 4 reemplaza a autor y toma su nombre.
+	autor_funcionario = models.ForeignKey(Funcionario, on_delete=models.PROTECT, null=True, blank=True, related_name='historial_compromisos')
 
 	def __str__(self):
 		return f'{self.compromiso.folio}: {self.estado_anterior or "inicio"} -> {self.estado_nuevo}'

@@ -14,9 +14,11 @@ from .forms import EvidenciaMantenedorForm
 from .models import (
 	Actividad, Auditoria, Cargo, Catalogo, CatalogoItem, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
 	HistorialCompromiso, Indicador, ItemMedible, Meta, MetaMedicion, ParametroVersionado, PerfilUsuario, Periodo,
-	PeriodoMedicion, Rol, UsuarioMaestro,
+	PeriodoMedicion, Rol, UsuarioMaestro, Validacion,
 )
+from datetime import datetime
 from decimal import Decimal
+from django.utils import timezone
 
 
 class SGRMVPTests(TestCase):
@@ -622,3 +624,156 @@ class MedicionTests(TestCase):
 		self.assertTrue(Catalogo.objects.get(pk=elemento.pk).activo)
 		with self.assertRaises(IntegrityError), transaction.atomic():
 			Catalogo.objects.create(codigo='AT-OPER', nombre='Duplicado', tipo='servicio')
+
+
+class OperacionTests(TestCase):
+	"""Etapa 3: RN-009, RN-010, control de versión y métodos de operación (se amplían con sus CU en la Etapa 6)."""
+
+	def setUp(self):
+		media = tempfile.mkdtemp()
+		self.addCleanup(shutil.rmtree, media, ignore_errors=True)
+		ajuste_media = override_settings(MEDIA_ROOT=media)
+		ajuste_media.enable()
+		self.addCleanup(ajuste_media.disable)
+
+		self.centro = Delegacion.objects.create(nombre='Centro', territorio='Centro', enfasis='Atencion territorial')
+		self.cargo = Cargo.objects.create(nombre='Profesional territorial')
+		self.autor = self._funcionario('autor.operacion')
+		self.verificador = self._funcionario('verificador.operacion')
+		self.periodo = Periodo.objects.create(nombre='Septiembre 2026', fecha_inicio=date(2026, 9, 1), fecha_termino=date(2026, 9, 30))
+		self.item = ItemMedible.objects.create(cargo=self.cargo, periodo=self.periodo, nombre='Atencion territorial', ponderacion=100)
+		self.catalogo = Catalogo.objects.create(codigo='AT-OPER', nombre='Operativo en terreno', tipo='atencion')
+
+	def _funcionario(self, username):
+		usuario = User.objects.create_user(username, password='clave-segura')
+		return Funcionario.objects.create(usuario=usuario, identificador_institucional=username, nombre=username, cargo=self.cargo, delegacion=self.centro)
+
+	def _actividad(self, dia=10, **cambios):
+		datos = {'item': self.item, 'catalogo': self.catalogo, 'fecha_hora': timezone.make_aware(datetime(2026, 9, dia, 10, 0)), 'solicitud_problema': 'Consulta vecinal', 'accion': 'Orientacion'}
+		datos.update(cambios)
+		return self.autor.registrar_actividad(datos)
+
+	def _archivo(self, nombre='respaldo.pdf'):
+		return SimpleUploadedFile(nombre, b'%PDF-1.4 prueba', content_type='application/pdf')
+
+	def _validacion(self, evidencia):
+		return Validacion(evidencia=evidencia, funcionario_verificador=self.verificador)
+
+	def test_registrar_actividad_genera_codigo_y_toma_la_delegacion_del_autor(self):
+		actividad = self._actividad()
+		self.assertTrue(actividad.codigo_verificador.startswith('EVD-'))
+		self.assertEqual(actividad.codigo, actividad.codigo_verificador)
+		self.assertEqual((actividad.delegacion, actividad.version, actividad.estado), (self.centro, 1, 'pendiente'))
+
+	def test_rn010_codigo_verificador_inmutable(self):
+		actividad = self._actividad()
+		actividad.codigo_verificador = 'EVD-OTRO'
+		with self.assertRaises(ValidationError):
+			actividad.save()
+
+	def test_registrar_actividad_fuera_del_periodo_o_con_periodo_cerrado(self):
+		with self.assertRaises(ValidationError):
+			self._actividad(fecha_hora=timezone.make_aware(datetime(2026, 10, 5, 10, 0)))
+		self.periodo.iniciar_periodo()
+		self.periodo.cerrar_periodo()
+		self.item.refresh_from_db()
+		with self.assertRaises(ValidationError):
+			self._actividad()
+
+	def test_version_optimista_rechaza_la_edicion_concurrente(self):
+		actividad = self._actividad()
+		primera = Actividad.objects.get(pk=actividad.pk)
+		segunda = Actividad.objects.get(pk=actividad.pk)
+		primera.accion = 'Guardada primero'
+		primera.save()
+		segunda.accion = 'Guardada con version vieja'
+		with self.assertRaises(ValidationError):
+			segunda.save()
+		actividad.refresh_from_db()
+		self.assertEqual((actividad.accion, actividad.version), ('Guardada primero', 2))
+
+	def test_subir_evidencia_genera_codigos_y_envia_a_revision(self):
+		actividad = self._actividad()
+		actividad.cambiar_estado('correccion')
+		primera = self.autor.subir_evidencia(actividad, self._archivo(), 'Acta firmada')
+		segunda = self.autor.subir_evidencia(actividad, self._archivo('foto.png'))
+		self.assertEqual(primera.codigo_evidencia, f'{actividad.codigo_verificador}-01')
+		self.assertEqual(segunda.codigo_evidencia, f'{actividad.codigo_verificador}-02')
+		self.assertEqual(primera.metadatos, {'comentario': 'Acta firmada'})
+		self.assertEqual(primera.estado_revision, 'pendiente')
+		self.assertIsNotNone(primera.fecha_carga)
+		self.assertTrue(primera.descargar_archivo().endswith('.pdf'))
+		self.assertEqual(Actividad.objects.get(pk=actividad.pk).estado, 'pendiente')
+
+	def test_subir_evidencia_rechaza_extension_no_permitida(self):
+		archivo = SimpleUploadedFile('script.exe', b'MZ', content_type='application/octet-stream')
+		with self.assertRaises(ValidationError):
+			self.autor.subir_evidencia(self._actividad(), archivo)
+
+	def test_rn009_solo_la_validacion_aprobada_aporta_al_avance(self):
+		validada = self._actividad()
+		evidencia = self.autor.subir_evidencia(validada, self._archivo())
+		sin_validar = self._actividad(dia=11)
+		sin_validar.cambiar_estado('aprobada')
+		meta = Meta.objects.create(item=self.item, funcionario=self.autor, valor_objetivo=2)
+		self.assertEqual(Indicador(meta=meta, periodo=self.periodo).calcular_avance(), 0)
+
+		self._validacion(evidencia).aprobar_evidencia('Conforme')
+
+		self.assertEqual(Evidencia.objects.get(pk=evidencia.pk).estado_revision, 'aprobada')
+		self.assertEqual(Actividad.objects.get(pk=validada.pk).estado, 'aprobada')
+		self.assertEqual(Indicador(meta=meta, periodo=self.periodo).calcular_avance(), 1)
+
+	def test_rechazo_y_correccion_exigen_texto_y_numeran_revisiones(self):
+		actividad = self._actividad()
+		evidencia = self.autor.subir_evidencia(actividad, self._archivo())
+		with self.assertRaises(ValidationError):
+			self._validacion(evidencia).rechazar_evidencia('')
+		correccion = self._validacion(evidencia).solicitar_correccion('Falta la firma')
+		self.assertEqual((correccion.version, actividad.estado, evidencia.estado_revision), (1, 'correccion', 'correccion'))
+
+		evidencia.reemplazar_archivo(self._archivo('firmado.pdf'))
+		self.assertEqual((evidencia.estado_revision, actividad.estado), ('pendiente', 'pendiente'))
+
+		rechazo = self._validacion(evidencia).rechazar_evidencia('Documento ilegible')
+		self.assertEqual((rechazo.version, Actividad.objects.get(pk=actividad.pk).estado), (2, 'rechazada'))
+
+	def test_actividad_aprobada_no_cambia_de_estado(self):
+		actividad = self._actividad()
+		actividad.cambiar_estado('aprobada')
+		with self.assertRaises(ValidationError):
+			actividad.cambiar_estado('pendiente')
+
+	def test_indicador_generar_calcula_y_guarda(self):
+		evidencia = self.autor.subir_evidencia(self._actividad(), self._archivo())
+		self._validacion(evidencia).aprobar_evidencia()
+		meta = Meta.objects.create(item=self.item, funcionario=self.autor, valor_objetivo=2)
+		indicador = Indicador.generar(meta, fecha=date(2026, 9, 15))
+		self.assertEqual((indicador.avance, indicador.cumplimiento, indicador.semaforo), (1, Decimal('50.00'), 'verde'))
+		self.assertTrue(Indicador.objects.filter(pk=indicador.pk).exists())
+
+	def _compromiso(self):
+		return Compromiso.objects.create(folio='LS-OPER-1', delegacion=self.centro, funcionario_responsable=self.autor, solicitante='Junta de vecinos', territorio='Centro', descripcion='Poda de arboles', fecha_comprometida=date(2026, 9, 30), origen='externo')
+
+	def test_compromiso_cambios_quedan_en_el_historial(self):
+		compromiso = self._compromiso()
+		compromiso.set_estado('proceso', self.autor)
+		compromiso.derivar_compromiso(self.verificador, self.autor)
+		with self.assertRaises(ValidationError):
+			compromiso.cerrar_compromiso('', self.autor)
+		compromiso.cerrar_compromiso('Poda realizada', self.verificador)
+
+		compromiso.refresh_from_db()
+		self.assertEqual((compromiso.estado, compromiso.funcionario_responsable, compromiso.observacion), ('realizado', self.verificador, 'Poda realizada'))
+		historial = list(compromiso.historial.order_by('pk').values_list('estado_anterior', 'estado_nuevo', 'autor_funcionario'))
+		self.assertEqual(historial, [('ingresado', 'proceso', self.autor.pk), ('proceso', 'proceso', self.autor.pk), ('proceso', 'realizado', self.verificador.pk)])
+		with self.assertRaises(ValidationError):
+			compromiso.derivar_compromiso(self.autor, self.autor)
+
+	def test_compromiso_version_optimista(self):
+		compromiso = self._compromiso()
+		vieja = Compromiso.objects.get(pk=compromiso.pk)
+		compromiso.set_estado('proceso', self.autor)
+		with self.assertRaises(ValidationError):
+			vieja.set_estado('realizado', self.autor)
+		self.assertEqual(HistorialCompromiso.objects.filter(compromiso=compromiso).count(), 1)
