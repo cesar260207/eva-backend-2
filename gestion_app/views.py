@@ -77,7 +77,7 @@ def ficha_personal(request):
 
 @login_required
 def informe(request):
-    """Informe filtrable de actividades, compromisos o cumplimiento, en pantalla, para imprimir o en CSV (RF-029).
+    """Informe filtrable de actividades, compromisos o cumplimiento, en pantalla, para imprimir o en CSV (RF-033).
 
     Solo incluye lo que el usuario ya puede ver en las listas; cada exportación queda en la auditoría.
     """

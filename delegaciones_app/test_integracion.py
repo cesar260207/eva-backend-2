@@ -45,7 +45,7 @@ def crear_funcionario(username, *roles, cargo=None, delegacion=None):
 
 
 class OrganizacionAccesoTests(TestCase):
-	"""Etapa 1: métodos de Delegacion, Cargo, Funcionario y Auditoria (se amplían con sus CU en la Etapa 6)."""
+	"""CU-26, CU-30 (RF-001, RF-002, RF-036). Métodos de Delegacion, Cargo, Funcionario y Auditoria con la base de datos."""
 
 	def setUp(self):
 		self.centro = Delegacion.objects.create(nombre='Centro', ambito='Centro', enfasis='Atencion territorial')
@@ -100,7 +100,7 @@ class OrganizacionAccesoTests(TestCase):
 
 
 class MedicionTests(TestCase):
-	"""Etapa 2: reglas RN-001 a RN-008 y RN-013 (se amplían con sus CU en la Etapa 6)."""
+	"""CU-05, CU-06.1, CU-07, CU-16.1, CU-28.1 (RF-005 a RF-007, RF-022 a RF-027). Reglas RN-001 a RN-008 y RN-013 de la medición."""
 
 	def setUp(self):
 		self.centro = Delegacion.objects.create(nombre='Centro', ambito='Centro', enfasis='Atencion territorial')
@@ -215,7 +215,7 @@ class MedicionTests(TestCase):
 
 
 class OperacionTests(TestCase):
-	"""Etapa 3: RN-009, RN-010, control de versión y métodos de operación (se amplían con sus CU en la Etapa 6)."""
+	"""CU-01, CU-10, CU-11, CU-23.1 (RF-009, RF-011, RF-013, RF-014, RF-034). RN-009, RN-010, control de versión y métodos de operación."""
 
 	def setUp(self):
 		media = tempfile.mkdtemp()
@@ -367,7 +367,7 @@ class OperacionTests(TestCase):
 
 
 class MigracionDatosTests(TransactionTestCase):
-	"""Etapa 4: la migración 0010 copia los datos antiguos al modelo de 17 clases y se puede revertir."""
+	"""Sin CU (migración de datos). La migración 0010 copia los datos antiguos al modelo de 17 clases y se puede revertir."""
 
 	antes = [('delegaciones_app', '0009_ampliar_operacion')]
 	despues = [('delegaciones_app', '0010_migrar_datos')]
@@ -468,7 +468,7 @@ class MigracionDatosTests(TransactionTestCase):
 
 
 class PermisosTests(TestCase):
-	"""Etapa 5a: tiene_rol y control de acceso por rol (se amplía con sus CU en la Etapa 6)."""
+	"""CU-26, CU-26.1 (RF-002). tiene_rol y control de acceso por rol."""
 
 	def setUp(self):
 		self.cargo = Cargo.objects.create(nombre='Profesional territorial')
@@ -544,7 +544,7 @@ class PermisosTests(TestCase):
 
 
 class MantenedoresTests(TestCase):
-	"""Etapa 5b: CRUD genérico de las ocho tablas maestras (se amplía con sus CU en la Etapa 6)."""
+	"""CU-04, CU-25, CU-26, CU-27, CU-27.1, CU-28 (RF-001 a RF-007). CRUD genérico de las ocho tablas maestras."""
 
 	def setUp(self):
 		self.cargo = Cargo.objects.create(nombre='Profesional territorial')
@@ -833,7 +833,7 @@ class BaseOperacion(TestCase):
 
 
 class ActividadVistasTests(BaseOperacion):
-	"""Etapa 5c: registro, consulta, modificación y eliminación de actividades (se amplía con sus CU en la Etapa 6)."""
+	"""CU-01, CU-01.1, CU-01.2, CU-10, CU-10.1, CU-10.2 (RF-009 a RF-011). Registro, consulta, modificación y eliminación de actividades."""
 
 	def test_registrar_actividad_genera_codigo_y_auditoria(self):
 		self.client.force_login(self.funcionario)
@@ -1010,7 +1010,7 @@ class ActividadVistasTests(BaseOperacion):
 
 
 class RevisionTests(BaseOperacion):
-	"""Etapa 5c: revisión de evidencias con Validacion (RN-009)."""
+	"""CU-11, CU-11.1, CU-11.2 (RF-013, RF-014). Revisión de evidencias con Validacion (RN-009)."""
 
 	def setUp(self):
 		super().setUp()
@@ -1083,7 +1083,7 @@ class RevisionTests(BaseOperacion):
 
 
 class CompromisoVistasTests(BaseOperacion):
-	"""Etapa 5c: agenda de compromisos con responsable, historial y control de versión."""
+	"""CU-02, CU-12, CU-13, CU-13.1, CU-23.1 (RF-016 a RF-018, RF-034). Agenda de compromisos con responsable, historial y control de versión."""
 
 	def _datos(self, **cambios):
 		datos = {
@@ -1159,7 +1159,7 @@ class CompromisoVistasTests(BaseOperacion):
 
 
 class AccesoAutenticadoTests(BaseOperacion):
-	"""RNF-004 (acceso con identidad individual) y CU-29.1 (resultados limitados al ámbito)."""
+	"""CU-26.1, CU-29.1 (RNF-004, RF-002). Acceso con identidad individual y resultados limitados al ámbito."""
 
 	def setUp(self):
 		super().setUp()
@@ -1203,7 +1203,7 @@ class AccesoAutenticadoTests(BaseOperacion):
 
 
 class MedicionVistasTests(BaseOperacion):
-	"""Etapa 5d: portada, dashboard, semáforo y resumen leen los Indicador (RN-005, RN-006, RN-008)."""
+	"""CU-16, CU-16.1, CU-17, CU-18, CU-18.1 (RF-026 a RF-029). Portada, dashboard, semáforo y resumen leen los Indicador (RN-005, RN-006, RN-008)."""
 
 	def setUp(self):
 		super().setUp()
@@ -1333,7 +1333,7 @@ def contar_filas():
 
 
 class SeedDemoTests(TestCase):
-	"""Etapa 5e: seed_demo crea los datos en el modelo de 17 clases y se puede repetir."""
+	"""Sin CU (datos de demostración). seed_demo crea los datos en el modelo de 17 clases y se puede repetir."""
 
 	def test_carga_el_modelo_nuevo_con_sus_datos_de_demostracion(self):
 		cargar_demo()
@@ -1395,7 +1395,7 @@ class SeedDemoTests(TestCase):
 
 
 class AdminTests(TestCase):
-	"""Etapa 5e: el Django Admin administra los 19 modelos (las 17 clases, FuncionarioRol y MedicionDelegacion)."""
+	"""CU-26, CU-30 (RF-001, RF-002, RF-036). El Django Admin administra los 19 modelos (las 17 clases, FuncionarioRol y MedicionDelegacion)."""
 
 	@classmethod
 	def setUpTestData(cls):
@@ -1441,7 +1441,7 @@ class AdminTests(TestCase):
 
 
 class AuditoriaTests(BaseOperacion):
-	"""Lote 1 (CU-30, CU-30.1, CU-26.1, RF-036, RNF-008): auditoría inmutable, accesos denegados y cambios del admin auditados."""
+	"""CU-26.1, CU-30, CU-30.1 (RF-036, RNF-008). Auditoría inmutable, accesos denegados y cambios del admin auditados."""
 
 	def _evento(self, evento, entidad=None):
 		eventos = Auditoria.objects.filter(evento=evento)
@@ -1569,7 +1569,7 @@ class AuditoriaTests(BaseOperacion):
 
 
 class EvidenciaTamanoTests(BaseOperacion):
-	"""Lote 2 (CU-09.2, RNF-017): las evidencias que superan el tamaño máximo configurado se rechazan con su motivo."""
+	"""CU-09.2 (RF-012, RNF-017). Las evidencias que superan el tamaño máximo configurado se rechazan con su motivo."""
 
 	def _pdf(self, megabytes):
 		return SimpleUploadedFile('respaldo.pdf', b'0' * int(megabytes * 1024 * 1024), content_type='application/pdf')
@@ -1608,7 +1608,7 @@ class EvidenciaTamanoTests(BaseOperacion):
 
 
 class CompromisoReglasTests(BaseOperacion):
-	"""Lote 2 (CU-13, CU-14.2, RF-018, RF-019): transiciones controladas, alerta de vencimiento y conservación de incumplimientos."""
+	"""CU-13, CU-14.2, CU-02.3 (RF-018, RF-019). Transiciones controladas, alerta de vencimiento y conservación de incumplimientos."""
 
 	def _con_plazo(self, dias, estado='pendiente', folio=None):
 		compromiso = self._compromiso(folio=folio or f'PLAZO-{dias}-{estado}')
@@ -1729,7 +1729,7 @@ class CompromisoReglasTests(BaseOperacion):
 
 
 class FichaPersonalTests(BaseOperacion):
-	"""Lote 3 (CU-06, CU-17, RF-008): ficha personal, diferencia con lo esperado, meta cumplida y detalle de la fórmula."""
+	"""CU-06, CU-06.2, CU-07.3, CU-17, CU-17.2 (RF-008, RF-028). Ficha personal, diferencia con lo esperado, meta cumplida y detalle de la fórmula."""
 
 	def setUp(self):
 		super().setUp()
@@ -1834,7 +1834,7 @@ class FichaPersonalTests(BaseOperacion):
 
 
 class AnularAprobacionTests(BaseOperacion):
-	"""Lote 3 (CU-07.2, RN-009, RN-013): anular una aprobación exige motivo, recalcula hacia abajo y conserva el historial."""
+	"""CU-07.2 (RF-022, RF-023, RN-009, RN-013). Anular una aprobación exige motivo, recalcula hacia abajo y conserva el historial."""
 
 	def setUp(self):
 		super().setUp()
@@ -1910,7 +1910,7 @@ class AnularAprobacionTests(BaseOperacion):
 
 
 class FiltrosYInformesTests(BaseOperacion):
-	"""Lote 4 (RF-029, CU-26): filtros de actividades y compromisos, informes en pantalla, para imprimir y en CSV."""
+	"""CU-20, CU-20.1, CU-20.2, CU-29 (RF-032, RF-033). Filtros de actividades y compromisos, informes en pantalla, para imprimir y en CSV."""
 
 	def setUp(self):
 		super().setUp()

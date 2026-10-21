@@ -1,4 +1,4 @@
-"""Filtros e informes compartidos por las listas (actividades, agenda) y por los informes exportables (RF-029)."""
+"""Filtros e informes compartidos por las listas (actividades, agenda) y por los informes exportables (RF-032, RF-033)."""
 import csv
 from datetime import date, datetime, time, timedelta
 
