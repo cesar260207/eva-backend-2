@@ -123,7 +123,7 @@ class PlazoUnitTests(CompromisoBase):
         self.assertEqual(self.nuevo_compromiso(dias=-2, folio='D2').dias_para_vencer, -2)
 
     def test_proximo_a_vencer_dentro_de_los_dias_de_alerta(self):
-        """CU-14.2 Generar alerta por vencimiento próximo (RF-019). Hoy y los 3 días siguientes, por defecto."""
+        """CU-14.2 Generar alerta por vencimiento próximo (RF-019, RF-037). Hoy y los 3 días siguientes, por defecto."""
         casos = [(0, 'pendiente', True), (3, 'pendiente', True), (4, 'pendiente', False), (-1, 'pendiente', False), (2, 'realizado', False)]
         for dias, estado, esperado in casos:
             compromiso = self.nuevo_compromiso(dias=dias, estado=estado, folio=f'P{dias}{estado}')
@@ -131,7 +131,7 @@ class PlazoUnitTests(CompromisoBase):
 
     @override_settings(COMPROMISO_DIAS_ALERTA=7)
     def test_los_dias_de_alerta_son_configurables(self):
-        """CU-14.2 Generar alerta por vencimiento próximo (RF-019). Con 7 días, vence en 7 sí y en 8 no."""
+        """CU-14.2 Generar alerta por vencimiento próximo (RF-019, RF-037). Con 7 días, vence en 7 sí y en 8 no."""
         self.assertTrue(self.nuevo_compromiso(dias=7, folio='A7').proximo_a_vencer)
         self.assertFalse(self.nuevo_compromiso(dias=8, folio='A8').proximo_a_vencer)
 
@@ -214,7 +214,7 @@ class EstadoUnitTests(CompromisoBase):
         self.assertEqual(Compromiso.objects.get(pk=compromiso.pk).estado, 'ingresado')
 
     def test_cerrar_deja_el_compromiso_realizado_con_su_resolucion(self):
-        """CU-13.2 Reflejar cierre de compromiso (RF-020). El cierre se refleja y queda en el historial."""
+        """CU-13.2 Reflejar cierre de compromiso (RF-018). El cierre se refleja y queda en el historial."""
         compromiso = self.nuevo_compromiso(estado='proceso')
         compromiso.cerrar_compromiso('Poda realizada', self.coordinador.funcionario)
         compromiso.refresh_from_db()
@@ -222,7 +222,7 @@ class EstadoUnitTests(CompromisoBase):
         self.assertEqual(compromiso.historial.get().estado_nuevo, 'realizado')
 
     def test_cerrar_uno_ya_realizado_se_rechaza(self):
-        """CU-13.2 Reflejar cierre de compromiso (RF-020). El cierre solo se hace una vez."""
+        """CU-13.2 Reflejar cierre de compromiso (RF-018). El cierre solo se hace una vez."""
         with self.assertRaises(ValidationError):
             self.nuevo_compromiso(estado='realizado').cerrar_compromiso('Otra resolución', self.coordinador.funcionario)
 

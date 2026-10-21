@@ -91,7 +91,7 @@ class OrganizacionAccesoTests(TestCase):
 
 
 class MedicionTests(TestCase):
-	"""CU-05, CU-06.1, CU-07, CU-16.1, CU-28.1 (RF-005 a RF-007, RF-022 a RF-027). Reglas RN-001 a RN-008 y RN-013 de la medición."""
+	"""CU-05, CU-06.1, CU-07, CU-16.1, CU-28.1 (RF-005, RF-006, RF-007, RF-022, RF-023, RF-024, RF-026, RF-027). Reglas RN-001 a RN-008 y RN-013 de la medición."""
 
 	def setUp(self):
 		self.centro = Delegacion.objects.create(nombre='Centro', ambito='Centro', enfasis='Atencion territorial')

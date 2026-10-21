@@ -1,5 +1,5 @@
 """Pruebas unitarias del cálculo de avance, cumplimiento, semáforo y de las funciones de medicion.py (EP-02 y EP-05)."""
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from unittest import mock
 
@@ -189,6 +189,13 @@ class ResultadosPorDelegacionUnitTests(MedicionBase):
     def test_se_filtra_por_texto(self):
         """CU-29 Búsqueda y filtros (RF-032). Buscar «rur» deja solo Rural."""
         self.assertEqual(set(self._filas(texto='rur')), {'Rural'})
+
+    def test_informa_el_ultimo_calculo_y_los_dias_transcurridos(self):
+        """CU-18.1 Consolidar datos de delegación (RF-030). Fecha del último registro y días desde entonces."""
+        hoy = timezone.localdate()
+        with mock.patch('django.utils.timezone.localdate', return_value=hoy + timedelta(days=3)):
+            fila = {f['nombre']: f for f in medicion.resultados_por_delegacion(self.periodo)}['Centro']
+        self.assertEqual((fila['ultimos_datos'], fila['dias_desde_registro']), (hoy, 3))
 
     def test_sin_periodo_no_hay_resultados(self):
         """CU-18 Resumen ejecutivo (RF-029). Sin período elegido la lista está vacía."""
