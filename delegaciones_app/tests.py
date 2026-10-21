@@ -2,17 +2,21 @@ import shutil
 import tempfile
 from datetime import date
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import AnonymousUser, User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
-from django.test import TestCase, TransactionTestCase, override_settings
+from django.test import RequestFactory, TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 
+from django.http import HttpResponse
+from django.views import View
+
 from .forms import EvidenciaMantenedorForm
+from .permisos import RolRequeridoMixin, roles_de, rol_requerido, tiene_rol
 from .models import (
 	Actividad, Auditoria, Cargo, Catalogo, CatalogoItem, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
 	HistorialCompromiso, Indicador, ItemMedible, Meta, MetaMedicion, ParametroVersionado, PerfilUsuario, Periodo,
@@ -881,3 +885,79 @@ class MigracionDatosTests(TransactionTestCase):
 		self.assertFalse(viejo.get_model('auth', 'User').objects.filter(username__startswith='delegado.').exists())
 		self.assertEqual(modelo('Evidencia').objects.count(), 2)
 		self.assertEqual(modelo('MetaMedicion').objects.count(), 2)
+
+
+class PermisosTests(TestCase):
+	"""Etapa 5a: tiene_rol y control de acceso por rol (se amplía con sus CU en la Etapa 6)."""
+
+	def setUp(self):
+		self.cargo = Cargo.objects.create(nombre='Profesional territorial')
+		self.factory = RequestFactory()
+
+	def _usuario(self, username, *roles, estado=True):
+		usuario = User.objects.create_user(username, password='clave-segura')
+		funcionario = Funcionario.objects.create(usuario=usuario, identificador_institucional=username, nombre=username, cargo=self.cargo, estado=estado)
+		for rol in roles:
+			FuncionarioRol.objects.create(funcionario=funcionario, rol=Rol.objects.get(nombre_rol=rol))
+		return usuario
+
+	def _llamar(self, vista, usuario, ruta='/prueba/'):
+		request = self.factory.get(ruta)
+		request.user = usuario
+		return vista(request)
+
+	def test_tiene_rol_segun_los_roles_del_funcionario(self):
+		coordinador = self._usuario('coord', 'coordinador')
+		self.assertTrue(tiene_rol(coordinador, 'administrador', 'coordinador'))
+		self.assertFalse(tiene_rol(coordinador, 'administrador'))
+		self.assertFalse(tiene_rol(coordinador))
+
+	def test_funcionario_con_varios_roles(self):
+		usuario = self._usuario('doble', 'funcionario', 'verificador')
+		self.assertEqual(roles_de(usuario), {'funcionario', 'verificador'})
+
+	def test_funcionario_inactivo_no_aporta_roles(self):
+		self.assertEqual(roles_de(self._usuario('baja', 'coordinador', estado=False)), frozenset())
+
+	def test_usuario_sin_funcionario_ni_sesion_no_tiene_roles(self):
+		self.assertEqual(roles_de(User.objects.create_user('sin.perfil', password='clave-segura')), frozenset())
+		self.assertFalse(tiene_rol(AnonymousUser(), 'administrador'))
+
+	def test_superusuario_y_usuario_maestro_cuentan_como_administrador(self):
+		self.assertTrue(tiene_rol(User.objects.create_superuser('super', password='clave-segura'), 'administrador'))
+		usuario = User.objects.create_user('maestro', password='clave-segura')
+		maestro = UsuarioMaestro.objects.create(usuario=usuario, identificador_maestro='maestro', nombre='Maestro', nivel_dominio='total')
+		self.assertTrue(tiene_rol(usuario, 'administrador'))
+		maestro.estado = False
+		maestro.save()
+		self.assertFalse(tiene_rol(usuario, 'administrador'))
+
+	def test_cuenta_inactiva_no_tiene_roles(self):
+		usuario = self._usuario('inactivo', 'administrador')
+		usuario.is_active = False
+		self.assertEqual(roles_de(usuario), frozenset())
+
+	def test_mixin_deja_pasar_al_rol_permitido_y_redirige_a_los_demas(self):
+		class VistaDePrueba(RolRequeridoMixin, View):
+			roles_permitidos = ('administrador', 'coordinador')
+
+			def get(self, request):
+				return HttpResponse('ok')
+
+		vista = VistaDePrueba.as_view()
+		self.assertEqual(self._llamar(vista, self._usuario('coord2', 'coordinador')).status_code, 200)
+		sin_permiso = self._llamar(vista, self._usuario('func2', 'funcionario'))
+		self.assertEqual((sin_permiso.status_code, sin_permiso.url), (302, reverse('inicio')))
+		anonimo = self._llamar(vista, AnonymousUser())
+		self.assertEqual((anonimo.status_code, anonimo.url), (302, f"{reverse('login')}?next=/prueba/"))
+
+	def test_decorador_deja_pasar_al_rol_permitido_y_redirige_a_los_demas(self):
+		@rol_requerido('verificador')
+		def vista(request):
+			return HttpResponse('ok')
+
+		self.assertEqual(self._llamar(vista, self._usuario('verif', 'verificador')).status_code, 200)
+		sin_permiso = self._llamar(vista, self._usuario('func3', 'funcionario'))
+		self.assertEqual((sin_permiso.status_code, sin_permiso.url), (302, reverse('inicio')))
+		anonimo = self._llamar(vista, AnonymousUser())
+		self.assertEqual((anonimo.status_code, anonimo.url), (302, f"{reverse('login')}?next=/prueba/"))
