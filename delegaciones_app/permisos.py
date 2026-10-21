@@ -6,7 +6,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import redirect_to_login
 from django.shortcuts import redirect
 
-from .models import Rol, UsuarioMaestro
+from .models import Funcionario, Rol, UsuarioMaestro
 
 ADMINISTRADOR = 'administrador'
 COORDINADOR = 'coordinador'
@@ -38,6 +38,18 @@ def roles_de(user):
 def tiene_rol(user, *roles):
     """True si el usuario tiene al menos uno de los roles indicados."""
     return bool(roles_de(user) & set(roles))
+
+
+def puede_ver_todo(user):
+    """Administración y coordinación ven los registros de todas las delegaciones."""
+    return tiene_rol(user, ADMINISTRADOR, COORDINADOR)
+
+
+def funcionario_de(user):
+    """Funcionario activo del usuario (con su delegación y cargo) o None."""
+    if not user.is_authenticated:
+        return None
+    return Funcionario.objects.select_related('delegacion', 'cargo').filter(usuario=user, estado=True).first()
 
 
 def rol_requerido(*roles):

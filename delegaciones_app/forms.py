@@ -1,12 +1,13 @@
-﻿from django import forms
+from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
+from django.utils import timezone
 
-from .models import Actividad, Cargo, Catalogo, Compromiso, Delegacion, Evidencia, Funcionario, ItemMedible, Meta, Periodo, Rol
-from .permisos import ADMINISTRADOR, ROLES_DEL_SISTEMA
+from .models import Actividad, Cargo, Catalogo, Compromiso, Delegacion, Evidencia, Funcionario, ItemMedible, Meta, Periodo, Rol, VersionOptimistaMixin
+from .permisos import ADMINISTRADOR, ROLES_DEL_SISTEMA, funcionario_de, puede_ver_todo
 
 
 class FormularioBootstrap:
@@ -205,42 +206,96 @@ class MetaForm(FormularioBootstrap, forms.ModelForm):
             self.fields['item'].queryset = ItemMedible.objects.select_related('cargo', 'periodo')
 
 
-class ActividadForm(forms.ModelForm):
-    def __init__(self, *args, user=None, **kwargs):
+class VersionOptimistaForm:
+    """Campo oculto `version` para el bloqueo optimista (RF-034): si otro usuario guardó antes, se rechaza."""
+
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        perfil = getattr(user, 'perfil', None)
-        if perfil and perfil.delegacion_id and perfil.rol in {'funcionario', 'delegado'}:
-            self.fields['delegacion'].queryset = Delegacion.objects.filter(pk=perfil.delegacion_id, activa=True)
-        else:
-            self.fields['delegacion'].queryset = Delegacion.objects.filter(activa=True)
         if self.instance.pk:
-            # Al editar se conserva la delegación actual aunque luego se haya desactivado.
-            self.fields['delegacion'].queryset |= Delegacion.objects.filter(pk=self.instance.delegacion_id)
+            self.fields['version'] = forms.IntegerField(widget=forms.HiddenInput, initial=self.instance.version)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        version = cleaned_data.get('version')
+        if self.instance.pk and version is not None and version != self.instance.version:
+            raise ValidationError(VersionOptimistaMixin.MENSAJE_CONCURRENCIA)
+        return cleaned_data
+
+
+class ActividadForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm):
+    def __init__(self, *args, user=None, compromisos=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        funcionario = funcionario_de(user) if user else None
+        ve_todo = bool(user) and puede_ver_todo(user)
+        delegaciones, items = Q(estado=True), Q(periodo__estado='abierto')
+        if funcionario and not ve_todo:
+            # Quien tiene delegación registra en la suya, y solo sobre los ítems de su cargo.
+            if funcionario.delegacion_id:
+                delegaciones &= Q(pk=funcionario.delegacion_id)
+            items &= Q(cargo_id=funcionario.cargo_id)
+        # Al editar se conservan los valores actuales aunque luego dejen de estar disponibles.
+        self.fields['delegacion'].queryset = Delegacion.objects.filter(delegaciones | Q(pk=self.instance.delegacion_id))
+        self.fields['item'].queryset = ItemMedible.objects.filter(items | Q(pk=self.instance.item_id)).select_related('cargo', 'periodo')
+        self.fields['catalogo'].queryset = Catalogo.objects.filter(Q(tipo='atencion', activo=True) | Q(pk=self.instance.catalogo_id))
+        self.fields['catalogo'].label_from_instance = lambda elemento: elemento.nombre
+        self.fields['compromiso'].queryset = (compromisos if compromisos is not None else Compromiso.objects.all()).select_related('delegacion')
+        for campo in ('item', 'catalogo', 'fecha_hora'):
+            self.fields[campo].required = True
+        self.fields['fecha_hora'].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M']
+        if not self.instance.pk:
+            self.fields['fecha_hora'].initial = timezone.localtime().replace(second=0, microsecond=0)
 
     class Meta:
         model = Actividad
-        fields = ['delegacion', 'fecha', 'tipo_atencion', 'descripcion', 'accion', 'item_medicion', 'contacto', 'telefono']
-        widgets = {'fecha': forms.DateInput(attrs={'type': 'date'}), 'descripcion': forms.Textarea(attrs={'rows': 3}), 'accion': forms.Textarea(attrs={'rows': 3})}
+        fields = ['delegacion', 'item', 'catalogo', 'fecha_hora', 'solicitud_problema', 'accion', 'contacto_nombre', 'contacto_telefono', 'compromiso']
+        labels = {
+            'item': 'Ítem de medición', 'catalogo': 'Tipo de atención', 'fecha_hora': 'Fecha y hora',
+            'solicitud_problema': 'Solicitud o problema', 'accion': 'Acción ejecutada',
+            'contacto_nombre': 'Nombre de contacto', 'contacto_telefono': 'Teléfono de contacto', 'compromiso': 'Compromiso vinculado (opcional)',
+        }
+        help_texts = {'item': 'Solo ítems de períodos abiertos. La fecha debe caer dentro del período del ítem.'}
+        widgets = {
+            'fecha_hora': forms.DateTimeInput(attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
+            'solicitud_problema': forms.Textarea(attrs={'rows': 3}),
+            'accion': forms.Textarea(attrs={'rows': 3}),
+        }
 
 
-class EvidenciaForm(forms.ModelForm):
+class EvidenciaForm(FormularioBootstrap, forms.ModelForm):
+    comentario = forms.CharField(required=False, label='Comentario', widget=forms.Textarea(attrs={'rows': 2}))
+
     class Meta:
         model = Evidencia
-        fields = ['archivo', 'comentario']
-        widgets = {'comentario': forms.Textarea(attrs={'rows': 2})}
+        fields = ['archivo_vinculo']
+        labels = {'archivo_vinculo': 'Archivo'}
+        help_texts = {'archivo_vinculo': 'Formatos permitidos: JPG, PNG o PDF.'}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['archivo_vinculo'].required = True
 
 
-class CompromisoForm(forms.ModelForm):
+class CompromisoForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm):
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
-        perfil = getattr(user, 'perfil', None)
-        if perfil and perfil.delegacion_id and perfil.rol in {'funcionario', 'delegado'}:
-            self.fields['delegacion'].queryset = Delegacion.objects.filter(pk=perfil.delegacion_id, activa=True)
-            self.fields['responsable'].queryset = self.fields['responsable'].queryset.filter(pk=user.pk)
-        else:
-            self.fields['delegacion'].queryset = Delegacion.objects.filter(activa=True)
+        funcionario = funcionario_de(user) if user else None
+        ve_todo = bool(user) and puede_ver_todo(user)
+        delegaciones, responsables = Q(estado=True), Q(estado=True)
+        if funcionario and funcionario.delegacion_id and not ve_todo:
+            delegaciones &= Q(pk=funcionario.delegacion_id)
+            responsables = Q(pk=funcionario.pk)
+        self.fields['delegacion'].queryset = Delegacion.objects.filter(delegaciones | Q(pk=self.instance.delegacion_id))
+        self.fields['funcionario_responsable'].queryset = Funcionario.objects.filter(responsables | Q(pk=self.instance.funcionario_responsable_id))
+        self.fields['item'].queryset = ItemMedible.objects.exclude(periodo__estado='cerrado').select_related('cargo', 'periodo')
+        for campo in ('funcionario_responsable', 'origen'):
+            self.fields[campo].required = True
+        self.fields['origen'].initial = 'externo'
+        if self.instance.pk:
+            # El estado cambia con las acciones de la agenda, que dejan su historial.
+            del self.fields['estado']
 
     class Meta:
         model = Compromiso
-        fields = ['delegacion', 'responsable', 'solicitante', 'territorio', 'eje', 'descripcion', 'fecha_comprometida', 'estado', 'observacion']
+        fields = ['delegacion', 'funcionario_responsable', 'origen', 'solicitante', 'territorio', 'eje', 'descripcion', 'fecha_comprometida', 'area_apoyo', 'item', 'estado', 'observacion']
+        labels = {'funcionario_responsable': 'Responsable', 'area_apoyo': 'Área de apoyo', 'item': 'Ítem medible (opcional)'}
         widgets = {'fecha_comprometida': forms.DateInput(attrs={'type': 'date'}), 'descripcion': forms.Textarea(attrs={'rows': 3}), 'observacion': forms.Textarea(attrs={'rows': 2})}

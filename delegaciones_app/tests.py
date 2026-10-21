@@ -27,42 +27,20 @@ from decimal import Decimal
 from django.utils import timezone
 
 
+def crear_funcionario(username, *roles, cargo=None, delegacion=None):
+	"""Usuario de Django con su Funcionario y roles (la migración 0010 crea los seis roles del sistema)."""
+	usuario = User.objects.create_user(username, password='clave-segura')
+	cargo = cargo or Cargo.objects.get_or_create(nombre='Profesional territorial')[0]
+	funcionario = Funcionario.objects.create(usuario=usuario, identificador_institucional=username, nombre=username, cargo=cargo, delegacion=delegacion)
+	for rol in roles:
+		FuncionarioRol.objects.create(funcionario=funcionario, rol=Rol.objects.get(nombre_rol=rol))
+	return usuario
+
+
 class SGRMVPTests(TestCase):
 	def setUp(self):
 		self.delegacion = Delegacion.objects.create(nombre='Centro', territorio='Centro', enfasis='Atencion territorial')
-		self.otra_delegacion = Delegacion.objects.create(nombre='Rural', territorio='Rural', enfasis='Servicios cercanos')
-		self.coordinador = User.objects.create_user('coordinador', password='clave-segura')
-		PerfilUsuario.objects.create(usuario=self.coordinador, rol='coordinador')
-		self.funcionario = User.objects.create_user('funcionario', password='clave-segura')
-		PerfilUsuario.objects.create(usuario=self.funcionario, rol='funcionario', delegacion=self.delegacion)
-
-	def test_actividad_genera_codigo_y_auditoria(self):
-		self.client.force_login(self.funcionario)
-		response = self.client.post(reverse('actividad_nueva'), {'delegacion': self.delegacion.pk, 'fecha': '2026-09-07', 'tipo_atencion': 'Solicitud ciudadana', 'descripcion': 'Consulta vecinal', 'accion': 'Orientacion y derivacion', 'item_medicion': 'Atencion territorial', 'contacto': 'Organizacion demo', 'telefono': ''})
-		self.assertEqual(response.status_code, 302)
-		actividad = Actividad.objects.get(descripcion='Consulta vecinal')
-		self.assertTrue(actividad.codigo.startswith('EVD-'))
-		self.assertTrue(Auditoria.objects.filter(entidad='Actividad', identificador=actividad.codigo).exists())
-
-	def test_funcionario_ve_solo_su_delegacion(self):
-		Actividad.objects.create(codigo='EVD-TEST-1', funcionario=self.funcionario, delegacion=self.delegacion, fecha=date(2026, 9, 1), tipo_atencion='Solicitud', descripcion='Visible', accion='Accion', item_medicion='Item')
-		otro = User.objects.create_user('otro', password='clave-segura')
-		Actividad.objects.create(codigo='EVD-TEST-2', funcionario=otro, delegacion=self.otra_delegacion, fecha=date(2026, 9, 1), tipo_atencion='Solicitud', descripcion='No visible', accion='Accion', item_medicion='Item')
-		self.client.force_login(self.funcionario)
-		response = self.client.get(reverse('actividades'))
-		self.assertContains(response, 'EVD-TEST-1')
-		self.assertNotContains(response, 'EVD-TEST-2')
-
-	def test_compromiso_persistente_y_cambio_de_estado_auditado(self):
-		self.client.force_login(self.funcionario)
-		response = self.client.post(reverse('compromiso_nuevo'), {'delegacion': self.delegacion.pk, 'responsable': self.funcionario.pk, 'solicitante': 'Organizacion demo', 'territorio': 'Centro', 'eje': 'Seguridad', 'descripcion': 'Compromiso de prueba', 'fecha_comprometida': '2026-09-30', 'estado': 'pendiente', 'observacion': ''})
-		self.assertRedirects(response, reverse('agenda'))
-		compromiso = Compromiso.objects.get(descripcion='Compromiso de prueba')
-		self.assertContains(self.client.get(reverse('agenda')), compromiso.folio)
-		self.client.post(reverse('compromiso_estado', args=[compromiso.pk, 'realizado']))
-		compromiso.refresh_from_db()
-		self.assertEqual(compromiso.estado, 'realizado')
-		self.assertEqual(HistorialCompromiso.objects.filter(compromiso=compromiso).count(), 2)
+		self.funcionario = crear_funcionario('funcionario', 'funcionario', delegacion=self.delegacion)
 
 	def test_meta_cuenta_solo_actividades_aprobadas(self):
 		MetaMedicion.objects.create(delegacion=self.delegacion, nombre='Item', objetivo=2, periodo_inicio=date(2026, 9, 1), periodo_termino=date(2026, 9, 30), ponderador=100)
@@ -82,164 +60,6 @@ class SGRMVPTests(TestCase):
 		response = self.client.post(reverse('logout'))
 		self.assertRedirects(response, reverse('inicio'))
 		self.assertFalse('_auth_user_id' in self.client.session)
-
-
-class ActividadCRUDTests(TestCase):
-	def setUp(self):
-		self.centro = Delegacion.objects.create(nombre='Centro', territorio='Centro', enfasis='Atencion territorial')
-		self.rural = Delegacion.objects.create(nombre='Rural', territorio='Rural', enfasis='Servicios cercanos')
-		self.coordinador = User.objects.create_user('coordinador-actividad', password='clave-segura')
-		PerfilUsuario.objects.create(usuario=self.coordinador, rol='coordinador')
-		self.funcionario = User.objects.create_user('funcionario-actividad', password='clave-segura')
-		PerfilUsuario.objects.create(usuario=self.funcionario, rol='funcionario', delegacion=self.centro)
-		self.actividad = self._crear_actividad('EVD-CRUD-1')
-		self.client.force_login(self.funcionario)
-
-	def _crear_actividad(self, codigo, estado='pendiente'):
-		return Actividad.objects.create(codigo=codigo, funcionario=self.funcionario, delegacion=self.centro, fecha=date(2026, 9, 1), tipo_atencion='Solicitud', descripcion='Descripcion original', accion='Accion', item_medicion='Item', estado=estado)
-
-	def _datos(self, **cambios):
-		datos = {'delegacion': self.centro.pk, 'fecha': '2026-09-01', 'tipo_atencion': 'Solicitud', 'descripcion': 'Descripcion corregida', 'accion': 'Accion', 'item_medicion': 'Item', 'contacto': '', 'telefono': ''}
-		datos.update(cambios)
-		return datos
-
-	def test_listado_enlaza_modificar_y_eliminar_reales(self):
-		response = self.client.get(reverse('actividades'))
-
-		self.assertContains(response, reverse('actividad_editar', args=[self.actividad.codigo]))
-		self.assertContains(response, reverse('actividad_eliminar', args=[self.actividad.codigo]))
-		self.assertNotContains(response, 'href="#"')
-
-	def test_autor_edita_su_actividad_y_audita(self):
-		url = reverse('actividad_editar', args=[self.actividad.codigo])
-		response = self.client.get(url)
-		self.assertEqual(response.status_code, 200)
-		self.assertTemplateUsed(response, 'delegaciones_app/actividad_form.html')
-
-		response = self.client.post(url, self._datos())
-
-		self.assertRedirects(response, reverse('actividad_detalle', args=[self.actividad.codigo]))
-		self.actividad.refresh_from_db()
-		self.assertEqual(self.actividad.descripcion, 'Descripcion corregida')
-		self.assertEqual(self.actividad.funcionario, self.funcionario)
-		self.assertEqual(self.actividad.estado, 'pendiente')
-		self.assertTrue(Auditoria.objects.filter(entidad='Actividad', identificador=self.actividad.codigo, accion='editar').exists())
-
-	def test_editar_actividad_rechazada_la_devuelve_a_revision(self):
-		self.actividad.estado = 'rechazada'
-		self.actividad.save()
-
-		self.client.post(reverse('actividad_editar', args=[self.actividad.codigo]), self._datos())
-
-		self.actividad.refresh_from_db()
-		self.assertEqual(self.actividad.estado, 'pendiente')
-
-	def test_actividad_aprobada_no_se_edita_ni_se_elimina(self):
-		aprobada = self._crear_actividad('EVD-CRUD-OK', estado='aprobada')
-		self.client.force_login(self.coordinador)
-		detalle = reverse('actividad_detalle', args=[aprobada.codigo])
-
-		self.assertNotContains(self.client.get(reverse('actividades')), reverse('actividad_editar', args=[aprobada.codigo]))
-		response = self.client.post(reverse('actividad_editar', args=[aprobada.codigo]), self._datos())
-		self.assertRedirects(response, detalle)
-		response = self.client.post(reverse('actividad_eliminar', args=[aprobada.codigo]))
-		self.assertRedirects(response, detalle)
-
-		aprobada.refresh_from_db()
-		self.assertEqual(aprobada.descripcion, 'Descripcion original')
-		self.assertFalse(Auditoria.objects.filter(identificador=aprobada.codigo).exists())
-
-	def test_eliminar_requiere_confirmacion_post_y_borra_sus_evidencias(self):
-		Evidencia.objects.create(actividad=self.actividad, archivo='evidencias/2026/09/respaldo.pdf')
-		url = reverse('actividad_eliminar', args=[self.actividad.codigo])
-
-		response = self.client.get(url)
-		self.assertEqual(response.status_code, 200)
-		self.assertEqual(response.context['total_evidencias'], 1)
-		self.assertContains(response, 'también se eliminan sus evidencias')
-		self.assertTrue(Actividad.objects.filter(pk=self.actividad.pk).exists())
-
-		response = self.client.post(url)
-		self.assertRedirects(response, reverse('actividades'))
-		self.assertFalse(Actividad.objects.filter(pk=self.actividad.pk).exists())
-		self.assertFalse(Evidencia.objects.filter(actividad_id=self.actividad.pk).exists())
-		self.assertTrue(Auditoria.objects.filter(entidad='Actividad', identificador=self.actividad.codigo, accion='eliminar').exists())
-
-	def test_funcionario_de_otra_delegacion_no_puede_editar_ni_eliminar(self):
-		intruso = User.objects.create_user('funcionario-rural', password='clave-segura')
-		PerfilUsuario.objects.create(usuario=intruso, rol='funcionario', delegacion=self.rural)
-		self.client.force_login(intruso)
-		codigo = self.actividad.codigo
-
-		self.assertEqual(self.client.get(reverse('actividad_editar', args=[codigo])).status_code, 404)
-		self.assertEqual(self.client.post(reverse('actividad_editar', args=[codigo]), self._datos()).status_code, 404)
-		self.assertEqual(self.client.post(reverse('actividad_eliminar', args=[codigo])).status_code, 404)
-
-		self.actividad.refresh_from_db()
-		self.assertEqual(self.actividad.descripcion, 'Descripcion original')
-		self.assertFalse(Auditoria.objects.filter(identificador=codigo).exists())
-
-	def test_funcionario_de_la_misma_delegacion_que_no_es_autor_no_puede_modificar(self):
-		companero = User.objects.create_user('funcionario-centro-2', password='clave-segura')
-		PerfilUsuario.objects.create(usuario=companero, rol='funcionario', delegacion=self.centro)
-		self.client.force_login(companero)
-		detalle = reverse('actividad_detalle', args=[self.actividad.codigo])
-
-		self.assertRedirects(self.client.get(reverse('actividad_editar', args=[self.actividad.codigo])), detalle)
-		self.assertRedirects(self.client.post(reverse('actividad_eliminar', args=[self.actividad.codigo])), detalle)
-		self.assertTrue(Actividad.objects.filter(pk=self.actividad.pk).exists())
-
-	def test_coordinador_puede_modificar_actividad_ajena(self):
-		self.client.force_login(self.coordinador)
-
-		response = self.client.post(reverse('actividad_editar', args=[self.actividad.codigo]), self._datos(descripcion='Ajustada por coordinacion'))
-
-		self.assertRedirects(response, reverse('actividad_detalle', args=[self.actividad.codigo]))
-		self.actividad.refresh_from_db()
-		self.assertEqual(self.actividad.descripcion, 'Ajustada por coordinacion')
-		self.assertEqual(self.actividad.funcionario, self.funcionario)
-
-class AccesoAutenticadoTests(TestCase):
-	"""RNF-004 (acceso con identidad individual) y CU-29.1 (resultados limitados al ámbito)."""
-
-	def setUp(self):
-		self.centro = Delegacion.objects.create(nombre='Centro', territorio='Centro', enfasis='Atencion territorial')
-		self.rural = Delegacion.objects.create(nombre='Rural', territorio='Rural', enfasis='Servicios cercanos')
-		self.coordinador = User.objects.create_user('coordinador-acceso', password='clave-segura')
-		PerfilUsuario.objects.create(usuario=self.coordinador, rol='coordinador')
-		self.funcionario = User.objects.create_user('funcionario-acceso', password='clave-segura')
-		PerfilUsuario.objects.create(usuario=self.funcionario, rol='funcionario', delegacion=self.centro)
-		datos = {'responsable': self.coordinador, 'solicitante': 'Junta de vecinos demo', 'territorio': 'Sector demo', 'descripcion': 'Compromiso demo', 'fecha_comprometida': date(2026, 12, 31)}
-		Compromiso.objects.create(folio='FOL-CENTRO-1', delegacion=self.centro, **datos)
-		Compromiso.objects.create(folio='FOL-RURAL-1', delegacion=self.rural, **datos)
-
-	def test_vistas_internas_exigen_inicio_de_sesion(self):
-		urls = (
-			reverse('solicitudes'), reverse('agenda'), reverse('delegacion_detalle', args=['Centro']),
-			reverse('dashboard'), reverse('semaforo'), reverse('resumen'),
-		)
-		for url in urls:
-			response = self.client.get(url)
-			self.assertRedirects(response, f"{reverse('login')}?next={url}")
-
-	def test_portada_y_territorio_siguen_publicos(self):
-		self.assertEqual(self.client.get(reverse('inicio')).status_code, 200)
-		self.assertEqual(self.client.get(reverse('institucional')).status_code, 200)
-
-	def test_funcionario_solo_ve_compromisos_de_su_delegacion(self):
-		self.client.force_login(self.funcionario)
-		for url in (reverse('solicitudes'), reverse('agenda')):
-			response = self.client.get(url)
-			self.assertContains(response, 'FOL-CENTRO-1')
-			self.assertNotContains(response, 'FOL-RURAL-1')
-		response = self.client.get(reverse('delegacion_detalle', args=['Rural']))
-		self.assertNotContains(response, 'FOL-RURAL-1')
-
-	def test_coordinador_ve_compromisos_de_todas_las_delegaciones(self):
-		self.client.force_login(self.coordinador)
-		response = self.client.get(reverse('solicitudes'))
-		self.assertContains(response, 'FOL-CENTRO-1')
-		self.assertContains(response, 'FOL-RURAL-1')
 
 
 class OrganizacionAccesoTests(TestCase):
@@ -978,3 +798,419 @@ class MantenedoresTests(TestCase):
 	def test_los_avisos_se_muestran_en_pantalla(self):
 		respuesta = self.client.post(self._url('mantenedor_nuevo', 'cargos'), {'nombre': 'Cargo con aviso', 'vigencia': 'on'}, follow=True)
 		self.assertContains(respuesta, 'Se guardó: Cargo con aviso.')
+
+
+class BaseOperacion(TestCase):
+	"""Datos comunes de las pruebas de actividades, evidencias y compromisos."""
+
+	def setUp(self):
+		media = tempfile.mkdtemp()
+		self.addCleanup(shutil.rmtree, media, ignore_errors=True)
+		ajuste_media = override_settings(MEDIA_ROOT=media)
+		ajuste_media.enable()
+		self.addCleanup(ajuste_media.disable)
+
+		self.cargo = Cargo.objects.create(nombre='Profesional territorial')
+		self.centro = Delegacion.objects.create(nombre='Centro', ambito='Centro historico', enfasis='Atencion territorial')
+		self.rural = Delegacion.objects.create(nombre='Rural', ambito='Rural', enfasis='Servicios cercanos')
+		self.periodo = Periodo.objects.create(nombre='Septiembre 2026', fecha_inicio=date(2026, 9, 1), fecha_termino=date(2026, 9, 30), estado='abierto')
+		self.item = ItemMedible.objects.create(cargo=self.cargo, periodo=self.periodo, nombre='Atencion territorial', ponderacion=100)
+		self.catalogo = Catalogo.objects.create(codigo='AT-OPER', nombre='Operativo en terreno', tipo='atencion')
+		# Los atributos son usuarios de Django; su Funcionario es usuario.funcionario.
+		self.coordinador = crear_funcionario('coordinador-op', 'coordinador', cargo=self.cargo)
+		self.verificador = crear_funcionario('verificador-op', 'verificador', cargo=self.cargo)
+		self.funcionario = crear_funcionario('funcionario-op', 'funcionario', cargo=self.cargo, delegacion=self.centro)
+
+	def _actividad(self, autor=None, delegacion=None, estado='pendiente', **cambios):
+		datos = {
+			'funcionario_autor': (autor or self.funcionario).funcionario, 'delegacion': delegacion or self.centro,
+			'item': self.item, 'catalogo': self.catalogo, 'fecha_hora': timezone.make_aware(datetime(2026, 9, 1, 10, 0)),
+			'solicitud_problema': 'Solicitud original', 'accion': 'Accion', 'estado': estado,
+		}
+		datos.update(cambios)
+		return Actividad.objects.create(**datos)
+
+	def _datos_actividad(self, **cambios):
+		datos = {
+			'delegacion': self.centro.pk, 'item': self.item.pk, 'catalogo': self.catalogo.pk, 'fecha_hora': '2026-09-01T10:00',
+			'solicitud_problema': 'Solicitud corregida', 'accion': 'Accion', 'contacto_nombre': '', 'contacto_telefono': '',
+		}
+		datos.update(cambios)
+		return datos
+
+	def _archivo(self, nombre='respaldo.pdf'):
+		return SimpleUploadedFile(nombre, b'%PDF-1.4 prueba', content_type='application/pdf')
+
+	def _evidencia(self, actividad, **cambios):
+		return Evidencia.objects.create(actividad=actividad, funcionario_autor=actividad.funcionario_autor, archivo_vinculo='evidencias/2026/09/respaldo.pdf', **cambios)
+
+	def _compromiso(self, responsable=None, delegacion=None, folio='LS-OP-1'):
+		return Compromiso.objects.create(
+			folio=folio, delegacion=delegacion or self.centro, funcionario_responsable=(responsable or self.funcionario).funcionario,
+			solicitante='Junta de vecinos', territorio='Centro', descripcion='Poda de arboles', fecha_comprometida=date(2026, 12, 31), origen='externo',
+		)
+
+
+class ActividadVistasTests(BaseOperacion):
+	"""Etapa 5c: registro, consulta, modificación y eliminación de actividades (se amplía con sus CU en la Etapa 6)."""
+
+	def test_registrar_actividad_genera_codigo_y_auditoria(self):
+		self.client.force_login(self.funcionario)
+		respuesta = self.client.post(reverse('actividad_nueva'), self._datos_actividad(solicitud_problema='Consulta vecinal', contacto_nombre='Organizacion demo'))
+		actividad = Actividad.objects.get(solicitud_problema='Consulta vecinal')
+		self.assertRedirects(respuesta, reverse('actividad_detalle', args=[actividad.codigo_verificador]))
+		self.assertTrue(actividad.codigo_verificador.startswith('EVD-'))
+		self.assertEqual((actividad.funcionario_autor, actividad.estado, actividad.version), (self.funcionario.funcionario, 'pendiente', 1))
+		self.assertTrue(Auditoria.objects.filter(entidad='Actividad', identificador_registro=actividad.codigo_verificador, evento='crear').exists())
+
+	def test_el_formulario_ofrece_solo_los_items_del_cargo_del_funcionario(self):
+		ajeno = ItemMedible.objects.create(cargo=Cargo.objects.create(nombre='Otro cargo'), periodo=self.periodo, nombre='Item ajeno', ponderacion=100)
+		self.client.force_login(self.funcionario)
+		self.assertQuerySetEqual(self.client.get(reverse('actividad_nueva')).context['form'].fields['item'].queryset, [self.item])
+		self.client.force_login(self.coordinador)
+		self.assertEqual(set(self.client.get(reverse('actividad_nueva')).context['form'].fields['item'].queryset), {self.item, ajeno})
+
+	def test_rechaza_una_fecha_fuera_del_periodo_del_item(self):
+		self.client.force_login(self.funcionario)
+		respuesta = self.client.post(reverse('actividad_nueva'), self._datos_actividad(fecha_hora='2026-10-05T10:00'))
+		self.assertIn('fecha_hora', respuesta.context['form'].errors)
+		self.assertFalse(Actividad.objects.exists())
+
+	def test_usuario_sin_funcionario_no_puede_registrar(self):
+		self.client.force_login(User.objects.create_user('suelto', password='clave-segura'))
+		respuesta = self.client.get(reverse('actividad_nueva'), follow=True)
+		self.assertRedirects(respuesta, reverse('inicio'))
+		self.assertContains(respuesta, 'no tiene un funcionario asociado')
+
+	def test_funcionario_ve_solo_su_delegacion(self):
+		visible = self._actividad()
+		otro = crear_funcionario('otro-op', 'funcionario', cargo=self.cargo, delegacion=self.rural)
+		oculta = self._actividad(autor=otro, delegacion=self.rural)
+		self.client.force_login(self.funcionario)
+		respuesta = self.client.get(reverse('actividades'))
+		self.assertContains(respuesta, visible.codigo_verificador)
+		self.assertNotContains(respuesta, oculta.codigo_verificador)
+
+	def test_verificador_sin_delegacion_ve_todas_las_actividades(self):
+		actividad = self._actividad()
+		self.client.force_login(self.verificador)
+		self.assertContains(self.client.get(reverse('actividades')), actividad.codigo_verificador)
+		self.assertEqual(self.client.get(reverse('actividad_detalle', args=[actividad.codigo_verificador])).status_code, 200)
+
+	def test_listado_enlaza_modificar_y_eliminar_reales(self):
+		actividad = self._actividad()
+		self.client.force_login(self.funcionario)
+		respuesta = self.client.get(reverse('actividades'))
+		self.assertContains(respuesta, reverse('actividad_editar', args=[actividad.codigo_verificador]))
+		self.assertContains(respuesta, reverse('actividad_eliminar', args=[actividad.codigo_verificador]))
+		self.assertNotContains(respuesta, 'href="#"')
+
+	def test_autor_edita_su_actividad_y_audita(self):
+		actividad = self._actividad()
+		url = reverse('actividad_editar', args=[actividad.codigo_verificador])
+		self.client.force_login(self.funcionario)
+		respuesta = self.client.get(url)
+		self.assertTemplateUsed(respuesta, 'delegaciones_app/actividad_form.html')
+		self.assertContains(respuesta, 'name="version"')
+
+		respuesta = self.client.post(url, self._datos_actividad(version=actividad.version))
+
+		self.assertRedirects(respuesta, reverse('actividad_detalle', args=[actividad.codigo_verificador]))
+		actividad.refresh_from_db()
+		self.assertEqual((actividad.solicitud_problema, actividad.funcionario_autor, actividad.estado, actividad.version), ('Solicitud corregida', self.funcionario.funcionario, 'pendiente', 2))
+		self.assertTrue(Auditoria.objects.filter(entidad='Actividad', identificador_registro=actividad.codigo_verificador, evento='editar').exists())
+
+	def test_editar_actividad_rechazada_la_devuelve_a_revision_con_sus_evidencias(self):
+		actividad = self._actividad(estado='rechazada')
+		evidencia = self._evidencia(actividad, estado_revision='rechazada')
+		self.client.force_login(self.funcionario)
+		self.client.post(reverse('actividad_editar', args=[actividad.codigo_verificador]), self._datos_actividad(version=actividad.version))
+		self.assertEqual(Actividad.objects.get(pk=actividad.pk).estado, 'pendiente')
+		self.assertEqual(Evidencia.objects.get(pk=evidencia.pk).estado_revision, 'pendiente')
+
+	def test_edicion_concurrente_se_rechaza_con_la_version_desactualizada(self):
+		actividad = self._actividad()
+		url = reverse('actividad_editar', args=[actividad.codigo_verificador])
+		self.client.force_login(self.funcionario)
+		self.client.post(url, self._datos_actividad(solicitud_problema='Guardada primero', version=1))
+		respuesta = self.client.post(url, self._datos_actividad(solicitud_problema='Con version vieja', version=1))
+		self.assertEqual(respuesta.status_code, 200)
+		self.assertContains(respuesta, 'modificado por otro usuario')
+		actividad.refresh_from_db()
+		self.assertEqual((actividad.solicitud_problema, actividad.version), ('Guardada primero', 2))
+
+	def test_actividad_aprobada_no_se_edita_ni_se_elimina(self):
+		aprobada = self._actividad(estado='aprobada')
+		self.client.force_login(self.coordinador)
+		detalle = reverse('actividad_detalle', args=[aprobada.codigo_verificador])
+
+		self.assertNotContains(self.client.get(reverse('actividades')), reverse('actividad_editar', args=[aprobada.codigo_verificador]))
+		self.assertRedirects(self.client.post(reverse('actividad_editar', args=[aprobada.codigo_verificador]), self._datos_actividad(version=1)), detalle)
+		self.assertRedirects(self.client.post(reverse('actividad_eliminar', args=[aprobada.codigo_verificador])), detalle)
+
+		aprobada.refresh_from_db()
+		self.assertEqual(aprobada.solicitud_problema, 'Solicitud original')
+		self.assertFalse(Auditoria.objects.filter(identificador_registro=aprobada.codigo_verificador).exists())
+
+	def test_actividad_de_un_periodo_cerrado_no_se_modifica(self):
+		actividad = self._actividad()
+		Periodo.objects.filter(pk=self.periodo.pk).update(estado='cerrado')
+		self.client.force_login(self.coordinador)
+		detalle = reverse('actividad_detalle', args=[actividad.codigo_verificador])
+		self.assertRedirects(self.client.get(reverse('actividad_editar', args=[actividad.codigo_verificador])), detalle)
+		self.assertRedirects(self.client.post(reverse('actividad_eliminar', args=[actividad.codigo_verificador])), detalle)
+		self.assertTrue(Actividad.objects.filter(pk=actividad.pk).exists())
+
+	def test_eliminar_requiere_confirmacion_post_y_borra_sus_evidencias(self):
+		actividad = self._actividad()
+		self._evidencia(actividad)
+		url = reverse('actividad_eliminar', args=[actividad.codigo_verificador])
+		self.client.force_login(self.funcionario)
+
+		respuesta = self.client.get(url)
+		self.assertEqual(respuesta.context['total_evidencias'], 1)
+		self.assertContains(respuesta, 'también se eliminan sus evidencias')
+		self.assertTrue(Actividad.objects.filter(pk=actividad.pk).exists())
+
+		self.assertRedirects(self.client.post(url), reverse('actividades'))
+		self.assertFalse(Actividad.objects.filter(pk=actividad.pk).exists())
+		self.assertFalse(Evidencia.objects.filter(actividad_id=actividad.pk).exists())
+		self.assertTrue(Auditoria.objects.filter(entidad='Actividad', identificador_registro=actividad.codigo_verificador, evento='eliminar').exists())
+
+	def test_funcionario_de_otra_delegacion_no_puede_editar_ni_eliminar(self):
+		actividad = self._actividad()
+		self.client.force_login(crear_funcionario('intruso-op', 'funcionario', cargo=self.cargo, delegacion=self.rural))
+		codigo = actividad.codigo_verificador
+		self.assertEqual(self.client.get(reverse('actividad_editar', args=[codigo])).status_code, 404)
+		self.assertEqual(self.client.post(reverse('actividad_editar', args=[codigo]), self._datos_actividad(version=1)).status_code, 404)
+		self.assertEqual(self.client.post(reverse('actividad_eliminar', args=[codigo])).status_code, 404)
+		self.assertEqual(Actividad.objects.get(pk=actividad.pk).solicitud_problema, 'Solicitud original')
+
+	def test_funcionario_de_la_misma_delegacion_que_no_es_autor_no_puede_modificar(self):
+		actividad = self._actividad()
+		self.client.force_login(crear_funcionario('companero-op', 'funcionario', cargo=self.cargo, delegacion=self.centro))
+		detalle = reverse('actividad_detalle', args=[actividad.codigo_verificador])
+		self.assertRedirects(self.client.get(reverse('actividad_editar', args=[actividad.codigo_verificador])), detalle)
+		self.assertRedirects(self.client.post(reverse('actividad_eliminar', args=[actividad.codigo_verificador])), detalle)
+		self.assertTrue(Actividad.objects.filter(pk=actividad.pk).exists())
+
+	def test_coordinador_puede_modificar_actividad_ajena(self):
+		actividad = self._actividad()
+		self.client.force_login(self.coordinador)
+		respuesta = self.client.post(reverse('actividad_editar', args=[actividad.codigo_verificador]), self._datos_actividad(solicitud_problema='Ajustada por coordinacion', version=1))
+		self.assertRedirects(respuesta, reverse('actividad_detalle', args=[actividad.codigo_verificador]))
+		actividad.refresh_from_db()
+		self.assertEqual((actividad.solicitud_problema, actividad.funcionario_autor), ('Ajustada por coordinacion', self.funcionario.funcionario))
+
+	def test_subir_evidencia_la_envia_a_revision_y_audita(self):
+		actividad = self._actividad(estado='correccion')
+		self.client.force_login(self.funcionario)
+		respuesta = self.client.post(reverse('actividad_detalle', args=[actividad.codigo_verificador]), {'archivo_vinculo': self._archivo(), 'comentario': 'Acta firmada'})
+		self.assertRedirects(respuesta, reverse('actividad_detalle', args=[actividad.codigo_verificador]))
+		evidencia = Evidencia.objects.get()
+		self.assertEqual((evidencia.codigo_evidencia, evidencia.metadatos, evidencia.estado_revision), (f'{actividad.codigo_verificador}-01', {'comentario': 'Acta firmada'}, 'pendiente'))
+		self.assertEqual(Actividad.objects.get(pk=actividad.pk).estado, 'pendiente')
+		self.assertTrue(Auditoria.objects.filter(evento='cargar_evidencia', identificador_registro=actividad.codigo_verificador).exists())
+
+	def test_evidencia_rechaza_extension_no_permitida(self):
+		actividad = self._actividad()
+		self.client.force_login(self.funcionario)
+		archivo = SimpleUploadedFile('script.exe', b'MZ', content_type='application/octet-stream')
+		respuesta = self.client.post(reverse('actividad_detalle', args=[actividad.codigo_verificador]), {'archivo_vinculo': archivo, 'comentario': ''})
+		self.assertIn('archivo_vinculo', respuesta.context['evidencia_form'].errors)
+		self.assertFalse(Evidencia.objects.exists())
+
+	def test_actividad_aprobada_no_admite_nuevas_evidencias(self):
+		actividad = self._actividad(estado='aprobada')
+		self.client.force_login(self.funcionario)
+		self.client.post(reverse('actividad_detalle', args=[actividad.codigo_verificador]), {'archivo_vinculo': self._archivo(), 'comentario': ''})
+		self.assertFalse(Evidencia.objects.exists())
+		self.assertContains(self.client.get(reverse('actividad_detalle', args=[actividad.codigo_verificador])), 'ya no admite nuevas evidencias')
+
+
+class RevisionTests(BaseOperacion):
+	"""Etapa 5c: revisión de evidencias con Validacion (RN-009)."""
+
+	def setUp(self):
+		super().setUp()
+		self.meta = Meta.objects.create(item=self.item, funcionario=self.funcionario.funcionario, valor_objetivo=10)
+		self.actividad = self._actividad()
+		self.evidencias = [self._evidencia(self.actividad), self._evidencia(self.actividad)]
+		self.codigo = self.actividad.codigo_verificador
+
+	def _revisar(self, decision, usuario=None, observacion=''):
+		self.client.force_login(usuario or self.verificador)
+		return self.client.post(reverse('revisar_actividad', args=[self.codigo, decision]), {'observacion': observacion})
+
+	def test_aprobar_valida_cada_evidencia_pendiente_y_actualiza_el_indicador(self):
+		self.assertRedirects(self._revisar('aprobar', observacion='Conforme'), reverse('actividad_detalle', args=[self.codigo]))
+		self.assertEqual(Actividad.objects.get(pk=self.actividad.pk).estado, 'aprobada')
+		self.assertEqual(set(Evidencia.objects.values_list('estado_revision', flat=True)), {'aprobada'})
+		validaciones = Validacion.objects.all()
+		self.assertEqual((validaciones.count(), {v.decision for v in validaciones}, {v.funcionario_verificador for v in validaciones}), (2, {'aprobada'}, {self.verificador.funcionario}))
+		indicador = Indicador.objects.get(meta=self.meta)
+		self.assertEqual((indicador.avance, indicador.cumplimiento), (1, Decimal('10.00')))
+		self.assertTrue(Auditoria.objects.filter(evento='aprobar', identificador_registro=self.codigo).exists())
+
+	def test_rechazar_y_pedir_correccion_exigen_observacion(self):
+		for decision in ('rechazar', 'corregir'):
+			self._revisar(decision, observacion='')
+			self.assertEqual(Actividad.objects.get(pk=self.actividad.pk).estado, 'pendiente', decision)
+			self.assertFalse(Validacion.objects.exists(), decision)
+		self._revisar('corregir', observacion='Falta la firma')
+		self.assertEqual(Actividad.objects.get(pk=self.actividad.pk).estado, 'correccion')
+		self.assertEqual(set(Evidencia.objects.values_list('estado_revision', flat=True)), {'correccion'})
+
+	def test_rechazo_sin_observacion_explica_el_motivo(self):
+		respuesta = self._revisar('rechazar', observacion='')
+		self.assertContains(self.client.get(respuesta.url), 'exige un motivo')
+
+	def test_actividad_corregida_vuelve_a_revision_y_se_puede_aprobar(self):
+		self._revisar('corregir', observacion='Falta la firma')
+		self.client.force_login(self.funcionario)
+		actividad = Actividad.objects.get(pk=self.actividad.pk)
+		self.client.post(reverse('actividad_editar', args=[self.codigo]), self._datos_actividad(version=actividad.version))
+		self.assertEqual(Actividad.objects.get(pk=self.actividad.pk).estado, 'pendiente')
+		self._revisar('aprobar')
+		self.assertEqual(Actividad.objects.get(pk=self.actividad.pk).estado, 'aprobada')
+		self.assertEqual(Validacion.objects.filter(evidencia=self.evidencias[0]).count(), 2)
+
+	def test_actividad_sin_evidencias_pendientes_no_se_revisa(self):
+		sin_evidencias = self._actividad(solicitud_problema='Sin respaldo')
+		self.client.force_login(self.verificador)
+		respuesta = self.client.post(reverse('revisar_actividad', args=[sin_evidencias.codigo_verificador, 'aprobar']), follow=True)
+		self.assertContains(respuesta, 'no tiene evidencias pendientes')
+		self.assertEqual(Actividad.objects.get(pk=sin_evidencias.pk).estado, 'pendiente')
+
+	def test_solo_administracion_coordinacion_y_verificacion_revisan(self):
+		self._revisar('aprobar', usuario=self.funcionario)
+		self.assertFalse(Validacion.objects.exists())
+		self._revisar('aprobar', usuario=self.coordinador)
+		self.assertEqual(Validacion.objects.count(), 2)
+
+	def test_superusuario_sin_funcionario_no_puede_revisar(self):
+		respuesta = self._revisar('aprobar', usuario=User.objects.create_superuser('super-op', password='clave-segura'))
+		self.assertContains(self.client.get(respuesta.url), 'no tiene un funcionario asociado')
+		self.assertFalse(Validacion.objects.exists())
+
+	def test_el_detalle_ofrece_la_revision_solo_a_quien_puede_hacerla(self):
+		url = reverse('actividad_detalle', args=[self.codigo])
+		self.client.force_login(self.verificador)
+		self.assertContains(self.client.get(url), 'Solicitar corrección')
+		self.client.force_login(self.funcionario)
+		self.assertNotContains(self.client.get(url), 'Solicitar corrección')
+
+
+class CompromisoVistasTests(BaseOperacion):
+	"""Etapa 5c: agenda de compromisos con responsable, historial y control de versión."""
+
+	def _datos(self, **cambios):
+		datos = {
+			'delegacion': self.centro.pk, 'funcionario_responsable': self.funcionario.funcionario.pk, 'origen': 'externo',
+			'solicitante': 'Organizacion demo', 'territorio': 'Centro', 'eje': 'Seguridad', 'descripcion': 'Compromiso de prueba',
+			'fecha_comprometida': '2026-09-30', 'area_apoyo': '', 'item': '', 'estado': 'pendiente', 'observacion': '',
+		}
+		datos.update(cambios)
+		return datos
+
+	def test_crear_compromiso_deja_historial_y_auditoria(self):
+		self.client.force_login(self.funcionario)
+		self.assertRedirects(self.client.post(reverse('compromiso_nuevo'), self._datos()), reverse('agenda'))
+		compromiso = Compromiso.objects.get(descripcion='Compromiso de prueba')
+		self.assertTrue(compromiso.folio.startswith('AGR-'))
+		self.assertEqual((compromiso.funcionario_responsable, compromiso.version), (self.funcionario.funcionario, 1))
+		registro = compromiso.historial.get()
+		self.assertEqual((registro.estado_anterior, registro.estado_nuevo, registro.autor_funcionario), ('', 'pendiente', self.funcionario.funcionario))
+		self.assertTrue(Auditoria.objects.filter(evento='crear', entidad='Compromiso', identificador_registro=compromiso.folio).exists())
+		self.assertContains(self.client.get(reverse('agenda')), compromiso.folio)
+
+	def test_un_funcionario_siempre_queda_como_responsable_de_lo_que_crea(self):
+		otro = crear_funcionario('otro-resp', 'funcionario', cargo=self.cargo, delegacion=self.centro)
+		self.client.force_login(self.funcionario)
+		respuesta = self.client.post(reverse('compromiso_nuevo'), self._datos(funcionario_responsable=otro.funcionario.pk))
+		self.assertIn('funcionario_responsable', respuesta.context['form'].errors)
+
+	def test_cambio_de_estado_queda_en_el_historial_y_en_la_auditoria(self):
+		compromiso = self._compromiso()
+		self.client.force_login(self.funcionario)
+		self.client.post(reverse('compromiso_estado', args=[compromiso.pk, 'realizado']))
+		compromiso.refresh_from_db()
+		self.assertEqual(compromiso.estado, 'realizado')
+		registro = compromiso.historial.get()
+		self.assertEqual((registro.estado_anterior, registro.estado_nuevo), ('ingresado', 'realizado'))
+		auditoria = Auditoria.objects.get(evento='cambio_estado', identificador_registro=compromiso.folio)
+		self.assertEqual((auditoria.valor_anterior, auditoria.valor_nuevo), ('ingresado', 'realizado'))
+
+	def test_solo_el_responsable_o_la_coordinacion_modifican_un_compromiso(self):
+		compromiso = self._compromiso()
+		url = reverse('compromiso_editar', args=[compromiso.pk])
+		self.client.force_login(crear_funcionario('companero-comp', 'funcionario', cargo=self.cargo, delegacion=self.centro))
+		self.assertRedirects(self.client.post(url, self._datos(descripcion='Intento ajeno', version=1)), reverse('agenda'))
+		self.assertEqual(Compromiso.objects.get(pk=compromiso.pk).descripcion, 'Poda de arboles')
+
+		self.client.force_login(self.funcionario)
+		self.assertRedirects(self.client.post(url, self._datos(descripcion='Corregido por el responsable', version=1)), reverse('agenda'))
+		self.client.force_login(self.coordinador)
+		self.assertRedirects(self.client.post(url, self._datos(descripcion='Ajustado por coordinacion', version=2)), reverse('agenda'))
+		compromiso.refresh_from_db()
+		self.assertEqual((compromiso.descripcion, compromiso.version), ('Ajustado por coordinacion', 3))
+
+	def test_el_formulario_de_edicion_no_cambia_el_estado_y_rechaza_versiones_viejas(self):
+		compromiso = self._compromiso()
+		url = reverse('compromiso_editar', args=[compromiso.pk])
+		self.client.force_login(self.coordinador)
+		self.assertNotIn('estado', self.client.get(url).context['form'].fields)
+		self.client.post(url, self._datos(descripcion='Guardado primero', version=1))
+		respuesta = self.client.post(url, self._datos(descripcion='Con version vieja', version=1))
+		self.assertContains(respuesta, 'modificado por otro usuario')
+		self.assertEqual(Compromiso.objects.get(pk=compromiso.pk).descripcion, 'Guardado primero')
+
+	def test_solo_la_coordinacion_elimina_compromisos(self):
+		compromiso = self._compromiso()
+		compromiso.set_estado('proceso', self.funcionario.funcionario)
+		self.client.force_login(self.funcionario)
+		self.client.post(reverse('compromiso_eliminar', args=[compromiso.pk]))
+		self.assertTrue(Compromiso.objects.filter(pk=compromiso.pk).exists())
+		self.client.force_login(self.coordinador)
+		self.client.post(reverse('compromiso_eliminar', args=[compromiso.pk]))
+		self.assertFalse(Compromiso.objects.filter(pk=compromiso.pk).exists())
+		self.assertFalse(HistorialCompromiso.objects.exists())
+
+
+class AccesoAutenticadoTests(BaseOperacion):
+	"""RNF-004 (acceso con identidad individual) y CU-29.1 (resultados limitados al ámbito)."""
+
+	def setUp(self):
+		super().setUp()
+		self._compromiso(responsable=self.coordinador, delegacion=self.centro, folio='FOL-CENTRO-1')
+		self._compromiso(responsable=self.coordinador, delegacion=self.rural, folio='FOL-RURAL-1')
+
+	def test_vistas_internas_exigen_inicio_de_sesion(self):
+		urls = (
+			reverse('solicitudes'), reverse('agenda'), reverse('delegacion_detalle', args=['Centro']),
+			reverse('dashboard'), reverse('semaforo'), reverse('resumen'),
+		)
+		for url in urls:
+			self.assertRedirects(self.client.get(url), f"{reverse('login')}?next={url}")
+
+	def test_portada_y_territorio_siguen_publicos(self):
+		self.assertEqual(self.client.get(reverse('inicio')).status_code, 200)
+		self.assertEqual(self.client.get(reverse('institucional')).status_code, 200)
+
+	def test_funcionario_solo_ve_compromisos_de_su_delegacion(self):
+		self.client.force_login(self.funcionario)
+		for url in (reverse('solicitudes'), reverse('agenda')):
+			respuesta = self.client.get(url)
+			self.assertContains(respuesta, 'FOL-CENTRO-1')
+			self.assertNotContains(respuesta, 'FOL-RURAL-1')
+		self.assertNotContains(self.client.get(reverse('delegacion_detalle', args=['Rural'])), 'FOL-RURAL-1')
+
+	def test_coordinador_ve_compromisos_de_todas_las_delegaciones(self):
+		self.client.force_login(self.coordinador)
+		respuesta = self.client.get(reverse('solicitudes'))
+		self.assertContains(respuesta, 'FOL-CENTRO-1')
+		self.assertContains(respuesta, 'FOL-RURAL-1')
+
+	def test_usuario_sin_funcionario_no_ve_compromisos(self):
+		self.client.force_login(User.objects.create_user('suelto-acceso', password='clave-segura'))
+		self.assertNotContains(self.client.get(reverse('agenda')), 'FOL-CENTRO-1')

@@ -1,8 +1,67 @@
 {% extends 'base.html' %}
-{% block title %}{{ actividad.codigo }} | SGR{% endblock %}
+{% block title %}{{ actividad.codigo_verificador }} | SGR{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4"><div><div class="page-kicker">Detalle y trazabilidad</div><h1 class="page-title">{{ actividad.codigo }}</h1><p class="page-intro mb-0">{{ actividad.descripcion }}</p></div><span class="badge badge-soft">{{ actividad.get_estado_display }}</span></div>
-<div class="row g-4"><div class="col-lg-7"><div class="panel"><div class="row g-3"><div class="col-md-6"><div class="section-label">Delegación</div><strong>{{ actividad.delegacion }}</strong></div><div class="col-md-6"><div class="section-label">Funcionario</div><strong>{{ actividad.funcionario.get_full_name|default:actividad.funcionario.username }}</strong></div><div class="col-md-6"><div class="section-label">Fecha</div><strong>{{ actividad.fecha|date:'d-m-Y' }}</strong></div><div class="col-md-6"><div class="section-label">Ítem de medición</div><strong>{{ actividad.item_medicion }}</strong></div><div class="col-12"><div class="section-label">Acción ejecutada</div><p>{{ actividad.accion }}</p></div></div></div>
-{% if puede_validar and actividad.estado == 'pendiente' %}<div class="panel mt-4"><div class="section-label mb-2">Revisión de verificador</div><form method="post" action="{% url 'revisar_actividad' actividad.codigo 'aprobar' %}" class="d-inline">{% csrf_token %}<button class="btn btn-sgr me-2" type="submit">Aprobar</button></form><form method="post" action="{% url 'revisar_actividad' actividad.codigo 'rechazar' %}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-danger" type="submit">Rechazar</button></form></div>{% endif %}</div>
-<div class="col-lg-5"><div class="panel"><div class="section-label mb-2">Evidencia</div>{% for evidencia in actividad.evidencias.all %}<p class="mb-1"><strong>{{ evidencia.archivo.name }}</strong></p><small class="text-muted">{% if evidencia.aprobada %}Aprobada{% elif evidencia.aprobada == False %}Rechazada{% else %}Pendiente de revisión{% endif %}</small>{% empty %}<p class="text-muted">Todavía no hay archivos asociados.</p>{% endfor %}<hr><form method="post" enctype="multipart/form-data">{% csrf_token %}{{ evidencia_form.as_p }}<button class="btn btn-sgr" type="submit">Cargar evidencia</button></form></div></div></div>
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+    <div>
+        <div class="page-kicker">Detalle y trazabilidad</div>
+        <h1 class="page-title">{{ actividad.codigo_verificador }}</h1>
+        <p class="page-intro mb-0">{{ actividad.solicitud_problema }}</p>
+    </div>
+    <span class="badge badge-soft">{{ actividad.get_estado_display }}</span>
+</div>
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="panel">
+            <div class="row g-3">
+                <div class="col-md-6"><div class="section-label">Delegación</div><strong>{{ actividad.delegacion }}</strong></div>
+                <div class="col-md-6"><div class="section-label">Funcionario</div><strong>{{ actividad.funcionario_autor.nombre|default:'-' }}</strong></div>
+                <div class="col-md-6"><div class="section-label">Fecha y hora</div><strong>{{ actividad.fecha_hora|date:'d-m-Y H:i' }}</strong></div>
+                <div class="col-md-6"><div class="section-label">Tipo de atención</div><strong>{{ actividad.catalogo.nombre|default:'-' }}</strong></div>
+                <div class="col-md-6"><div class="section-label">Ítem de medición</div><strong>{{ actividad.item.nombre|default:'-' }}</strong>{% if actividad.item %}<div class="small text-muted">{{ actividad.item.periodo }}</div>{% endif %}</div>
+                <div class="col-md-6"><div class="section-label">Contacto</div><strong>{{ actividad.contacto_nombre|default:'-' }}</strong>{% if actividad.contacto_telefono %}<div class="small text-muted">{{ actividad.contacto_telefono }}</div>{% endif %}</div>
+                {% if actividad.compromiso %}<div class="col-12"><div class="section-label">Compromiso vinculado</div><strong>{{ actividad.compromiso.folio }}</strong> {{ actividad.compromiso.descripcion|truncatechars:80 }}</div>{% endif %}
+                <div class="col-12"><div class="section-label">Acción ejecutada</div><p class="mb-0">{{ actividad.accion }}</p></div>
+            </div>
+        </div>
+        {% if puede_validar and hay_pendientes %}
+        <div class="panel mt-4">
+            <div class="section-label mb-2">Revisión de verificador</div>
+            <form method="post">
+                {% csrf_token %}
+                <textarea class="form-control mb-3" name="observacion" rows="2" placeholder="Observación (obligatoria para rechazar o solicitar corrección)"></textarea>
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-sgr" type="submit" formaction="{% url 'revisar_actividad' actividad.codigo_verificador 'aprobar' %}">Aprobar</button>
+                    <button class="btn btn-outline-secondary" type="submit" formaction="{% url 'revisar_actividad' actividad.codigo_verificador 'corregir' %}">Solicitar corrección</button>
+                    <button class="btn btn-outline-danger" type="submit" formaction="{% url 'revisar_actividad' actividad.codigo_verificador 'rechazar' %}">Rechazar</button>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+    <div class="col-lg-5">
+        <div class="panel">
+            <div class="section-label mb-2">Evidencias</div>
+            {% for evidencia in actividad.evidencias.all %}
+            <div class="mb-3">
+                <p class="mb-1"><strong>{{ evidencia.codigo_evidencia }}</strong> · {{ evidencia.archivo_vinculo.name }}</p>
+                <small class="text-muted">{{ evidencia.get_estado_revision_display }}</small>
+                {% if evidencia.metadatos.comentario %}<div class="small">{{ evidencia.metadatos.comentario }}</div>{% endif %}
+                {% with ultima=evidencia.validaciones.all.0 %}{% if ultima.observacion %}<div class="small text-muted">Observación del verificador: {{ ultima.observacion }}</div>{% endif %}{% endwith %}
+            </div>
+            {% empty %}
+            <p class="text-muted">Todavía no hay archivos asociados.</p>
+            {% endfor %}
+            <hr>
+            {% if actividad.estado == 'aprobada' %}
+            <p class="text-muted mb-0">Actividad aprobada: ya no admite nuevas evidencias.</p>
+            {% else %}
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                {{ evidencia_form.as_p }}
+                <button class="btn btn-sgr" type="submit">Cargar evidencia</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
 {% endblock %}

@@ -310,6 +310,14 @@ class Actividad(VersionOptimistaMixin, models.Model):
 		evidencia.save()
 		evidencia.enviar_a_revision()
 
+	def actualizar_indicadores(self):
+		"""Cada validación deja un Indicador nuevo en las metas del ítem; los períodos cerrados quedan congelados (RN-013)."""
+		if not self.item_id or self.item.periodo.estado == 'cerrado':
+			return []
+		metas = self.item.metas.select_related('funcionario', 'item__periodo')
+		# calcular_avance solo cuenta las actividades de la delegación de la meta.
+		return [Indicador.generar(meta) for meta in metas if meta.funcionario.delegacion_id in (None, self.delegacion_id)]
+
 
 EXTENSIONES_EVIDENCIA = ['jpg', 'jpeg', 'png', 'pdf']
 
@@ -457,7 +465,7 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 		from django.utils import timezone
 		return self.estado != 'realizado' and self.fecha_comprometida < timezone.localdate()
 
-	def _registrar_historial(self, autor, estado_anterior, observacion=None):
+	def registrar_historial(self, autor, estado_anterior, observacion=None):
 		HistorialCompromiso.objects.create(
 			compromiso=self, autor_funcionario=autor,
 			estado_anterior=estado_anterior, estado_nuevo=self.estado, observacion=observacion or '',
@@ -470,7 +478,7 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 		anterior = self.estado
 		self.estado = estado
 		self.save(update_fields=['estado'])
-		self._registrar_historial(autor, anterior, observacion)
+		self.registrar_historial(autor, anterior, observacion)
 
 	@transaction.atomic
 	def derivar_compromiso(self, nuevo_responsable, autor):
@@ -479,7 +487,7 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 		anterior = self.funcionario_responsable
 		self.funcionario_responsable = nuevo_responsable
 		self.save(update_fields=['funcionario_responsable'])
-		self._registrar_historial(autor, self.estado, f'Derivado de {anterior or "sin responsable"} a {nuevo_responsable}.')
+		self.registrar_historial(autor, self.estado, f'Derivado de {anterior or "sin responsable"} a {nuevo_responsable}.')
 
 	@transaction.atomic
 	def cerrar_compromiso(self, resolucion, autor):
@@ -489,7 +497,7 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 		self.estado = 'realizado'
 		self.observacion = resolucion
 		self.save(update_fields=['estado', 'observacion'])
-		self._registrar_historial(autor, anterior, resolucion)
+		self.registrar_historial(autor, anterior, resolucion)
 
 
 class MetaMedicion(models.Model):
