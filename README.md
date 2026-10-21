@@ -16,7 +16,10 @@ administrable desde Django Admin y desplegable en una instancia AWS EC2.
   Delegaciones, Cargos, Roles, Funcionarios, Catálogo, Períodos, Ítems medibles y Metas.
 - Registro de actividades con código verificador único e inmutable, carga de evidencias
   (JPG, PNG o PDF, hasta 5 MB), revisión por verificadores y anulación de aprobaciones con motivo.
-- Agenda de compromisos con responsable, plazos, alerta de vencimiento, estados controlados e historial.
+- Agenda de compromisos con responsable, plazos, alerta de vencimiento, estados controlados, historial
+  y un resumen por responsable y estado.
+- Alertas por vencimientos, evidencias pendientes de revisión, ausencia de registros y avance bajo lo esperado.
+- Actividad reciente por funcionario: registros, último ingreso, días sin ingreso y promedio diario.
 - Filtros en las listas, que se conservan al volver desde un detalle, e informes de actividades,
   compromisos y cumplimiento en pantalla, para imprimir y en CSV.
 - Control de períodos: un período cerrado no se modifica salvo reapertura con motivo.
@@ -117,10 +120,11 @@ Abrir `http://127.0.0.1:8000/`. El panel de administracion esta en
 > `DB_ENGINE=sqlite` en tu `.env` para usar SQLite localmente. Para la entrega
 > (evidencia de phpMyAdmin) se necesita `DB_ENGINE=mysql`.
 
-Dos reglas son configurables desde el `.env` (ver `.env.example`):
-`EVIDENCIA_TAMANO_MAXIMO_MB` (tamaño máximo de una evidencia, 5 por defecto) y
+Tres reglas son configurables desde el `.env` (ver `.env.example`):
+`EVIDENCIA_TAMANO_MAXIMO_MB` (tamaño máximo de una evidencia, 5 por defecto),
 `COMPROMISO_DIAS_ALERTA` (días de anticipación para marcar un compromiso como
-próximo a vencer, 3 por defecto).
+próximo a vencer, 3 por defecto) y `ALERTA_DIAS_SIN_REGISTRO` (días sin registrar
+actividades para emitir una alerta, 7 por defecto).
 
 Configura `DB_PORT` segun el puerto donde escucha tu servidor. En el equipo
 local actual MariaDB usa `3307`; MySQL/MariaDB con configuracion estandar,
@@ -159,7 +163,9 @@ Los datos son sinteticos y solo sirven para demostracion academica.
 - `/admin/`: administracion completa de Django (las 19 tablas).
 - `/gestion/`, `/gestion/semaforo/`, `/gestion/resumen/`: medicion y cumplimiento.
 - `/gestion/mi-ficha/`: ficha personal del funcionario.
-- `/gestion/informes/`: informes de actividades, compromisos y cumplimiento (pantalla, imprimir y CSV).
+- `/gestion/informes/`: informes de actividades, compromisos, resumen por responsable, actividad reciente
+  y cumplimiento (pantalla, imprimir y CSV).
+- `/gestion/alertas/`: alertas según tu rol y tu ámbito.
 - `/territorio/`: contexto institucional.
 
 ## Validacion y pruebas
@@ -185,11 +191,10 @@ requisito, la tabla CP, CU, RF, método de prueba y resultado, y las fichas de l
 ## Alcance y requisitos pendientes
 
 Todos los casos de uso de la especificación detallada (CU-01 a CU-30, con sus extensiones) tienen pruebas. Entre los requisitos
-funcionales no están completos: RF-015 (atención social por etapas), RF-020 (el cierre de un
-compromiso no alimenta el indicador), RF-021 (resumen colectivo por funcionario), RF-025
-(incentivos y penalizaciones), RF-030 (actividad reciente, parcial), RF-031 (vista global por
-cargos), RF-035 (comentarios) y RF-037 (alertas, solo por vencimiento). El detalle de cada uno está
-en [MODELO_DATOS.md](MODELO_DATOS.md) y en la sección 4 de [PLAN_DE_PRUEBAS.md](PLAN_DE_PRUEBAS.md).
+funcionales no están implementados: RF-015 (atención social por etapas), RF-020 (el cierre de un
+compromiso no alimenta el indicador), RF-025 (incentivos y penalizaciones), RF-031 (vista global
+por cargos) y RF-035 (comentarios). El detalle de cada uno está en [MODELO_DATOS.md](MODELO_DATOS.md)
+y en la sección 4 de [PLAN_DE_PRUEBAS.md](PLAN_DE_PRUEBAS.md).
 
 ## Despliegue en AWS EC2
 

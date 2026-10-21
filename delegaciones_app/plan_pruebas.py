@@ -56,19 +56,16 @@ CATALOGO_RF = {
 
 CODIGO_DE_MODULO = {
     'test_integracion': 'INT', 'test_unit_autenticacion': 'LOGIN', 'test_unit_organizacion': 'ORG', 'test_unit_actividades': 'ACT',
-    'test_unit_medicion': 'MED', 'test_unit_compromisos': 'COM', 'test_unit_transversal': 'TRA', 'test_unit_plan_pruebas': 'PLAN',
+    'test_unit_medicion': 'MED', 'test_unit_compromisos': 'COM', 'test_unit_transversal': 'TRA', 'test_unit_plan_pruebas': 'PLAN', 'test_unit_alertas': 'ALE',
 }
 
 # Estado de los requisitos que no están completos en el sistema (se declara aquí para que el plan lo diga con claridad).
 OBSERVACIONES_RF = {
     15: 'No implementado: no existe el registro de atenciones sociales por etapas.',
     20: 'No implementado: cerrar un compromiso no alimenta el indicador del ítem; solo cuentan las actividades aprobadas.',
-    21: 'Parcial: la agenda totaliza por estado y plazo, pero no por funcionario ni muestra porcentajes.',
     25: 'No implementado: el campo ajuste del indicador se guarda pero no entra al cálculo.',
-    30: 'Parcial: informa fecha del último cálculo y días transcurridos; faltan cantidad de registros y promedio diario.',
     31: 'No implementado: no hay vista global por cargos.',
     35: 'No implementado: no hay observaciones o comentarios asociados a registros.',
-    37: 'Parcial: solo alerta por vencimiento de compromisos; faltan evidencias pendientes, ausencia de registros y avance bajo el umbral.',
 }
 
 # Ficha de cada caso de login, con los campos del formato del plan de pruebas.

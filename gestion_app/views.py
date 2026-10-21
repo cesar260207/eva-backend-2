@@ -1,9 +1,11 @@
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from delegaciones_app import medicion
+from delegaciones_app.alertas import alertas_de
 from delegaciones_app.informes import (
     TIPOS_INFORME, filas_de_actividad_reciente, filas_de_actividades, filas_de_compromisos, filas_de_cumplimiento, filas_de_resumen,
     filtrar_actividades, filtrar_compromisos, respuesta_csv,
@@ -113,5 +115,18 @@ def informe(request):
         'delegaciones_filtro': Delegacion.objects.filter(estado=True), 'periodos_filtro': Periodo.objects.order_by('-fecha_inicio'),
         'estados_filtro': Actividad.ESTADOS if tipo in ('actividades', 'reciente') else Compromiso.ESTADOS,
         'periodo_informe': periodo,
+    })
+
+
+@login_required
+def alertas(request):
+    """Alertas del usuario: vencimientos, evidencias pendientes, ausencia de registros y avance bajo el umbral (RF-037)."""
+    lista = alertas_de(request.user)
+    return render(request, 'gestion_app/alertas.html', {
+        'alertas': lista,
+        'peligro': sum(1 for alerta in lista if alerta['nivel'] == 'danger'),
+        'advertencia': sum(1 for alerta in lista if alerta['nivel'] == 'warning'),
+        'dias_sin_registro': settings.ALERTA_DIAS_SIN_REGISTRO,
+        'dias_alerta': settings.COMPROMISO_DIAS_ALERTA,
     })
 

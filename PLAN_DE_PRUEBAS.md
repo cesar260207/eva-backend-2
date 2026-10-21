@@ -17,10 +17,10 @@ Generado con `python manage.py plan_pruebas` a partir de los docstrings de las p
 
 | Concepto | Cantidad |
 |---|---|
-| Pruebas ejecutadas | 442 |
-| Unitarias | 250 |
-| De integración | 192 |
-| Aprobadas | 442 |
+| Pruebas ejecutadas | 495 |
+| Unitarias | 295 |
+| De integración | 200 |
+| Aprobadas | 495 |
 | Reprobadas o con error | 0 |
 
 ## 3. Cobertura por caso de uso
@@ -43,7 +43,7 @@ Los casos de uso son los de la especificación detallada (CU-01 a CU-30). «Cubi
 | CU-05.1 | Validar parámetros de meta | 1 | 0 | Aprobado |
 | CU-05.2 | Bloquear guardado por valor inválido | 2 | 0 | Aprobado |
 | CU-05.3 | Notificar período cerrado | 1 | 0 | Aprobado |
-| CU-06 | Seguimiento de avance | 5 | 12 | Aprobado |
+| CU-06 | Seguimiento de avance | 19 | 14 | Aprobado |
 | CU-06.1 | Recalcular indicadores automáticamente | 2 | 15 | Aprobado |
 | CU-06.2 | Destacar meta cumplida | 1 | 12 | Aprobado |
 | CU-07 | Cálculo automático de cumplimiento | 0 | 15 | Aprobado |
@@ -56,19 +56,19 @@ Los casos de uso son los de la especificación detallada (CU-01 a CU-30). «Cubi
 | CU-10 | Generación de códigos verificadores | 3 | 31 | Aprobado |
 | CU-10.1 | Buscar actividad por código | 1 | 19 | Aprobado |
 | CU-10.2 | Consulta sin coincidencias | 1 | 19 | Aprobado |
-| CU-11 | Validación de actividades | 5 | 20 | Aprobado |
+| CU-11 | Validación de actividades | 10 | 20 | Aprobado |
 | CU-11.1 | Registrar trazabilidad de decisión | 2 | 8 | Aprobado |
 | CU-11.2 | Bloquear aporte al avance | 7 | 8 | Aprobado |
-| CU-12 | Agenda compartida | 1 | 6 | Aprobado |
-| CU-12.1 | Filtrar agenda compartida | 5 | 0 | Aprobado |
-| CU-12.2 | Consulta sin coincidencias en agenda | 1 | 0 | Aprobado |
+| CU-12 | Agenda compartida | 4 | 7 | Aprobado |
+| CU-12.1 | Filtrar agenda compartida | 6 | 1 | Aprobado |
+| CU-12.2 | Consulta sin coincidencias en agenda | 2 | 0 | Aprobado |
 | CU-13 | Actualización de estados | 5 | 19 | Aprobado |
 | CU-13.1 | Registrar historial de cambio de estado | 4 | 6 | Aprobado |
 | CU-13.2 | Reflejar cierre de compromiso | 3 | 0 | Aprobado |
-| CU-14 | Seguimiento de compromisos | 0 | 0 | Cubierto por sus subcasos |
+| CU-14 | Seguimiento de compromisos | 2 | 0 | Aprobado |
 | CU-14.1 | Clasificar compromisos por vencimiento | 3 | 0 | Aprobado |
-| CU-14.2 | Generar alerta por vencimiento próximo | 4 | 13 | Aprobado |
-| CU-16 | Semáforo de cumplimiento | 1 | 10 | Aprobado |
+| CU-14.2 | Generar alerta por vencimiento próximo | 14 | 13 | Aprobado |
+| CU-16 | Semáforo de cumplimiento | 4 | 10 | Aprobado |
 | CU-16.1 | Calcular estado del semáforo | 2 | 25 | Aprobado |
 | CU-17 | Comparación entre avance esperado y real | 0 | 22 | Aprobado |
 | CU-17.1 | Calcular diferencia de avance | 3 | 0 | Aprobado |
@@ -77,20 +77,20 @@ Los casos de uso son los de la especificación detallada (CU-01 a CU-30). «Cubi
 | CU-18.1 | Consolidar datos de delegación | 4 | 10 | Aprobado |
 | CU-18.2 | Navegar al detalle de gestión | 1 | 0 | Aprobado |
 | CU-20 | Generación de informes | 1 | 15 | Aprobado |
-| CU-20.1 | Consolidar datos filtrados | 4 | 15 | Aprobado |
-| CU-20.2 | Restringir por ámbito de permisos | 1 | 15 | Aprobado |
+| CU-20.1 | Consolidar datos filtrados | 6 | 16 | Aprobado |
+| CU-20.2 | Restringir por ámbito de permisos | 1 | 16 | Aprobado |
 | CU-23 | Trabajo colaborativo en línea | 0 | 0 | Cubierto por sus subcasos |
 | CU-23.1 | Controlar conflicto de concurrencia | 5 | 18 | Aprobado |
 | CU-25 | Modificar parámetros | 5 | 26 | Aprobado |
 | CU-26 | Administración de delegaciones, usuarios y roles | 26 | 44 | Aprobado |
-| CU-26.1 | Denegar acceso por ámbito | 13 | 26 | Aprobado |
+| CU-26.1 | Denegar acceso por ámbito | 17 | 27 | Aprobado |
 | CU-27 | Administración de catálogos | 4 | 26 | Aprobado |
 | CU-27.1 | Restringir elemento duplicado | 2 | 26 | Aprobado |
 | CU-28 | Administración de períodos | 12 | 26 | Aprobado |
 | CU-28.1 | Restricción por período cerrado | 9 | 15 | Aprobado |
 | CU-29 | Búsqueda y filtros | 3 | 15 | Aprobado |
 | CU-29.1 | Restricción de búsqueda por ámbito | 4 | 6 | Aprobado |
-| CU-30 | Auditoría de cambios | 8 | 22 | Aprobado |
+| CU-30 | Auditoría de cambios | 8 | 23 | Aprobado |
 | CU-30.1 | Bloqueo por alteración no autorizada | 3 | 12 | Aprobado |
 
 Casos de uso sin ninguna prueba: ninguno.
@@ -119,9 +119,9 @@ En las pruebas de integración el CU y los RF se declaran por clase, así que ca
 | RF-016 | Crear compromisos en agenda colectiva | 1 | 6 | Aprobado |  |
 | RF-017 | Asignar compromiso | 9 | 6 | Aprobado |  |
 | RF-018 | Gestionar estados | 10 | 19 | Aprobado |  |
-| RF-019 | Controlar plazos | 9 | 13 | Aprobado |  |
+| RF-019 | Controlar plazos | 10 | 13 | Aprobado |  |
 | RF-020 | Relacionar agenda y medición | 0 | 0 | Sin prueba | No implementado: cerrar un compromiso no alimenta el indicador del ítem; solo cuentan las actividades aprobadas. |
-| RF-021 | Generar resumen colectivo | 0 | 0 | Sin prueba | Parcial: la agenda totaliza por estado y plazo, pero no por funcionario ni muestra porcentajes. |
+| RF-021 | Generar resumen colectivo | 8 | 4 | Aprobado |  |
 | RF-022 | Calcular avance actual | 13 | 23 | Aprobado |  |
 | RF-023 | Calcular porcentaje de cumplimiento | 3 | 23 | Aprobado |  |
 | RF-024 | Calcular cumplimiento ponderado | 6 | 15 | Aprobado |  |
@@ -130,17 +130,17 @@ En las pruebas de integración el CU y los RF se declaran por clase, así que ca
 | RF-027 | Mostrar semáforo de avance | 3 | 25 | Aprobado |  |
 | RF-028 | Mostrar tablero personal | 3 | 22 | Aprobado |  |
 | RF-029 | Mostrar tablero de delegación | 9 | 10 | Aprobado |  |
-| RF-030 | Medir actividad reciente | 1 | 0 | Aprobado | Parcial: informa fecha del último cálculo y días transcurridos; faltan cantidad de registros y promedio diario. |
+| RF-030 | Medir actividad reciente | 10 | 3 | Aprobado |  |
 | RF-031 | Mostrar vista global por cargos | 0 | 0 | Sin prueba | No implementado: no hay vista global por cargos. |
 | RF-032 | Buscar y filtrar información | 17 | 15 | Aprobado |  |
-| RF-033 | Generar y exportar informes | 5 | 15 | Aprobado |  |
+| RF-033 | Generar y exportar informes | 7 | 18 | Aprobado |  |
 | RF-034 | Permitir trabajo simultáneo | 5 | 18 | Aprobado |  |
 | RF-035 | Facilitar coordinación | 0 | 0 | Sin prueba | No implementado: no hay observaciones o comentarios asociados a registros. |
-| RF-036 | Mantener trazabilidad | 13 | 22 | Aprobado |  |
-| RF-037 | Emitir alertas | 2 | 0 | Aprobado | Parcial: solo alerta por vencimiento de compromisos; faltan evidencias pendientes, ausencia de registros y avance bajo el umbral. |
+| RF-036 | Mantener trazabilidad | 13 | 23 | Aprobado |  |
+| RF-037 | Emitir alertas | 30 | 0 | Aprobado |  |
 | RF-038 | Versionar parámetros | 14 | 0 | Aprobado |  |
 
-Requisitos sin ninguna prueba: RF-015, RF-020, RF-021, RF-025, RF-031, RF-035
+Requisitos sin ninguna prueba: RF-015, RF-020, RF-025, RF-031, RF-035
 
 ## 5. Tabla de casos de prueba
 
@@ -261,6 +261,12 @@ Una fila por prueba. La columna CU lista los casos de uso que verifica y RF los 
 | CP-ORG-027 | CU-05.2 | RF-007 | Unitaria | Un valor inválido no llega a la base. | MetaUnitTests.test_actualizar_valor_objetivo_valida_antes_de_guardar | Aprobado |
 | CP-ORG-028 | CU-05.2 | RF-007 | Unitaria | RN-002: cero y negativos se rechazan. | MetaUnitTests.test_el_valor_objetivo_debe_ser_mayor_que_cero | Aprobado |
 | CP-ORG-030 | CU-05.3 | RF-038 | Unitaria | RN-013: los períodos cerrados no se modifican. | MetaUnitTests.test_no_se_crea_una_meta_en_un_periodo_cerrado | Aprobado |
+| CP-ALE-007 | CU-06 | RF-037, RNF-015 | Unitaria | Con 2 días, tres sin ingreso ya alertan. | AlertasDeAusenciaTests.test_el_limite_es_configurable | Aprobado |
+| CP-ALE-008 | CU-06 | RF-037 | Unitaria | Con 7 días justos aún no; con 8 sí. | AlertasDeAusenciaTests.test_el_limite_exacto_no_alerta | Aprobado |
+| CP-ALE-009 | CU-06 | RF-037 | Unitaria | Sin ninguna actividad. | AlertasDeAusenciaTests.test_quien_nunca_registro_alerta | Aprobado |
+| CP-ALE-010 | CU-06 | RF-037 | Unitaria | Un período cerrado no genera alertas de ausencia. | AlertasDeAusenciaTests.test_sin_metas_en_un_periodo_abierto_no_se_vigila | Aprobado |
+| CP-ALE-011 | CU-06 | RF-037 | Unitaria | Pasados 7 días sin ingreso. | AlertasDeAusenciaTests.test_un_registro_antiguo_alerta_con_los_dias_transcurridos | Aprobado |
+| CP-ALE-012 | CU-06 | RF-037 | Unitaria | Dentro del plazo no hay aviso. | AlertasDeAusenciaTests.test_un_registro_reciente_no_alerta | Aprobado |
 | CP-INT-074 | CU-06, CU-06.2, CU-07.3, CU-17, CU-17.2 | RF-008, RF-028 | Integración | Ficha personal, diferencia con lo esperado, meta cumplida y detalle de la fórmula. | FichaPersonalTests.test_dashboard_y_resumen_muestran_la_diferencia_y_la_desviacion | Aprobado |
 | CP-INT-075 | CU-06, CU-06.2, CU-07.3, CU-17, CU-17.2 | RF-008, RF-028 | Integración | Ficha personal, diferencia con lo esperado, meta cumplida y detalle de la fórmula. | FichaPersonalTests.test_el_detalle_explica_la_formula_y_enlaza_las_actividades_que_aportan | Aprobado |
 | CP-INT-076 | CU-06, CU-06.2, CU-07.3, CU-17, CU-17.2 | RF-008, RF-028 | Integración | Ficha personal, diferencia con lo esperado, meta cumplida y detalle de la fórmula. | FichaPersonalTests.test_el_detalle_informa_cuando_se_aplica_el_tope | Aprobado |
@@ -273,23 +279,33 @@ Una fila por prueba. La columna CU lista los casos de uso que verifica y RF los 
 | CP-INT-083 | CU-06, CU-06.2, CU-07.3, CU-17, CU-17.2 | RF-008, RF-028 | Integración | Ficha personal, diferencia con lo esperado, meta cumplida y detalle de la fórmula. | FichaPersonalTests.test_sin_metas_la_ficha_lo_indica | Aprobado |
 | CP-INT-084 | CU-06, CU-06.2, CU-07.3, CU-17, CU-17.2 | RF-008, RF-028 | Integración | Ficha personal, diferencia con lo esperado, meta cumplida y detalle de la fórmula. | FichaPersonalTests.test_un_usuario_sin_funcionario_es_redirigido_con_un_mensaje | Aprobado |
 | CP-INT-085 | CU-06, CU-06.2, CU-07.3, CU-17, CU-17.2 | RF-008, RF-028 | Integración | Ficha personal, diferencia con lo esperado, meta cumplida y detalle de la fórmula. | FichaPersonalTests.test_una_meta_sin_calculo_se_informa_sin_formula | Aprobado |
-| CP-MED-018 | CU-06 | RF-028 | Unitaria | 1 de 4 con esperado de 50 % es 25 %, 25 puntos bajo lo esperado. | FichaPersonalUnitTests.test_la_fila_trae_avance_cumplimiento_y_diferencia | Aprobado |
-| CP-MED-021 | CU-06 | RF-008 | Unitaria | El selector de períodos de la ficha. | FichaPersonalUnitTests.test_periodos_de_lista_solo_donde_hay_metas | Aprobado |
-| CP-MED-023 | CU-06 | RF-028 | Unitaria | Cuántas evidencias hay en cada estado de revisión. | FichaPersonalUnitTests.test_resumen_de_evidencias_por_estado | Aprobado |
-| CP-MED-024 | CU-06 | RF-008 | Unitaria | La ficha es personal. | FichaPersonalUnitTests.test_solo_aparecen_las_metas_del_funcionario | Aprobado |
-| CP-MED-025 | CU-06 | RF-008 | Unitaria | Antes del primer cálculo no hay formula ni diferencia. | FichaPersonalUnitTests.test_una_meta_sin_calculo_se_marca_como_tal | Aprobado |
+| CP-INT-185 | CU-06 | RF-030 | Integración | Último ingreso, días sin ingreso, registros y promedio diario. | ResumenYActividadRecienteVistasTests.test_la_ficha_muestra_la_actividad_reciente_propia | Aprobado |
+| CP-INT-186 | CU-06 | RF-030 | Integración | Sin registros no hay cifras inventadas. | ResumenYActividadRecienteVistasTests.test_la_ficha_sin_actividades_lo_dice | Aprobado |
+| CP-MED-001 | CU-06 | RF-030 | Unitaria | Una fila por funcionario con su cantidad. | ActividadRecienteUnitTests.test_cuenta_los_registros_de_cada_funcionario | Aprobado |
+| CP-MED-002 | CU-06 | RF-030 | Unitaria | 5 registros en 10 días son 0,50 por día. | ActividadRecienteUnitTests.test_el_promedio_diario_usa_los_dias_transcurridos_del_periodo | Aprobado |
+| CP-MED-003 | CU-06 | RF-030 | Unitaria | Antes de empezar se cuenta al menos un día. | ActividadRecienteUnitTests.test_el_promedio_no_divide_por_cero_antes_del_inicio_del_periodo | Aprobado |
+| CP-MED-004 | CU-06 | RF-030 | Unitaria | El último ingreso es la fecha de registro, no la de la actividad. | ActividadRecienteUnitTests.test_informa_la_fecha_del_ultimo_ingreso_y_los_dias_sin_ingreso | Aprobado |
+| CP-MED-006 | CU-06 | RF-030 | Unitaria | Quien no tiene delegación figura con alcance global. | ActividadRecienteUnitTests.test_nombra_la_delegacion_o_el_alcance_global | Aprobado |
+| CP-MED-007 | CU-06 | RF-030 | Unitaria | Un funcionario sin registros no aparece. | ActividadRecienteUnitTests.test_sin_actividades_no_hay_filas | Aprobado |
+| CP-MED-008 | CU-06 | RF-030 | Unitaria | El promedio necesita un período de referencia. | ActividadRecienteUnitTests.test_sin_periodo_no_hay_promedio | Aprobado |
+| CP-MED-009 | CU-06 | RF-030 | Unitaria | Un ítem de otro período no suma. | ActividadRecienteUnitTests.test_solo_cuentan_las_actividades_del_periodo | Aprobado |
+| CP-MED-027 | CU-06 | RF-028 | Unitaria | 1 de 4 con esperado de 50 % es 25 %, 25 puntos bajo lo esperado. | FichaPersonalUnitTests.test_la_fila_trae_avance_cumplimiento_y_diferencia | Aprobado |
+| CP-MED-030 | CU-06 | RF-008 | Unitaria | El selector de períodos de la ficha. | FichaPersonalUnitTests.test_periodos_de_lista_solo_donde_hay_metas | Aprobado |
+| CP-MED-032 | CU-06 | RF-028 | Unitaria | Cuántas evidencias hay en cada estado de revisión. | FichaPersonalUnitTests.test_resumen_de_evidencias_por_estado | Aprobado |
+| CP-MED-033 | CU-06 | RF-008 | Unitaria | La ficha es personal. | FichaPersonalUnitTests.test_solo_aparecen_las_metas_del_funcionario | Aprobado |
+| CP-MED-034 | CU-06 | RF-008 | Unitaria | Antes del primer cálculo no hay formula ni diferencia. | FichaPersonalUnitTests.test_una_meta_sin_calculo_se_marca_como_tal | Aprobado |
 | CP-ACT-046 | CU-06.1 | RF-022 | Unitaria | Aprobar una actividad deja un indicador nuevo. | ValidacionUnitTests.test_una_aprobacion_recalcula_los_indicadores_de_la_meta | Aprobado |
-| CP-MED-013 | CU-06.1 | RF-022 | Unitaria | Cada generación deja un registro. | CumplimientoUnitTests.test_generar_calcula_y_guarda_un_indicador_nuevo | Aprobado |
-| CP-MED-019 | CU-06.2 | RF-028 | Unitaria | Con el avance igual al objetivo queda cumplida. | FichaPersonalUnitTests.test_la_meta_alcanzada_se_destaca_como_cumplida | Aprobado |
-| CP-MED-001 | CU-07.1 | RF-022 | Unitaria | RN-003: solo aprobadas con validación aprobada. | AvanceUnitTests.test_cuenta_las_actividades_aprobadas_del_item_en_el_periodo | Aprobado |
-| CP-MED-003 | CU-07.1 | RF-022 | Unitaria | RN-003: se mide dentro del período. | AvanceUnitTests.test_no_cuentan_las_actividades_fuera_de_las_fechas_del_periodo | Aprobado |
-| CP-MED-005 | CU-07.1 | RF-022, RF-029 | Unitaria | Una meta de Centro no suma lo de Rural. | AvanceUnitTests.test_solo_cuentan_las_actividades_de_la_delegacion_de_la_meta | Aprobado |
-| CP-MED-006 | CU-07.1 | RF-022 | Unitaria | Un ítem distinto no aporta. | AvanceUnitTests.test_solo_cuentan_las_actividades_del_item_de_la_meta | Aprobado |
-| CP-MED-007 | CU-07.1 | RF-022 | Unitaria | RN-003: se cuentan actividades, no evidencias. | AvanceUnitTests.test_una_actividad_con_dos_evidencias_aprobadas_cuenta_una_vez | Aprobado |
-| CP-MED-008 | CU-07.1 | RF-022 | Unitaria | El alcance global cuenta cualquier delegación. | AvanceUnitTests.test_una_meta_sin_delegacion_suma_todas_las_delegaciones | Aprobado |
-| CP-MED-009 | CU-07.1 | RF-023 | Unitaria | RN-004: 1 de 4 es 25 %. | CumplimientoUnitTests.test_cumplimiento_es_avance_sobre_meta | Aprobado |
-| CP-MED-010 | CU-07.1 | RF-024 | Unitaria | RN-005: ponderador 40 % de un 50 % da 20. | CumplimientoUnitTests.test_el_cumplimiento_ponderado_usa_el_ponderador_de_la_meta | Aprobado |
-| CP-MED-011 | CU-07.1 | RF-024 | Unitaria | RN-005: no pasa del máximo computable. | CumplimientoUnitTests.test_el_cumplimiento_se_topa_en_150_por_defecto | Aprobado |
+| CP-MED-022 | CU-06.1 | RF-022 | Unitaria | Cada generación deja un registro. | CumplimientoUnitTests.test_generar_calcula_y_guarda_un_indicador_nuevo | Aprobado |
+| CP-MED-028 | CU-06.2 | RF-028 | Unitaria | Con el avance igual al objetivo queda cumplida. | FichaPersonalUnitTests.test_la_meta_alcanzada_se_destaca_como_cumplida | Aprobado |
+| CP-MED-010 | CU-07.1 | RF-022 | Unitaria | RN-003: solo aprobadas con validación aprobada. | AvanceUnitTests.test_cuenta_las_actividades_aprobadas_del_item_en_el_periodo | Aprobado |
+| CP-MED-012 | CU-07.1 | RF-022 | Unitaria | RN-003: se mide dentro del período. | AvanceUnitTests.test_no_cuentan_las_actividades_fuera_de_las_fechas_del_periodo | Aprobado |
+| CP-MED-014 | CU-07.1 | RF-022, RF-029 | Unitaria | Una meta de Centro no suma lo de Rural. | AvanceUnitTests.test_solo_cuentan_las_actividades_de_la_delegacion_de_la_meta | Aprobado |
+| CP-MED-015 | CU-07.1 | RF-022 | Unitaria | Un ítem distinto no aporta. | AvanceUnitTests.test_solo_cuentan_las_actividades_del_item_de_la_meta | Aprobado |
+| CP-MED-016 | CU-07.1 | RF-022 | Unitaria | RN-003: se cuentan actividades, no evidencias. | AvanceUnitTests.test_una_actividad_con_dos_evidencias_aprobadas_cuenta_una_vez | Aprobado |
+| CP-MED-017 | CU-07.1 | RF-022 | Unitaria | El alcance global cuenta cualquier delegación. | AvanceUnitTests.test_una_meta_sin_delegacion_suma_todas_las_delegaciones | Aprobado |
+| CP-MED-018 | CU-07.1 | RF-023 | Unitaria | RN-004: 1 de 4 es 25 %. | CumplimientoUnitTests.test_cumplimiento_es_avance_sobre_meta | Aprobado |
+| CP-MED-019 | CU-07.1 | RF-024 | Unitaria | RN-005: ponderador 40 % de un 50 % da 20. | CumplimientoUnitTests.test_el_cumplimiento_ponderado_usa_el_ponderador_de_la_meta | Aprobado |
+| CP-MED-020 | CU-07.1 | RF-024 | Unitaria | RN-005: no pasa del máximo computable. | CumplimientoUnitTests.test_el_cumplimiento_se_topa_en_150_por_defecto | Aprobado |
 | CP-ORG-029 | CU-07.1 | RF-023 | Unitaria | RN-004: 1 de 4 es 25 %, 1 de 3 es 33,33 %. | MetaUnitTests.test_evaluar_progreso_es_avance_sobre_meta_por_100 | Aprobado |
 | CP-ACT-001 | CU-07.2 | RF-022 | Unitaria | La anulación explícita sí cambia el estado. | ActividadEstadoUnitTests.test_anulando_si_se_puede_salir_de_aprobada | Aprobado |
 | CP-ACT-038 | CU-07.2 | RF-022 | Unitaria | Con motivo, la actividad deja de sumar. | ValidacionUnitTests.test_anular_una_aprobacion_deja_sin_efecto_el_aporte | Aprobado |
@@ -301,9 +317,9 @@ Una fila por prueba. La columna CU lista los casos de uso que verifica y RF los 
 | CP-INT-035 | CU-07.2 | RF-022, RF-023, RN-009, RN-013 | Integración | Anular una aprobación exige motivo, recalcula hacia abajo y conserva el historial. | AnularAprobacionTests.test_la_vista_rechaza_un_motivo_vacio_sin_cambios | Aprobado |
 | CP-INT-036 | CU-07.2 | RF-022, RF-023, RN-009, RN-013 | Integración | Anular una aprobación exige motivo, recalcula hacia abajo y conserva el historial. | AnularAprobacionTests.test_un_funcionario_no_puede_anular_y_queda_registrado | Aprobado |
 | CP-INT-037 | CU-07.2 | RF-022, RF-023, RN-009, RN-013 | Integración | Anular una aprobación exige motivo, recalcula hacia abajo y conserva el historial. | AnularAprobacionTests.test_un_periodo_cerrado_no_permite_anular | Aprobado |
-| CP-MED-016 | CU-07.3 | RF-024 | Unitaria | Si el bruto supera el máximo, se explica. | FichaPersonalUnitTests.test_el_detalle_avisa_cuando_se_aplica_el_tope | Aprobado |
-| CP-MED-017 | CU-07.3 | RF-023 | Unitaria | El cálculo se puede verificar a mano. | FichaPersonalUnitTests.test_el_detalle_muestra_la_formula_y_la_ponderacion | Aprobado |
-| CP-MED-020 | CU-07.3 | RF-022 | Unitaria | Cada cifra enlaza a su origen. | FichaPersonalUnitTests.test_lista_las_actividades_que_aportan | Aprobado |
+| CP-MED-025 | CU-07.3 | RF-024 | Unitaria | Si el bruto supera el máximo, se explica. | FichaPersonalUnitTests.test_el_detalle_avisa_cuando_se_aplica_el_tope | Aprobado |
+| CP-MED-026 | CU-07.3 | RF-023 | Unitaria | El cálculo se puede verificar a mano. | FichaPersonalUnitTests.test_el_detalle_muestra_la_formula_y_la_ponderacion | Aprobado |
+| CP-MED-029 | CU-07.3 | RF-022 | Unitaria | Cada cifra enlaza a su origen. | FichaPersonalUnitTests.test_lista_las_actividades_que_aportan | Aprobado |
 | CP-ACT-028 | CU-09 | RF-012 | Unitaria | Código de la actividad más un correlativo. | EvidenciaUnitTests.test_el_codigo_de_evidencia_deriva_del_de_la_actividad | Aprobado |
 | CP-ACT-029 | CU-09 | RF-012 | Unitaria | El código de la evidencia es inmutable. | EvidenciaUnitTests.test_el_codigo_de_evidencia_no_se_puede_modificar | Aprobado |
 | CP-ACT-037 | CU-09 | RF-012 | Unitaria | La evidencia queda ligada a la actividad y pendiente. | EvidenciaUnitTests.test_subir_evidencia_vincula_el_archivo_y_envia_a_revision | Aprobado |
@@ -325,15 +341,20 @@ Una fila por prueba. La columna CU lista los casos de uso que verifica y RF los 
 | CP-ACT-003 | CU-11 | RF-013 | Unitaria | Solo existen los estados definidos. | ActividadEstadoUnitTests.test_cambiar_estado_rechaza_un_estado_inexistente | Aprobado |
 | CP-ACT-036 | CU-11 | RF-013 | Unitaria | Un archivo nuevo debe revisarse de nuevo. | EvidenciaUnitTests.test_reemplazar_archivo_vuelve_a_revision | Aprobado |
 | CP-ACT-039 | CU-11 | RF-013 | Unitaria | La aprobación se refleja en ambas. | ValidacionUnitTests.test_aprobar_marca_la_evidencia_y_la_actividad | Aprobado |
-| CP-INT-180 | CU-11, CU-11.1, CU-11.2 | RF-013, RF-014 | Integración | Revisión de evidencias con Validacion (RN-009). | RevisionTests.test_actividad_corregida_vuelve_a_revision_y_se_puede_aprobar | Aprobado |
-| CP-INT-181 | CU-11, CU-11.1, CU-11.2 | RF-013, RF-014 | Integración | Revisión de evidencias con Validacion (RN-009). | RevisionTests.test_actividad_sin_evidencias_pendientes_no_se_revisa | Aprobado |
-| CP-INT-182 | CU-11, CU-11.1, CU-11.2 | RF-013, RF-014 | Integración | Revisión de evidencias con Validacion (RN-009). | RevisionTests.test_aprobar_valida_cada_evidencia_pendiente_y_actualiza_el_indicador | Aprobado |
-| CP-INT-183 | CU-11, CU-11.1, CU-11.2 | RF-013, RF-014 | Integración | Revisión de evidencias con Validacion (RN-009). | RevisionTests.test_el_detalle_ofrece_la_revision_solo_a_quien_puede_hacerla | Aprobado |
-| CP-INT-184 | CU-11, CU-11.1, CU-11.2 | RF-013, RF-014 | Integración | Revisión de evidencias con Validacion (RN-009). | RevisionTests.test_rechazar_y_pedir_correccion_exigen_observacion | Aprobado |
-| CP-INT-185 | CU-11, CU-11.1, CU-11.2 | RF-013, RF-014 | Integración | Revisión de evidencias con Validacion (RN-009). | RevisionTests.test_rechazo_sin_observacion_explica_el_motivo | Aprobado |
-| CP-INT-186 | CU-11, CU-11.1, CU-11.2 | RF-013, RF-014 | Integración | Revisión de evidencias con Validacion (RN-009). | RevisionTests.test_solo_administracion_coordinacion_y_verificacion_revisan | Aprobado |
-| CP-INT-187 | CU-11, CU-11.1, CU-11.2 | RF-013, RF-014 | Integración | Revisión de evidencias con Validacion (RN-009). | RevisionTests.test_superusuario_sin_funcionario_no_puede_revisar | Aprobado |
-| CP-MED-002 | CU-11 | RF-022 | Unitaria | RN-009: la aprobación exige la validación del verificador. | AvanceUnitTests.test_no_cuenta_una_actividad_aprobada_sin_validacion_aprobada | Aprobado |
+| CP-ALE-018 | CU-11 | RF-037 | Unitaria | Solo quien puede revisar recibe este aviso. | AlertasDeEvidenciasTests.test_alerta_tambien_a_la_coordinacion_pero_no_al_autor | Aprobado |
+| CP-ALE-019 | CU-11 | RF-037 | Unitaria | Con tres días o más, urgente. | AlertasDeEvidenciasTests.test_la_espera_larga_sube_el_nivel_a_urgente | Aprobado |
+| CP-ALE-020 | CU-11 | RF-037 | Unitaria | Se alerta por actividad, no por archivo. | AlertasDeEvidenciasTests.test_una_actividad_con_dos_pendientes_alerta_una_vez | Aprobado |
+| CP-ALE-021 | CU-11 | RF-037 | Unitaria | Con motivo, autor como responsable y enlace a la actividad. | AlertasDeEvidenciasTests.test_una_evidencia_pendiente_alerta_al_verificador | Aprobado |
+| CP-ALE-022 | CU-11 | RF-037 | Unitaria | Al aprobarla, la alerta desaparece. | AlertasDeEvidenciasTests.test_una_evidencia_revisada_ya_no_alerta | Aprobado |
+| CP-INT-188 | CU-11, CU-11.1, CU-11.2 | RF-013, RF-014 | Integración | Revisión de evidencias con Validacion (RN-009). | RevisionTests.test_actividad_corregida_vuelve_a_revision_y_se_puede_aprobar | Aprobado |
+| CP-INT-189 | CU-11, CU-11.1, CU-11.2 | RF-013, RF-014 | Integración | Revisión de evidencias con Validacion (RN-009). | RevisionTests.test_actividad_sin_evidencias_pendientes_no_se_revisa | Aprobado |
+| CP-INT-190 | CU-11, CU-11.1, CU-11.2 | RF-013, RF-014 | Integración | Revisión de evidencias con Validacion (RN-009). | RevisionTests.test_aprobar_valida_cada_evidencia_pendiente_y_actualiza_el_indicador | Aprobado |
+| CP-INT-191 | CU-11, CU-11.1, CU-11.2 | RF-013, RF-014 | Integración | Revisión de evidencias con Validacion (RN-009). | RevisionTests.test_el_detalle_ofrece_la_revision_solo_a_quien_puede_hacerla | Aprobado |
+| CP-INT-192 | CU-11, CU-11.1, CU-11.2 | RF-013, RF-014 | Integración | Revisión de evidencias con Validacion (RN-009). | RevisionTests.test_rechazar_y_pedir_correccion_exigen_observacion | Aprobado |
+| CP-INT-193 | CU-11, CU-11.1, CU-11.2 | RF-013, RF-014 | Integración | Revisión de evidencias con Validacion (RN-009). | RevisionTests.test_rechazo_sin_observacion_explica_el_motivo | Aprobado |
+| CP-INT-194 | CU-11, CU-11.1, CU-11.2 | RF-013, RF-014 | Integración | Revisión de evidencias con Validacion (RN-009). | RevisionTests.test_solo_administracion_coordinacion_y_verificacion_revisan | Aprobado |
+| CP-INT-195 | CU-11, CU-11.1, CU-11.2 | RF-013, RF-014 | Integración | Revisión de evidencias con Validacion (RN-009). | RevisionTests.test_superusuario_sin_funcionario_no_puede_revisar | Aprobado |
+| CP-MED-011 | CU-11 | RF-022 | Unitaria | RN-009: la aprobación exige la validación del verificador. | AvanceUnitTests.test_no_cuenta_una_actividad_aprobada_sin_validacion_aprobada | Aprobado |
 | CP-TRA-010 | CU-11 | RF-013 | Unitaria | Puede revisar actividades de cualquier delegación. | AlcanceUnitTests.test_un_verificador_sin_delegacion_revisa_todas | Aprobado |
 | CP-ACT-040 | CU-11.1 | RF-013 | Unitaria | Primera, segunda revisión, y así. | ValidacionUnitTests.test_cada_revision_incrementa_el_numero_de_version | Aprobado |
 | CP-ACT-042 | CU-11.1 | RF-013 | Unitaria | Quién, cuándo, qué decidió y por qué. | ValidacionUnitTests.test_la_decision_deja_verificador_fecha_resultado_y_observacion | Aprobado |
@@ -342,15 +363,22 @@ Una fila por prueba. La columna CU lista los casos de uso que verifica y RF los 
 | CP-ACT-043 | CU-11.2 | RF-014 | Unitaria | La solicitud de corrección se explica. | ValidacionUnitTests.test_pedir_correccion_exige_una_observacion | Aprobado |
 | CP-ACT-044 | CU-11.2 | RF-014 | Unitaria | Sin motivo no hay rechazo; con él la actividad queda rechazada. | ValidacionUnitTests.test_rechazar_exige_un_motivo_y_no_aporta_al_avance | Aprobado |
 | CP-ACT-045 | CU-11.2 | RF-014 | Unitaria | RN-009: rechazada o en corrección no suma. | ValidacionUnitTests.test_solo_las_actividades_aprobadas_cuentan_para_la_meta | Aprobado |
-| CP-MED-004 | CU-11.2 | RF-022 | Unitaria | RN-009: solo lo aprobado aporta. | AvanceUnitTests.test_no_cuentan_las_pendientes_rechazadas_ni_en_correccion | Aprobado |
+| CP-MED-013 | CU-11.2 | RF-022 | Unitaria | RN-009: solo lo aprobado aporta. | AvanceUnitTests.test_no_cuentan_las_pendientes_rechazadas_ni_en_correccion | Aprobado |
 | CP-TRA-003 | CU-11.2 | RF-014 | Unitaria | Aprobada no se modifica ni siquiera por la coordinación. | AlcanceUnitTests.test_bloqueo_de_una_actividad_aprobada | Aprobado |
 | CP-COM-029 | CU-12 | RF-032 | Unitaria | Sin criterios se ven todos los compromisos. | FiltrosAgendaUnitTests.test_sin_filtros_trae_todos | Aprobado |
+| CP-COM-040 | CU-12 | RF-021 | Unitaria | Los totales coinciden con el detalle. | ResumenColectivoUnitTests.test_la_fila_total_suma_a_todos_los_responsables | Aprobado |
+| CP-COM-042 | CU-12 | RF-021 | Unitaria | Orden estable por nombre. | ResumenColectivoUnitTests.test_los_responsables_salen_en_orden_alfabetico | Aprobado |
+| CP-COM-045 | CU-12 | RF-021 | Unitaria | Una fila por responsable con la cantidad en cada estado. | ResumenColectivoUnitTests.test_totaliza_por_responsable_y_estado | Aprobado |
+| CP-INT-184 | CU-12 | RF-021 | Integración | El panel totaliza lo que se ve en la agenda. | ResumenYActividadRecienteVistasTests.test_la_agenda_muestra_el_resumen_por_responsable | Aprobado |
 | CP-COM-023 | CU-12.1 | RF-032 | Unitaria | Delegación y estado se combinan. | FiltrosAgendaUnitTests.test_filtra_por_delegacion_y_estado | Aprobado |
 | CP-COM-024 | CU-12.1 | RF-019, RF-032 | Unitaria | Vencidos no incluye los realizados. | FiltrosAgendaUnitTests.test_filtra_por_plazo | Aprobado |
 | CP-COM-025 | CU-12.1 | RF-032 | Unitaria | Desde y hasta incluyen sus extremos. | FiltrosAgendaUnitTests.test_filtra_por_rango_de_fechas_comprometidas | Aprobado |
 | CP-COM-026 | CU-12.1 | RF-032 | Unitaria | La búsqueda de texto recorre los campos visibles. | FiltrosAgendaUnitTests.test_filtra_por_texto_en_folio_descripcion_solicitante_y_delegacion | Aprobado |
 | CP-COM-028 | CU-12.1 | RF-032 | Unitaria | Un filtro mal formado no rompe la agenda. | FiltrosAgendaUnitTests.test_los_valores_invalidos_se_ignoran | Aprobado |
+| CP-COM-039 | CU-12.1 | RF-021 | Unitaria | Los totales coinciden con el detalle filtrado. | ResumenColectivoUnitTests.test_el_resumen_respeta_el_filtro_aplicado | Aprobado |
+| CP-INT-183 | CU-12.1 | RF-021 | Integración | Al filtrar por delegación los totales cambian con el detalle. | ResumenYActividadRecienteVistasTests.test_el_resumen_sigue_el_filtro_de_la_agenda | Aprobado |
 | CP-COM-030 | CU-12.2 | RF-032 | Unitaria | Nada que mostrar, sin error. | FiltrosAgendaUnitTests.test_una_consulta_sin_coincidencias_devuelve_vacio | Aprobado |
+| CP-COM-044 | CU-12.2 | RF-021 | Unitaria | Sin datos no hay división por cero. | ResumenColectivoUnitTests.test_sin_compromisos_los_porcentajes_son_cero | Aprobado |
 | CP-COM-001 | CU-13 | RF-018 | Unitaria | El estado cambia solo desde la agenda, con historial. | CompromisoFormUnitTests.test_al_editar_se_oculta_el_estado_y_se_exige_la_version | Aprobado |
 | CP-COM-016 | CU-13 | RF-018 | Unitaria | Se avanza y un realizado solo vuelve a «en proceso». | EstadoUnitTests.test_estados_permitidos_avanzan_y_un_realizado_solo_se_reabre_a_en_proceso | Aprobado |
 | CP-COM-020 | CU-13 | RF-017 | Unitaria | Lo cerrado no cambia de responsable. | EstadoUnitTests.test_un_compromiso_realizado_no_se_deriva | Aprobado |
@@ -376,13 +404,28 @@ Una fila por prueba. La columna CU lista los casos de uso que verifica y RF los 
 | CP-COM-012 | CU-13.2 | RF-018 | Unitaria | El cierre se refleja y queda en el historial. | EstadoUnitTests.test_cerrar_deja_el_compromiso_realizado_con_su_resolucion | Aprobado |
 | CP-COM-013 | CU-13.2 | RF-018 | Unitaria | Sin resolución no se cierra. | EstadoUnitTests.test_cerrar_exige_una_resolucion | Aprobado |
 | CP-COM-014 | CU-13.2 | RF-018 | Unitaria | El cierre solo se hace una vez. | EstadoUnitTests.test_cerrar_uno_ya_realizado_se_rechaza | Aprobado |
+| CP-COM-038 | CU-14 | RF-019, RF-021 | Unitaria | El vencido sin realizar se destaca. | ResumenColectivoUnitTests.test_cuenta_los_vencidos_de_cada_responsable | Aprobado |
+| CP-COM-043 | CU-14 | RF-021 | Unitaria | El pendiente es todo lo que aún no está realizado. | ResumenColectivoUnitTests.test_porcentaje_realizado_y_pendiente | Aprobado |
 | CP-COM-031 | CU-14.1 | RF-019 | Unitaria | Días que faltan, negativos si ya pasó. | PlazoUnitTests.test_dias_para_vencer | Aprobado |
 | CP-COM-034 | CU-14.1 | RF-019 | Unitaria | Vencido, próximo a vencer, realizado o estado normal. | PlazoUnitTests.test_situacion_de_plazo_clasifica_cada_compromiso | Aprobado |
-| CP-MED-022 | CU-14.1 | RF-019 | Unitaria | Vigentes, por vencer, vencidos y realizados. | FichaPersonalUnitTests.test_resumen_de_compromisos_por_situacion | Aprobado |
+| CP-MED-031 | CU-14.1 | RF-019 | Unitaria | Vigentes, por vencer, vencidos y realizados. | FichaPersonalUnitTests.test_resumen_de_compromisos_por_situacion | Aprobado |
+| CP-ALE-001 | CU-14.2 | RF-037 | Unitaria | Los cuatro datos que pide el requisito. | AlertasConjuntasTests.test_cada_alerta_trae_motivo_responsable_fecha_y_enlace | Aprobado |
+| CP-ALE-002 | CU-14.2 | RF-037 | Unitaria | La página resume cuántas son urgentes. | AlertasConjuntasTests.test_la_pantalla_de_alertas_muestra_conteos_y_exige_sesion | Aprobado |
+| CP-ALE-003 | CU-14.2 | RF-037 | Unitaria | Mensaje claro cuando no hay nada. | AlertasConjuntasTests.test_la_pantalla_sin_alertas_lo_dice | Aprobado |
+| CP-ALE-004 | CU-14.2 | RF-037 | Unitaria | Orden por gravedad y antigüedad. | AlertasConjuntasTests.test_las_urgentes_van_primero_y_luego_por_fecha | Aprobado |
+| CP-ALE-005 | CU-14.2 | RF-037 | Unitaria | La lista vacía es válida. | AlertasConjuntasTests.test_sin_nada_pendiente_no_hay_alertas | Aprobado |
+| CP-ALE-023 | CU-14.2 | RF-037 | Unitaria | Un día, no 1 días. | AlertasDeVencimientoTests.test_el_singular_se_escribe_bien | Aprobado |
+| CP-ALE-024 | CU-14.2 | RF-037, RNF-015 | Unitaria | Con 7 días alerta el que vence en 6. | AlertasDeVencimientoTests.test_los_dias_de_alerta_son_configurables | Aprobado |
+| CP-ALE-025 | CU-14.2 | RF-037 | Unitaria | Solo lo que requiere atención. | AlertasDeVencimientoTests.test_no_alertan_los_realizados_ni_los_lejanos | Aprobado |
+| CP-ALE-027 | CU-14.2 | RF-037 | Unitaria | Hoy y los días de alerta. | AlertasDeVencimientoTests.test_un_compromiso_proximo_a_vencer_genera_una_advertencia | Aprobado |
+| CP-ALE-028 | CU-14.2 | RF-037 | Unitaria | Dice hace cuántos días venció. | AlertasDeVencimientoTests.test_un_compromiso_vencido_genera_una_alerta_urgente | Aprobado |
 | CP-COM-032 | CU-14.2 | RF-019, RF-037 | Unitaria | Con 7 días, vence en 7 sí y en 8 no. | PlazoUnitTests.test_los_dias_de_alerta_son_configurables | Aprobado |
 | CP-COM-033 | CU-14.2 | RF-019, RF-037 | Unitaria | Hoy y los 3 días siguientes, por defecto. | PlazoUnitTests.test_proximo_a_vencer_dentro_de_los_dias_de_alerta | Aprobado |
 | CP-COM-035 | CU-14.2 | RF-019 | Unitaria | El vencido se conserva con su historial. | PlazoUnitTests.test_un_incumplimiento_no_se_elimina | Aprobado |
 | CP-COM-036 | CU-14.2 | RF-019 | Unitaria | Solo el incumplimiento queda protegido. | PlazoUnitTests.test_uno_vigente_o_realizado_si_se_elimina | Aprobado |
+| CP-ALE-014 | CU-16 | RF-037 | Unitaria | Sin cálculos no se inventa nada. | AlertasDeAvanceTests.test_sin_indicadores_no_hay_alertas_de_avance | Aprobado |
+| CP-ALE-016 | CU-16 | RF-037 | Unitaria | 25 % frente a 50 % esperado. | AlertasDeAvanceTests.test_una_delegacion_en_rojo_alerta | Aprobado |
+| CP-ALE-017 | CU-16 | RF-037 | Unitaria | Solo el rojo, que no llega al 60 % de lo esperado. | AlertasDeAvanceTests.test_verde_y_ambar_no_alertan | Aprobado |
 | CP-INT-142 | CU-16, CU-16.1, CU-17, CU-18, CU-18.1 | RF-026, RF-027, RF-028, RF-029 | Integración | Portada, dashboard, semáforo y resumen leen los Indicador (RN-005, RN-006, RN-008). | MedicionVistasTests.test_dashboard_muestra_el_cumplimiento_y_el_semaforo_de_cada_delegacion | Aprobado |
 | CP-INT-143 | CU-16, CU-16.1, CU-17, CU-18, CU-18.1 | RF-026, RF-027, RF-028, RF-029 | Integración | Portada, dashboard, semáforo y resumen leen los Indicador (RN-005, RN-006, RN-008). | MedicionVistasTests.test_el_cumplimiento_de_la_delegacion_pondera_sus_metas | Aprobado |
 | CP-INT-144 | CU-16, CU-16.1, CU-17, CU-18, CU-18.1 | RF-026, RF-027, RF-028, RF-029 | Integración | Portada, dashboard, semáforo y resumen leen los Indicador (RN-005, RN-006, RN-008). | MedicionVistasTests.test_gestionar_metas_solo_para_administracion_y_coordinacion | Aprobado |
@@ -393,24 +436,24 @@ Una fila por prueba. La columna CU lista los casos de uso que verifica y RF los 
 | CP-INT-149 | CU-16, CU-16.1, CU-17, CU-18, CU-18.1 | RF-026, RF-027, RF-028, RF-029 | Integración | Portada, dashboard, semáforo y resumen leen los Indicador (RN-005, RN-006, RN-008). | MedicionVistasTests.test_semaforo_y_resumen_comparten_los_resultados | Aprobado |
 | CP-INT-150 | CU-16, CU-16.1, CU-17, CU-18, CU-18.1 | RF-026, RF-027, RF-028, RF-029 | Integración | Portada, dashboard, semáforo y resumen leen los Indicador (RN-005, RN-006, RN-008). | MedicionVistasTests.test_sin_indicadores_se_avisa_y_una_delegacion_sin_calculo_se_marca | Aprobado |
 | CP-INT-151 | CU-16, CU-16.1, CU-17, CU-18, CU-18.1 | RF-026, RF-027, RF-028, RF-029 | Integración | Portada, dashboard, semáforo y resumen leen los Indicador (RN-005, RN-006, RN-008). | MedicionVistasTests.test_solo_cuenta_el_ultimo_indicador_de_cada_meta | Aprobado |
-| CP-MED-032 | CU-16 | RF-027 | Unitaria | Centro al 100 % es verde y Rural al 25 % es rojo. | ResultadosPorDelegacionUnitTests.test_cumplimiento_y_color_de_cada_delegacion | Aprobado |
-| CP-MED-015 | CU-16.1 | RF-027 | Unitaria | RN-008 con esperado de 50 %. | CumplimientoUnitTests.test_semaforo_segun_lo_esperado_al_dia | Aprobado |
+| CP-MED-041 | CU-16 | RF-027 | Unitaria | Centro al 100 % es verde y Rural al 25 % es rojo. | ResultadosPorDelegacionUnitTests.test_cumplimiento_y_color_de_cada_delegacion | Aprobado |
+| CP-MED-024 | CU-16.1 | RF-027 | Unitaria | RN-008 con esperado de 50 %. | CumplimientoUnitTests.test_semaforo_segun_lo_esperado_al_dia | Aprobado |
 | CP-ORG-040 | CU-16.1 | RF-027 | Unitaria | RN-008 con esperado de 50 %. | PeriodoPuroUnitTests.test_semaforo_verde_ambar_y_rojo | Aprobado |
-| CP-MED-033 | CU-17.1 | RF-026 | Unitaria | Con esperado de 50 %: +50 para Centro y -25 para Rural. | ResultadosPorDelegacionUnitTests.test_diferencia_con_lo_esperado_y_desviacion | Aprobado |
+| CP-MED-042 | CU-17.1 | RF-026 | Unitaria | Con esperado de 50 %: +50 para Centro y -25 para Rural. | ResultadosPorDelegacionUnitTests.test_diferencia_con_lo_esperado_y_desviacion | Aprobado |
 | CP-ORG-038 | CU-17.1 | RF-026 | Unitaria | Antes del inicio es 0 % y después del término 100 %. | PeriodoPuroUnitTests.test_porcentaje_esperado_no_pasa_de_los_limites | Aprobado |
 | CP-ORG-039 | CU-17.1 | RF-026 | Unitaria | RN-007: días transcurridos sobre días totales. | PeriodoPuroUnitTests.test_porcentaje_esperado_segun_los_dias_transcurridos | Aprobado |
-| CP-MED-040 | CU-17.2 | RF-026 | Unitaria | RN-008: ámbar y rojo son desviación. | ResultadosPorDelegacionUnitTests.test_una_desviacion_ambar_tambien_se_destaca | Aprobado |
-| CP-MED-026 | CU-18 | RF-029 | Unitaria | Con indicadores en ambos, gana el abierto. | PeriodoVigenteUnitTests.test_por_defecto_el_periodo_abierto_mas_reciente | Aprobado |
-| CP-MED-028 | CU-18 | RF-029 | Unitaria | Sin períodos abiertos, el más reciente con cálculos. | PeriodoVigenteUnitTests.test_si_ninguno_esta_abierto_se_usa_el_mas_reciente | Aprobado |
-| CP-MED-029 | CU-18 | RF-029 | Unitaria | Sin cálculos la pantalla muestra el aviso vacío. | PeriodoVigenteUnitTests.test_sin_indicadores_en_ningun_periodo_no_hay_periodo_vigente | Aprobado |
-| CP-MED-030 | CU-18 | RF-029 | Unitaria | Un período sin cálculos no se ofrece. | PeriodoVigenteUnitTests.test_solo_se_ofrecen_los_periodos_con_indicadores | Aprobado |
-| CP-MED-038 | CU-18 | RF-029 | Unitaria | Sin período elegido la lista está vacía. | ResultadosPorDelegacionUnitTests.test_sin_periodo_no_hay_resultados | Aprobado |
+| CP-MED-049 | CU-17.2 | RF-026 | Unitaria | RN-008: ámbar y rojo son desviación. | ResultadosPorDelegacionUnitTests.test_una_desviacion_ambar_tambien_se_destaca | Aprobado |
+| CP-MED-035 | CU-18 | RF-029 | Unitaria | Con indicadores en ambos, gana el abierto. | PeriodoVigenteUnitTests.test_por_defecto_el_periodo_abierto_mas_reciente | Aprobado |
+| CP-MED-037 | CU-18 | RF-029 | Unitaria | Sin períodos abiertos, el más reciente con cálculos. | PeriodoVigenteUnitTests.test_si_ninguno_esta_abierto_se_usa_el_mas_reciente | Aprobado |
+| CP-MED-038 | CU-18 | RF-029 | Unitaria | Sin cálculos la pantalla muestra el aviso vacío. | PeriodoVigenteUnitTests.test_sin_indicadores_en_ningun_periodo_no_hay_periodo_vigente | Aprobado |
+| CP-MED-039 | CU-18 | RF-029 | Unitaria | Un período sin cálculos no se ofrece. | PeriodoVigenteUnitTests.test_solo_se_ofrecen_los_periodos_con_indicadores | Aprobado |
+| CP-MED-047 | CU-18 | RF-029 | Unitaria | Sin período elegido la lista está vacía. | ResultadosPorDelegacionUnitTests.test_sin_periodo_no_hay_resultados | Aprobado |
 | CP-ORG-041 | CU-18 | RF-029 | Unitaria | RN-006: el cumplimiento colectivo debe alcanzar el umbral. | PeriodoPuroUnitTests.test_umbral_colectivo | Aprobado |
-| CP-MED-035 | CU-18.1 | RF-030 | Unitaria | Fecha del último registro y días desde entonces. | ResultadosPorDelegacionUnitTests.test_informa_el_ultimo_calculo_y_los_dias_transcurridos | Aprobado |
-| CP-MED-036 | CU-18.1 | RF-029 | Unitaria | Promedio simple de los cumplimientos. | ResultadosPorDelegacionUnitTests.test_promedio_general | Aprobado |
+| CP-MED-044 | CU-18.1 | RF-030 | Unitaria | Fecha del último registro y días desde entonces. | ResultadosPorDelegacionUnitTests.test_informa_el_ultimo_calculo_y_los_dias_transcurridos | Aprobado |
+| CP-MED-045 | CU-18.1 | RF-029 | Unitaria | Promedio simple de los cumplimientos. | ResultadosPorDelegacionUnitTests.test_promedio_general | Aprobado |
 | CP-ORG-056 | CU-18.1 | RF-024 | Unitaria | 60 % de la meta al 100 % y 40 % al 50 % dan 80 %. | PromedioPonderadoUnitTests.test_pondera_cada_meta_por_su_ponderador | Aprobado |
 | CP-ORG-057 | CU-18.1 | RF-024 | Unitaria | Sin indicadores no hay división por cero. | PromedioPonderadoUnitTests.test_sin_indicadores_el_promedio_es_cero | Aprobado |
-| CP-MED-034 | CU-18.2 | RF-029 | Unitaria | El detalle explica de dónde sale la cifra. | ResultadosPorDelegacionUnitTests.test_el_detalle_muestra_avance_y_meta_de_cada_item | Aprobado |
+| CP-MED-043 | CU-18.2 | RF-029 | Unitaria | El detalle explica de dónde sale la cifra. | ResultadosPorDelegacionUnitTests.test_el_detalle_muestra_avance_y_meta_de_cada_item | Aprobado |
 | CP-INT-086 | CU-20, CU-20.1, CU-20.2, CU-29 | RF-032, RF-033 | Integración | Filtros de actividades y compromisos, informes en pantalla, para imprimir y en CSV. | FiltrosYInformesTests.test_cambiar_el_estado_de_un_compromiso_conserva_los_filtros_de_la_agenda | Aprobado |
 | CP-INT-087 | CU-20, CU-20.1, CU-20.2, CU-29 | RF-032, RF-033 | Integración | Filtros de actividades y compromisos, informes en pantalla, para imprimir y en CSV. | FiltrosYInformesTests.test_el_csv_tiene_bom_separador_y_cabecera_y_queda_auditado | Aprobado |
 | CP-INT-088 | CU-20, CU-20.1, CU-20.2, CU-29 | RF-032, RF-033 | Integración | Filtros de actividades y compromisos, informes en pantalla, para imprimir y en CSV. | FiltrosYInformesTests.test_el_detalle_vuelve_a_la_lista_con_los_filtros_usados | Aprobado |
@@ -428,16 +471,20 @@ Una fila por prueba. La columna CU lista los casos de uso que verifica y RF los 
 | CP-INT-100 | CU-20, CU-20.1, CU-20.2, CU-29 | RF-032, RF-033 | Integración | Filtros de actividades y compromisos, informes en pantalla, para imprimir y en CSV. | FiltrosYInformesTests.test_un_tipo_de_informe_desconocido_cae_en_actividades | Aprobado |
 | CP-TRA-028 | CU-20 | RF-033 | Unitaria | Abre bien en Excel con tildes. | InformesUnitTests.test_el_csv_tiene_bom_separador_punto_y_coma_y_nombre_de_archivo | Aprobado |
 | CP-COM-027 | CU-20.1 | RF-033 | Unitaria | Columnas y valores listos para exportar. | FiltrosAgendaUnitTests.test_las_filas_del_informe_incluyen_responsable_y_situacion_del_plazo | Aprobado |
+| CP-COM-041 | CU-20.1 | RF-021, RF-033 | Unitaria | Columnas y filas listas para exportar. | ResumenColectivoUnitTests.test_las_filas_del_informe_terminan_con_el_total | Aprobado |
+| CP-INT-182 | CU-20.1 | RF-021, RF-033 | Integración | El informe repite el resumen de la agenda. | ResumenYActividadRecienteVistasTests.test_el_informe_de_resumen_trae_el_total | Aprobado |
+| CP-MED-005 | CU-20.1 | RF-030, RF-033 | Unitaria | Fecha legible y promedio con dos decimales. | ActividadRecienteUnitTests.test_las_filas_del_informe_traen_los_datos_formateados | Aprobado |
 | CP-TRA-029 | CU-20.1 | RF-033 | Unitaria | Columnas y valores listos para exportar. | InformesUnitTests.test_las_filas_de_actividades_traen_los_datos_del_informe | Aprobado |
 | CP-TRA-030 | CU-20.1 | RF-033 | Unitaria | Una fila por delegación con su cumplimiento y estado. | InformesUnitTests.test_las_filas_de_cumplimiento_incluyen_la_diferencia | Aprobado |
 | CP-TRA-031 | CU-20.1 | RF-033 | Unitaria | Sin registros no hay error. | InformesUnitTests.test_un_informe_vacio_solo_trae_la_cabecera | Aprobado |
+| CP-INT-181 | CU-20.2 | RF-030, RF-033 | Integración | Un funcionario ve solo su delegación. | ResumenYActividadRecienteVistasTests.test_el_informe_de_actividad_reciente_respeta_el_ambito | Aprobado |
 | CP-TRA-006 | CU-20.2 | RF-032 | Unitaria | Un funcionario del Centro no ve lo de Rural. | AlcanceUnitTests.test_quien_tiene_delegacion_solo_ve_la_suya | Aprobado |
 | CP-ACT-002 | CU-23.1 | RF-034 | Unitaria | La versión crece con cada edición. | ActividadEstadoUnitTests.test_cada_guardado_sube_la_version_en_uno | Aprobado |
 | CP-ACT-004 | CU-23.1 | RF-034 | Unitaria | Gana el primero que guarda; el otro debe recargar. | ActividadEstadoUnitTests.test_dos_ediciones_simultaneas_la_segunda_se_rechaza | Aprobado |
 | CP-ACT-005 | CU-23.1 | RF-034 | Unitaria | El campo oculto version detecta datos viejos. | ActividadEstadoUnitTests.test_el_formulario_rechaza_una_version_desactualizada | Aprobado |
 | CP-COM-004 | CU-23.1 | RF-034 | Unitaria | El formulario detecta la versión vieja. | CompromisoFormUnitTests.test_dos_ediciones_simultaneas_la_segunda_se_rechaza | Aprobado |
 | CP-COM-006 | CU-23.1 | RF-034 | Unitaria | Gana quien guarda primero. | CompromisoFormUnitTests.test_el_modelo_tambien_rechaza_guardar_con_una_version_vieja | Aprobado |
-| CP-MED-012 | CU-25 | RF-024, RF-038 | Unitaria | El máximo computable es configurable por período. | CumplimientoUnitTests.test_el_tope_lo_define_el_parametro_del_periodo | Aprobado |
+| CP-MED-021 | CU-25 | RF-024, RF-038 | Unitaria | El máximo computable es configurable por período. | CumplimientoUnitTests.test_el_tope_lo_define_el_parametro_del_periodo | Aprobado |
 | CP-ORG-032 | CU-25 | RF-038 | Unitaria | Cambiar un período no altera otro. | ParametroUnitTests.test_cada_periodo_conserva_su_propio_valor | Aprobado |
 | CP-ORG-033 | CU-25 | RF-007 | Unitaria | Sin parámetro se usa el valor por defecto. | ParametroUnitTests.test_obtener_parametro_devuelve_el_valor_o_el_defecto | Aprobado |
 | CP-ORG-034 | CU-25 | RF-038 | Unitaria | RN-013: los resultados cerrados no cambian. | ParametroUnitTests.test_un_periodo_cerrado_conserva_sus_parametros | Aprobado |
@@ -460,7 +507,7 @@ Una fila por prueba. La columna CU lista los casos de uso que verifica y RF los 
 | CP-INT-177 | CU-26, CU-26.1 | RF-002 | Integración | tiene_rol y control de acceso por rol. | PermisosTests.test_superusuario_y_usuario_maestro_cuentan_como_administrador | Aprobado |
 | CP-INT-178 | CU-26, CU-26.1 | RF-002 | Integración | tiene_rol y control de acceso por rol. | PermisosTests.test_tiene_rol_segun_los_roles_del_funcionario | Aprobado |
 | CP-INT-179 | CU-26, CU-26.1 | RF-002 | Integración | tiene_rol y control de acceso por rol. | PermisosTests.test_usuario_sin_funcionario_ni_sesion_no_tiene_roles | Aprobado |
-| CP-MED-039 | CU-26 | RF-001 | Unitaria | Las desactivadas salen de los resultados. | ResultadosPorDelegacionUnitTests.test_una_delegacion_inactiva_no_aparece | Aprobado |
+| CP-MED-048 | CU-26 | RF-001 | Unitaria | Las desactivadas salen de los resultados. | ResultadosPorDelegacionUnitTests.test_una_delegacion_inactiva_no_aparece | Aprobado |
 | CP-ORG-009 | CU-26 | RF-002 | Unitaria | Asignar un funcionario actualiza su delegación. | DelegacionUnitTests.test_asignar_funcionario_cambia_su_delegacion | Aprobado |
 | CP-ORG-010 | CU-26 | RF-001 | Unitaria | Dos delegaciones no pueden llamarse igual. | DelegacionUnitTests.test_el_nombre_de_la_delegacion_es_unico | Aprobado |
 | CP-ORG-011 | CU-26 | RF-001 | Unitaria | Desactivar conserva el registro y su historial. | DelegacionUnitTests.test_set_estado_activa_y_desactiva_sin_borrar | Aprobado |
@@ -487,6 +534,10 @@ Una fila por prueba. La columna CU lista los casos de uso que verifica y RF los 
 | CP-TRA-048 | CU-26 | RF-002 | Unitaria | Desactivar al funcionario quita sus permisos. | RolesUnitTests.test_un_funcionario_inactivo_no_aporta_roles | Aprobado |
 | CP-TRA-049 | CU-26 | RF-002 | Unitaria | is_active en falso corta el acceso. | RolesUnitTests.test_una_cuenta_desactivada_no_tiene_roles | Aprobado |
 | CP-ACT-009 | CU-26.1 | RF-002 | Unitaria | El formulario no ofrece delegaciones ajenas. | ActividadFormUnitTests.test_quien_tiene_delegacion_solo_registra_en_la_suya | Aprobado |
+| CP-ALE-006 | CU-26.1 | RF-037 | Unitaria | Coordinación ve a todos, delegado a su delegación y funcionario a sí mismo. | AlertasDeAusenciaTests.test_cada_usuario_ve_solo_a_quienes_supervisa | Aprobado |
+| CP-ALE-013 | CU-26.1 | RF-037 | Unitaria | Rural no ve el rojo del Centro. | AlertasDeAvanceTests.test_quien_tiene_delegacion_ve_solo_la_suya | Aprobado |
+| CP-ALE-015 | CU-26.1 | RF-037 | Unitaria | Un verificador sin delegación no las ve. | AlertasDeAvanceTests.test_un_usuario_sin_delegacion_ni_alcance_global_no_recibe_alertas_de_avance | Aprobado |
+| CP-ALE-026 | CU-26.1 | RF-037 | Unitaria | Un funcionario del Centro no se entera de los de Rural. | AlertasDeVencimientoTests.test_solo_alertan_los_compromisos_del_ambito_del_usuario | Aprobado |
 | CP-COM-007 | CU-26.1 | RF-017 | Unitaria | Un funcionario no asigna a otros ni en otra delegación. | CompromisoFormUnitTests.test_quien_tiene_delegacion_solo_se_asigna_a_si_mismo_en_la_suya | Aprobado |
 | CP-INT-001 | CU-26.1, CU-29.1 | RF-002, RNF-004 | Integración | Acceso con identidad individual y resultados limitados al ámbito. | AccesoAutenticadoTests.test_coordinador_ve_compromisos_de_todas_las_delegaciones | Aprobado |
 | CP-INT-002 | CU-26.1, CU-29.1 | RF-002, RNF-004 | Integración | Acceso con identidad individual y resultados limitados al ámbito. | AccesoAutenticadoTests.test_funcionario_solo_ve_compromisos_de_su_delegacion | Aprobado |
@@ -506,6 +557,7 @@ Una fila por prueba. La columna CU lista los casos de uso que verifica y RF los 
 | CP-INT-047 | CU-26.1, CU-30, CU-30.1 | RF-036, RNF-008 | Integración | Auditoría inmutable, accesos denegados y cambios del admin auditados. | AuditoriaTests.test_un_codigo_inexistente_da_404_sin_registrar_acceso_denegado | Aprobado |
 | CP-INT-048 | CU-26.1, CU-30, CU-30.1 | RF-036, RNF-008 | Integración | Auditoría inmutable, accesos denegados y cambios del admin auditados. | AuditoriaTests.test_un_evento_registrado_no_se_modifica_ni_se_elimina | Aprobado |
 | CP-INT-049 | CU-26.1, CU-30, CU-30.1 | RF-036, RNF-008 | Integración | Auditoría inmutable, accesos denegados y cambios del admin auditados. | AuditoriaTests.test_un_rechazo_por_regla_de_negocio_no_cuenta_como_acceso_denegado | Aprobado |
+| CP-INT-187 | CU-26.1 | RF-021 | Integración | El resumen no incluye otras delegaciones. | ResumenYActividadRecienteVistasTests.test_quien_tiene_delegacion_solo_ve_su_resumen | Aprobado |
 | CP-ORG-013 | CU-26.1 | RF-002 | Unitaria | Evita que el administrador se bloquee a sí mismo. | FuncionarioFormUnitTests.test_el_actor_no_puede_desactivar_su_propia_cuenta | Aprobado |
 | CP-TRA-007 | CU-26.1 | RF-002 | Unitaria | Otro funcionario recibe el mensaje de solo autor. | AlcanceUnitTests.test_solo_el_autor_o_la_coordinacion_modifican | Aprobado |
 | CP-TRA-009 | CU-26.1 | RF-002 | Unitaria | Una cuenta sin ficha no consulta registros. | AlcanceUnitTests.test_un_usuario_sin_funcionario_no_ve_nada | Aprobado |
@@ -536,7 +588,7 @@ Una fila por prueba. La columna CU lista los casos de uso que verifica y RF los 
 | CP-ORG-052 | CU-28 | RF-005 | Unitaria | Un período abierto no se inicia otra vez. | PeriodoUnitTests.test_solo_se_inicia_un_periodo_en_borrador | Aprobado |
 | CP-TRA-035 | CU-28 | RF-005 | Unitaria | Borrador se inicia, abierto se cierra, cerrado se reabre con motivo. | MantenedoresUnitTests.test_las_acciones_de_un_periodo_dependen_de_su_estado | Aprobado |
 | CP-ACT-041 | CU-28.1 | RF-038 | Unitaria | RN-013: un período cerrado queda congelado. | ValidacionUnitTests.test_con_el_periodo_cerrado_los_indicadores_no_se_recalculan | Aprobado |
-| CP-MED-014 | CU-28.1 | RF-038 | Unitaria | RN-013: los resultados cerrados no cambian. | CumplimientoUnitTests.test_no_se_genera_un_indicador_de_un_periodo_cerrado | Aprobado |
+| CP-MED-023 | CU-28.1 | RF-038 | Unitaria | RN-013: los resultados cerrados no cambian. | CumplimientoUnitTests.test_no_se_genera_un_indicador_de_un_periodo_cerrado | Aprobado |
 | CP-ORG-023 | CU-28.1 | RF-038 | Unitaria | RN-013 alcanza a los ítems del período. | ItemMedibleUnitTests.test_en_un_periodo_cerrado_no_se_crean_ni_modifican_items | Aprobado |
 | CP-ORG-049 | CU-28.1 | RF-036, RF-038 | Unitaria | La reapertura es explícita y queda registrada. | PeriodoUnitTests.test_reabrir_deja_auditoria_y_sube_la_version_de_parametros | Aprobado |
 | CP-ORG-050 | CU-28.1 | RF-036 | Unitaria | Sin motivo no hay reapertura. | PeriodoUnitTests.test_reabrir_exige_un_motivo | Aprobado |
@@ -544,13 +596,14 @@ Una fila por prueba. La columna CU lista los casos de uso que verifica y RF los 
 | CP-ORG-054 | CU-28.1 | RF-038 | Unitaria | RN-013: tampoco se borra. | PeriodoUnitTests.test_un_periodo_cerrado_no_se_elimina | Aprobado |
 | CP-ORG-055 | CU-28.1 | RF-038 | Unitaria | RN-013: guardar un cerrado se rechaza. | PeriodoUnitTests.test_un_periodo_cerrado_no_se_modifica | Aprobado |
 | CP-TRA-004 | CU-28.1 | RF-038 | Unitaria | RN-013 alcanza a la edición de actividades. | AlcanceUnitTests.test_bloqueo_de_una_actividad_de_periodo_cerrado | Aprobado |
-| CP-MED-027 | CU-29 | RF-032 | Unitaria | El período pedido se respeta. | PeriodoVigenteUnitTests.test_se_puede_elegir_otro_periodo_con_indicadores | Aprobado |
-| CP-MED-031 | CU-29 | RF-032 | Unitaria | Un id inexistente o con texto no rompe la pantalla. | PeriodoVigenteUnitTests.test_un_valor_invalido_cae_en_el_periodo_por_defecto | Aprobado |
-| CP-MED-037 | CU-29 | RF-032 | Unitaria | Buscar «rur» deja solo Rural. | ResultadosPorDelegacionUnitTests.test_se_filtra_por_texto | Aprobado |
+| CP-MED-036 | CU-29 | RF-032 | Unitaria | El período pedido se respeta. | PeriodoVigenteUnitTests.test_se_puede_elegir_otro_periodo_con_indicadores | Aprobado |
+| CP-MED-040 | CU-29 | RF-032 | Unitaria | Un id inexistente o con texto no rompe la pantalla. | PeriodoVigenteUnitTests.test_un_valor_invalido_cae_en_el_periodo_por_defecto | Aprobado |
+| CP-MED-046 | CU-29 | RF-032 | Unitaria | Buscar «rur» deja solo Rural. | ResultadosPorDelegacionUnitTests.test_se_filtra_por_texto | Aprobado |
 | CP-TRA-002 | CU-29.1 | RF-032 | Unitaria | Alcance global. | AlcanceUnitTests.test_administracion_y_coordinacion_ven_todas_las_actividades | Aprobado |
 | CP-TRA-005 | CU-29.1 | RF-032 | Unitaria | Alcance global en la agenda. | AlcanceUnitTests.test_los_compromisos_de_administracion_incluyen_todas_las_delegaciones | Aprobado |
 | CP-TRA-008 | CU-29.1 | RF-032 | Unitaria | Sin delegación, solo sus propias actividades. | AlcanceUnitTests.test_un_funcionario_sin_delegacion_solo_ve_lo_que_registro | Aprobado |
 | CP-TRA-046 | CU-29.1 | RF-032 | Unitaria | El resto queda limitado a su ámbito. | RolesUnitTests.test_solo_administracion_y_coordinacion_ven_todo | Aprobado |
+| CP-INT-180 | CU-30 | RF-033, RF-036 | Integración | La exportación deja su registro. | ResumenYActividadRecienteVistasTests.test_el_informe_de_actividad_reciente_exporta_csv_y_queda_auditado | Aprobado |
 | CP-TRA-011 | CU-30 | RF-036 | Unitaria | Un superusuario con registro maestro se atribuye al maestro. | AuditoriaUnitTests.test_el_usuario_maestro_tiene_prioridad_sobre_el_funcionario | Aprobado |
 | CP-TRA-012 | CU-30 | RF-036, RNF-004 | Unitaria | Los campos sensibles se excluyen. | AuditoriaUnitTests.test_las_contrasenas_no_quedan_en_la_auditoria | Aprobado |
 | CP-TRA-013 | CU-30 | RF-036 | Unitaria | Al crear solo hay valores nuevos. | AuditoriaUnitTests.test_los_cambios_de_un_formulario_nuevo_no_tienen_valor_anterior | Aprobado |
@@ -572,11 +625,11 @@ Una fila por prueba. La columna CU lista los casos de uso que verifica y RF los 
 | CP-LOGIN-008 | HU-26 | RF-002, RNF-004 | Unitaria | Login con formato inválido: solo espacios, texto de inyección y usuario de 151 caracteres | ValidarCredencialesTests.test_login_con_formato_invalido | Aprobado |
 | CP-INT-152 | - | - | Integración | Migrar copia y transforma los datos | MigracionDatosTests.test_migrar_copia_y_transforma_los_datos | Aprobado |
 | CP-INT-153 | - | - | Integración | Revertir deja los datos como antes | MigracionDatosTests.test_revertir_deja_los_datos_como_antes | Aprobado |
-| CP-INT-188 | - | - | Integración | Carga el modelo nuevo con sus datos de demostracion | SeedDemoTests.test_carga_el_modelo_nuevo_con_sus_datos_de_demostracion | Aprobado |
-| CP-INT-189 | - | - | Integración | Convive con datos ya migrados sin duplicarlos | SeedDemoTests.test_convive_con_datos_ya_migrados_sin_duplicarlos | Aprobado |
-| CP-INT-190 | - | - | Integración | Cuentas demo y delegados inactivos | SeedDemoTests.test_cuentas_demo_y_delegados_inactivos | Aprobado |
-| CP-INT-191 | - | - | Integración | La demo se ve en la aplicacion | SeedDemoTests.test_la_demo_se_ve_en_la_aplicacion | Aprobado |
-| CP-INT-192 | - | - | Integración | Repetir la carga no duplica nada | SeedDemoTests.test_repetir_la_carga_no_duplica_nada | Aprobado |
+| CP-INT-196 | - | - | Integración | Carga el modelo nuevo con sus datos de demostracion | SeedDemoTests.test_carga_el_modelo_nuevo_con_sus_datos_de_demostracion | Aprobado |
+| CP-INT-197 | - | - | Integración | Convive con datos ya migrados sin duplicarlos | SeedDemoTests.test_convive_con_datos_ya_migrados_sin_duplicarlos | Aprobado |
+| CP-INT-198 | - | - | Integración | Cuentas demo y delegados inactivos | SeedDemoTests.test_cuentas_demo_y_delegados_inactivos | Aprobado |
+| CP-INT-199 | - | - | Integración | La demo se ve en la aplicacion | SeedDemoTests.test_la_demo_se_ve_en_la_aplicacion | Aprobado |
+| CP-INT-200 | - | - | Integración | Repetir la carga no duplica nada | SeedDemoTests.test_repetir_la_carga_no_duplica_nada | Aprobado |
 | CP-PLAN-001 | - | - | Unitaria | Cobertura distingue prueba propia subcasos y sin prueba | ArmadoDelPlanTests.test_cobertura_distingue_prueba_propia_subcasos_y_sin_prueba | Aprobado |
 | CP-PLAN-002 | - | - | Unitaria | Cobertura por rf cuenta unitarias e integracion | ArmadoDelPlanTests.test_cobertura_por_rf_cuenta_unitarias_e_integracion | Aprobado |
 | CP-PLAN-003 | - | - | Unitaria | El catalogo tiene los casos de uso y los 38 requisitos | ArmadoDelPlanTests.test_el_catalogo_tiene_los_casos_de_uso_y_los_38_requisitos | Aprobado |

@@ -157,6 +157,8 @@ LOGIN_REDIRECT_URL = 'inicio'
 LOGOUT_REDIRECT_URL = 'inicio'
 
 # Reglas configurables sin tocar el código (RNF-015): tamaño máximo de una evidencia en MB (RNF-017)
-# y días de anticipación con que un compromiso se marca como próximo a vencer (RF-019).
+# días de anticipación con que un compromiso se marca como próximo a vencer (RF-019)
+# y días sin registrar actividades a partir de los cuales se emite una alerta (RF-037).
 EVIDENCIA_TAMANO_MAXIMO_MB = env.int('EVIDENCIA_TAMANO_MAXIMO_MB', default=5)
 COMPROMISO_DIAS_ALERTA = env.int('COMPROMISO_DIAS_ALERTA', default=3)
+ALERTA_DIAS_SIN_REGISTRO = env.int('ALERTA_DIAS_SIN_REGISTRO', default=7)

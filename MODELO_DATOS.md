@@ -165,6 +165,20 @@ registra las 19 tablas.
   `COMPROMISO_DIAS_ALERTA` (3 por defecto) y vencido el que pasó su fecha sin
   realizarse. Un compromiso vencido no se elimina: se conserva con su historial.
 - Cerrar un compromiso exige una resolución, y uno realizado no se deriva.
+- La agenda incluye un resumen por responsable y estado, con el porcentaje realizado y el pendiente
+  («pendiente» es todo lo que aún no está realizado). Sus totales coinciden con el detalle filtrado
+  (RF-021).
+
+### Actividad reciente y alertas
+
+- La actividad reciente (RF-030) informa, por funcionario, la cantidad de registros del período, la
+  fecha del último ingreso (la fecha en que se registró, no la del hecho), los días sin ingreso y el
+  promedio diario sobre los días transcurridos del período. Está en la ficha personal y en un informe.
+- Las alertas (RF-037) están en `/gestion/alertas/` y cada una trae motivo, responsable, fecha y enlace.
+  Son cuatro: compromisos vencidos o próximos a vencer, evidencias pendientes de revisión (solo para
+  quien puede revisar), funcionarios con metas abiertas sin registros hace más de
+  `ALERTA_DIAS_SIN_REGISTRO` días (7 por defecto) y delegaciones en rojo, es decir, bajo el 60 % de lo
+  esperado al día (RN-008). Cada usuario ve solo lo que corresponde a su ámbito.
 
 ## Auditoría
 
@@ -296,9 +310,6 @@ están completos son:
 |---|---|
 | RF-015 Registrar atención social por etapas | No implementado. |
 | RF-020 Relacionar agenda y medición | No implementado: cerrar un compromiso no alimenta el indicador del ítem. |
-| RF-021 Generar resumen colectivo | Parcial: la agenda totaliza por estado y plazo, pero no por funcionario ni con porcentajes. |
 | RF-025 Aplicar incentivos y penalizaciones | No implementado: `Indicador.ajuste` se guarda pero no entra al cálculo. |
-| RF-030 Medir actividad reciente | Parcial: informa la fecha del último cálculo y los días transcurridos. |
 | RF-031 Mostrar vista global por cargos | No implementado. |
 | RF-035 Facilitar coordinación | No implementado: no hay comentarios asociados a registros. |
-| RF-037 Emitir alertas | Parcial: solo alerta por vencimiento de compromisos. |

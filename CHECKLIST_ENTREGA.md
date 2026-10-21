@@ -57,7 +57,8 @@ Este documento resume la pauta compartida por el equipo. El proyecto se migró a
 - [x] Pruebas unitarias por caso de uso con el CU y los RF en el docstring (`test_unit_*.py`) y los 8 casos de login.
 - [x] Pruebas de integración en `test_integracion.py`.
 - [x] `PLAN_DE_PRUEBAS.md` con la tabla CP, CU, RF, método de prueba y resultado, generado con `python manage.py plan_pruebas`.
-- [ ] Decidir si se implementan los requisitos pendientes (RF-015, 020, 021, 025, 030, 031, 035 y 037) o se entregan declarados como tales.
+- [x] Implementados RF-021, RF-030 y RF-037 (resumen colectivo, actividad reciente y alertas), sin migraciones nuevas.
+- [ ] Los requisitos RF-015, 020, 025, 031 y 035 quedan declarados como pendientes: necesitan modelos nuevos o decisiones de diseño que el informe no define.
 
 ## Notas del estado actual
 
