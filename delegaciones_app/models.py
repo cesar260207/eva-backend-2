@@ -3,19 +3,118 @@ from django.core.validators import FileExtensionValidator, MinValueValidator
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+import json
 import uuid
 
 
 class Delegacion(models.Model):
-	nombre = models.CharField(max_length=120, unique=True)
+	nombre = models.CharField(max_length=255, unique=True)
 	territorio = models.CharField(max_length=180)
 	enfasis = models.TextField()
 	activa = models.BooleanField(default=True)
+	# Campos del diseño. En la Etapa 4 reemplazan a activa y territorio.
+	estado = models.BooleanField(default=True)
+	ambito = models.CharField(max_length=255, null=True, blank=True)
 
 	class Meta:
 		ordering = ['nombre']
 		verbose_name = 'delegación'
 		verbose_name_plural = 'delegaciones'
+
+	def __str__(self):
+		return self.nombre
+
+	def get_identificador(self):
+		return self.nombre
+
+	def set_estado(self, estado):
+		self.estado = estado
+		self.save(update_fields=['estado'])
+
+	def asignar_funcionario(self, funcionario):
+		funcionario.delegacion = self
+		funcionario.save(update_fields=['delegacion'])
+
+
+class Cargo(models.Model):
+	nombre = models.CharField(max_length=255)
+	vigencia = models.BooleanField(default=True)
+
+	class Meta:
+		db_table = 'cargo'
+		ordering = ['nombre']
+
+	def __str__(self):
+		return self.nombre
+
+	def verificar_vigencia(self):
+		return self.vigencia
+
+
+class Rol(models.Model):
+	nombre_rol = models.CharField(max_length=255, unique=True)
+
+	class Meta:
+		db_table = 'rol'
+		ordering = ['nombre_rol']
+		verbose_name_plural = 'roles'
+
+	def __str__(self):
+		return self.nombre_rol
+
+
+class Funcionario(models.Model):
+	# Ajuste 1: el diseño no indica cómo inicia sesión un funcionario.
+	usuario = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='funcionario')
+	identificador_institucional = models.CharField(max_length=255, unique=True)
+	nombre = models.CharField(max_length=255)
+	cargo = models.ForeignKey(Cargo, on_delete=models.PROTECT, related_name='funcionarios')
+	# Ajuste 3: null para roles de alcance global (administrador, coordinador).
+	delegacion = models.ForeignKey(Delegacion, on_delete=models.PROTECT, null=True, blank=True, related_name='funcionarios')
+	estado = models.BooleanField(default=True)
+	roles = models.ManyToManyField(Rol, through='FuncionarioRol', related_name='funcionarios')
+
+	class Meta:
+		db_table = 'funcionario'
+		ordering = ['nombre']
+
+	def __str__(self):
+		return self.nombre
+
+	def get_identificador(self):
+		return self.identificador_institucional
+
+	def reasignar_cargo(self, nuevo_cargo):
+		if not nuevo_cargo.verificar_vigencia():
+			raise ValidationError(f'El cargo «{nuevo_cargo}» no está vigente.')
+		self.cargo = nuevo_cargo
+		self.save(update_fields=['cargo'])
+
+
+class FuncionarioRol(models.Model):
+	funcionario = models.ForeignKey(Funcionario, on_delete=models.CASCADE)
+	rol = models.ForeignKey(Rol, on_delete=models.PROTECT)
+
+	class Meta:
+		db_table = 'funcionario_rol'
+		constraints = [models.UniqueConstraint(fields=['funcionario', 'rol'], name='funcionario_rol_unico')]
+
+	def __str__(self):
+		return f'{self.funcionario} - {self.rol}'
+
+
+class UsuarioMaestro(models.Model):
+	# Ajuste 2: enlace opcional con el usuario de Django, para los superusuarios.
+	usuario = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name='usuario_maestro')
+	identificador_maestro = models.CharField(max_length=255, unique=True)
+	nombre = models.CharField(max_length=255)
+	nivel_dominio = models.CharField(max_length=255)
+	estado = models.BooleanField(default=True)
+
+	class Meta:
+		db_table = 'usuario_maestro'
+		verbose_name = 'usuario maestro'
+		verbose_name_plural = 'usuarios maestros'
 
 	def __str__(self):
 		return self.nombre
@@ -220,10 +319,42 @@ class HistorialCompromiso(models.Model):
 class Auditoria(models.Model):
 	usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
 	accion = models.CharField(max_length=80)
-	entidad = models.CharField(max_length=80)
+	entidad = models.CharField(max_length=255)
 	identificador = models.CharField(max_length=80)
 	detalle = models.JSONField(default=dict)
 	fecha = models.DateTimeField(auto_now_add=True)
+	# Campos del diseño. En la Etapa 4 reemplazan a usuario, accion, identificador y detalle.
+	funcionario = models.ForeignKey(Funcionario, on_delete=models.PROTECT, null=True, blank=True, related_name='auditorias')
+	usuario_maestro = models.ForeignKey(UsuarioMaestro, on_delete=models.PROTECT, null=True, blank=True, related_name='auditorias')
+	evento = models.CharField(max_length=255, null=True, blank=True)
+	identificador_registro = models.CharField(max_length=255, null=True, blank=True)
+	valor_anterior = models.TextField(null=True, blank=True)
+	valor_nuevo = models.TextField(null=True, blank=True)
 
 	def __str__(self):
 		return f'{self.fecha:%Y-%m-%d %H:%M} - {self.accion} - {self.entidad} {self.identificador}'
+
+	@staticmethod
+	def _como_texto(valor):
+		if valor is None or isinstance(valor, str):
+			return valor
+		return json.dumps(valor, ensure_ascii=False, default=str)
+
+	@classmethod
+	def registrar_evento(cls, usuario, accion, entidad, identificador='', valor_anterior=None, valor_nuevo=None):
+		"""Registra un evento a nombre del UsuarioMaestro del usuario o, si no tiene, de su Funcionario."""
+		usuario_maestro = UsuarioMaestro.objects.filter(usuario=usuario).first()
+		funcionario = None if usuario_maestro else Funcionario.objects.filter(usuario=usuario).first()
+		return cls.objects.create(
+			funcionario=funcionario,
+			usuario_maestro=usuario_maestro,
+			evento=accion,
+			entidad=entidad,
+			identificador_registro=str(identificador),
+			valor_anterior=cls._como_texto(valor_anterior),
+			valor_nuevo=cls._como_texto(valor_nuevo),
+			# Doble escritura temporal: los campos antiguos son obligatorios hasta la Etapa 4.
+			usuario=usuario,
+			accion=accion,
+			identificador=str(identificador),
+		)

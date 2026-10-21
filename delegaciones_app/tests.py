@@ -8,9 +8,13 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 
 from .forms import EvidenciaMantenedorForm
-from .models import Actividad, Auditoria, CatalogoItem, Compromiso, Delegacion, Evidencia, HistorialCompromiso, MetaMedicion, PerfilUsuario, PeriodoMedicion
+from .models import (
+	Actividad, Auditoria, Cargo, CatalogoItem, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
+	HistorialCompromiso, MetaMedicion, PerfilUsuario, PeriodoMedicion, Rol, UsuarioMaestro,
+)
 
 
 class SGRMVPTests(TestCase):
@@ -447,3 +451,57 @@ class AccesoAutenticadoTests(TestCase):
 		response = self.client.get(reverse('solicitudes'))
 		self.assertContains(response, 'FOL-CENTRO-1')
 		self.assertContains(response, 'FOL-RURAL-1')
+
+
+class OrganizacionAccesoTests(TestCase):
+	"""Etapa 1: métodos de Delegacion, Cargo, Funcionario y Auditoria (se amplían con sus CU en la Etapa 6)."""
+
+	def setUp(self):
+		self.centro = Delegacion.objects.create(nombre='Centro', territorio='Centro', enfasis='Atencion territorial')
+		self.rural = Delegacion.objects.create(nombre='Rural', territorio='Rural', enfasis='Servicios cercanos')
+		self.cargo = Cargo.objects.create(nombre='Profesional territorial')
+		self.usuario = User.objects.create_user('func.centro', password='clave-segura')
+		self.funcionario = Funcionario.objects.create(usuario=self.usuario, identificador_institucional='func.centro', nombre='Funcionario Centro', cargo=self.cargo, delegacion=self.centro)
+
+	def test_identificadores(self):
+		self.assertEqual(self.funcionario.get_identificador(), 'func.centro')
+		self.assertEqual(self.centro.get_identificador(), 'Centro')
+
+	def test_delegacion_asigna_funcionario_y_cambia_estado(self):
+		self.rural.asignar_funcionario(self.funcionario)
+		self.rural.set_estado(False)
+		self.funcionario.refresh_from_db()
+		self.rural.refresh_from_db()
+		self.assertEqual(self.funcionario.delegacion, self.rural)
+		self.assertFalse(self.rural.estado)
+
+	def test_reasignar_cargo_exige_cargo_vigente(self):
+		vigente = Cargo.objects.create(nombre='Delegado territorial')
+		no_vigente = Cargo.objects.create(nombre='Cargo antiguo', vigencia=False)
+		self.funcionario.reasignar_cargo(vigente)
+		self.assertEqual(Funcionario.objects.get(pk=self.funcionario.pk).cargo, vigente)
+		with self.assertRaises(ValidationError):
+			self.funcionario.reasignar_cargo(no_vigente)
+
+	def test_rol_no_se_repite_para_el_mismo_funcionario(self):
+		rol = Rol.objects.create(nombre_rol='funcionario')
+		FuncionarioRol.objects.create(funcionario=self.funcionario, rol=rol)
+		self.assertQuerySetEqual(self.funcionario.roles.all(), [rol])
+		with self.assertRaises(IntegrityError), transaction.atomic():
+			FuncionarioRol.objects.create(funcionario=self.funcionario, rol=rol)
+
+	def test_registrar_evento_a_nombre_del_funcionario(self):
+		evento = Auditoria.registrar_evento(self.usuario, 'editar', 'Compromiso', 'LS-1', {'estado': 'pendiente'}, {'estado': 'realizado'})
+		self.assertEqual(evento.funcionario, self.funcionario)
+		self.assertIsNone(evento.usuario_maestro)
+		self.assertEqual(evento.evento, 'editar')
+		self.assertEqual(evento.identificador_registro, 'LS-1')
+		self.assertEqual(evento.valor_nuevo, '{"estado": "realizado"}')
+
+	def test_registrar_evento_a_nombre_del_usuario_maestro(self):
+		admin = User.objects.create_superuser('admin.prueba', password='clave-segura')
+		maestro = UsuarioMaestro.objects.create(usuario=admin, identificador_maestro='admin.prueba', nombre='Admin', nivel_dominio='total')
+		evento = Auditoria.registrar_evento(admin, 'crear', 'Delegacion', 7)
+		self.assertEqual(evento.usuario_maestro, maestro)
+		self.assertIsNone(evento.funcionario)
+		self.assertEqual(evento.identificador_registro, '7')
