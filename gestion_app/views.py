@@ -4,9 +4,13 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from delegaciones_app import medicion
+from delegaciones_app.informes import (
+    TIPOS_INFORME, filas_de_actividades, filas_de_compromisos, filas_de_cumplimiento, filtrar_actividades, filtrar_compromisos, respuesta_csv,
+)
 from delegaciones_app.medicion import periodo_vigente, periodos_con_indicadores, promedio_general, resultados_por_delegacion
-from delegaciones_app.models import MedicionDelegacion
+from delegaciones_app.models import Actividad, Auditoria, Compromiso, Delegacion, MedicionDelegacion, Periodo
 from delegaciones_app.permisos import funcionario_de, roles_de
+from delegaciones_app.views import _actividades_autorizadas, _compromisos_autorizados
 
 
 def _contexto_medicion(request):
@@ -69,4 +73,37 @@ def ficha_personal(request):
         contexto.update(medicion.ficha_personal(funcionario, periodo))
         contexto['evidencias'] = medicion.resumen_de_evidencias(funcionario, periodo)
     return render(request, 'gestion_app/ficha.html', contexto)
+
+
+@login_required
+def informe(request):
+    """Informe filtrable de actividades, compromisos o cumplimiento, en pantalla, para imprimir o en CSV (RF-029).
+
+    Solo incluye lo que el usuario ya puede ver en las listas; cada exportación queda en la auditoría.
+    """
+    tipo = request.GET.get('tipo') if request.GET.get('tipo') in dict(TIPOS_INFORME) else 'actividades'
+    formato = request.GET.get('formato')
+    periodo = periodo_vigente(request.GET.get('periodo')) if tipo == 'cumplimiento' else None
+    if tipo == 'actividades':
+        columnas, filas = filas_de_actividades(filtrar_actividades(_actividades_autorizadas(request.user), request.GET))
+    elif tipo == 'compromisos':
+        columnas, filas = filas_de_compromisos(filtrar_compromisos(_compromisos_autorizados(request.user), request.GET))
+    else:
+        resultados = resultados_por_delegacion(periodo, '')
+        if request.GET.get('delegacion', '').isdigit():
+            elegida = Delegacion.objects.filter(pk=int(request.GET['delegacion'])).first()
+            resultados = [fila for fila in resultados if elegida and fila['nombre'] == elegida.nombre]
+        columnas, filas = filas_de_cumplimiento(resultados, periodo.porcentaje_esperado() if periodo else '')
+    if formato == 'csv':
+        Auditoria.registrar_evento(request.user, 'exportar', 'Informe', tipo, None, {'filtros': request.GET.urlencode(), 'filas': len(filas)})
+        return respuesta_csv(f'informe_{tipo}_{timezone.localdate():%Y%m%d}.csv', columnas, filas)
+    parametros = request.GET.copy()
+    parametros.pop('formato', None)
+    return render(request, 'gestion_app/informe.html', {
+        'tipo': tipo, 'nombre_tipo': dict(TIPOS_INFORME)[tipo], 'tipos': TIPOS_INFORME, 'columnas': columnas, 'filas': filas, 'filtros': request.GET,
+        'imprimir': formato == 'imprimir', 'consulta': parametros.urlencode(), 'hoy': timezone.localdate(),
+        'delegaciones_filtro': Delegacion.objects.filter(estado=True), 'periodos_filtro': Periodo.objects.order_by('-fecha_inicio'),
+        'estados_filtro': Actividad.ESTADOS if tipo == 'actividades' else Compromiso.ESTADOS,
+        'periodo_informe': periodo,
+    })
 

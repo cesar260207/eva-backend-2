@@ -21,6 +21,7 @@ from django.http import HttpResponse
 from django.views import View
 
 from .crud import MANTENEDORES
+from .informes import filtrar_actividades, filtrar_compromisos
 from .models import validar_tamano_evidencia
 from .permisos import RolRequeridoMixin, roles_de, rol_requerido, tiene_rol
 from .models import (
@@ -1906,3 +1907,153 @@ class AnularAprobacionTests(BaseOperacion):
 		self.assertContains(self.client.get(detalle), 'Anular aprobación')
 		self.client.force_login(self.funcionario)
 		self.assertNotContains(self.client.get(detalle), 'Anular aprobación')
+
+
+class FiltrosYInformesTests(BaseOperacion):
+	"""Lote 4 (RF-029, CU-26): filtros de actividades y compromisos, informes en pantalla, para imprimir y en CSV."""
+
+	def setUp(self):
+		super().setUp()
+		self.rural_user = crear_funcionario('rural-op', 'funcionario', cargo=self.cargo, delegacion=self.rural)
+		self.pendiente = self._actividad(solicitud_problema='Consulta pendiente')
+		self.aprobada = self._actividad(estado='aprobada', solicitud_problema='Operativo aprobado', fecha=timezone.make_aware(datetime(2026, 9, 20, 9, 0)))
+		self.de_rural = self._actividad(autor=self.rural_user, delegacion=self.rural, solicitud_problema='Visita rural')
+
+	def _filtrar(self, **datos):
+		return set(filtrar_actividades(Actividad.objects.all(), datos).values_list('solicitud_problema', flat=True))
+
+	def test_filtrar_actividades_por_cada_criterio(self):
+		self.assertEqual(self._filtrar(estado='aprobada'), {'Operativo aprobado'})
+		self.assertEqual(self._filtrar(delegacion=str(self.rural.pk)), {'Visita rural'})
+		self.assertEqual(self._filtrar(q='operativo'), {'Operativo aprobado'})
+		self.assertEqual(self._filtrar(periodo=str(self.periodo.pk)), {'Consulta pendiente', 'Operativo aprobado', 'Visita rural'})
+		self.assertEqual(self._filtrar(desde='2026-09-15'), {'Operativo aprobado'})
+		self.assertEqual(self._filtrar(hasta='2026-09-01'), {'Consulta pendiente', 'Visita rural'})
+		self.assertEqual(self._filtrar(desde='2026-09-20', hasta='2026-09-20'), {'Operativo aprobado'})
+
+	def test_los_valores_invalidos_se_ignoran_en_vez_de_fallar(self):
+		todas = {'Consulta pendiente', 'Operativo aprobado', 'Visita rural'}
+		self.assertEqual(self._filtrar(estado='inventado', delegacion='x', periodo='9;drop', desde='ayer', hasta='32-13-2026'), todas)
+
+	def test_filtrar_compromisos_por_plazo_estado_y_periodo(self):
+		hoy = timezone.localdate()
+		vencido, por_vencer, lejano, hecho = (self._compromiso(folio=f'F-{n}') for n in range(4))
+		for compromiso, dias, estado in ((vencido, -4, 'pendiente'), (por_vencer, 2, 'pendiente'), (lejano, 90, 'proceso'), (hecho, -4, 'realizado')):
+			compromiso.fecha_comprometida, compromiso.estado = hoy + timedelta(days=dias), estado
+			compromiso.save()
+		folios = lambda **datos: set(filtrar_compromisos(Compromiso.objects.all(), datos).values_list('folio', flat=True))
+		self.assertEqual(folios(plazo='vencidos'), {'F-0'})
+		self.assertEqual(folios(plazo='por_vencer'), {'F-1'})
+		self.assertEqual(folios(estado='proceso'), {'F-2'})
+		self.assertEqual(folios(estado='realizado'), {'F-3'})
+		self.assertEqual(folios(desde=str(hoy), hasta=str(hoy + timedelta(days=10))), {'F-1'})
+		compromiso = Compromiso.objects.get(folio='F-1')
+		compromiso.fecha_comprometida = date(2026, 9, 15)
+		compromiso.save()
+		self.assertIn('F-1', folios(periodo=str(self.periodo.pk)))
+		self.assertNotIn('F-0', folios(periodo=str(self.periodo.pk)))
+
+	def test_la_lista_de_actividades_aplica_los_filtros(self):
+		self.client.force_login(self.coordinador)
+		respuesta = self.client.get(reverse('actividades'), {'estado': 'aprobada'})
+		self.assertEqual([a.solicitud_problema for a in respuesta.context['actividades']], ['Operativo aprobado'])
+		self.assertTrue(respuesta.context['filtrado'])
+		self.assertContains(self.client.get(reverse('actividades'), {'estado': 'correccion'}), 'Ninguna actividad coincide con los filtros')
+
+	def test_la_agenda_filtra_por_plazo(self):
+		vencido = self._compromiso(folio='AG-VENCIDO')
+		vencido.fecha_comprometida = timezone.localdate() - timedelta(days=5)
+		vencido.save()
+		self._compromiso(folio='AG-VIGENTE')
+		self.client.force_login(self.coordinador)
+		respuesta = self.client.get(reverse('agenda'), {'plazo': 'vencidos'})
+		self.assertEqual([c.folio for c in respuesta.context['compromisos']], ['AG-VENCIDO'])
+
+	def test_el_detalle_vuelve_a_la_lista_con_los_filtros_usados(self):
+		self.client.force_login(self.coordinador)
+		self.client.get(reverse('actividades'), {'estado': 'aprobada', 'q': 'operativo'})
+		detalle = self.client.get(reverse('actividad_detalle', args=[self.aprobada.codigo_verificador]))
+		self.assertEqual(detalle.context['url_lista'], reverse('actividades') + '?estado=aprobada&q=operativo')
+		self.assertContains(detalle, 'Volver a las actividades')
+		self.client.get(reverse('actividades'))
+		detalle = self.client.get(reverse('actividad_detalle', args=[self.aprobada.codigo_verificador]))
+		self.assertEqual(detalle.context['url_lista'], reverse('actividades'))
+
+	def test_eliminar_una_actividad_vuelve_a_la_lista_filtrada(self):
+		self.client.force_login(self.coordinador)
+		self.client.get(reverse('actividades'), {'estado': 'pendiente'})
+		respuesta = self.client.post(reverse('actividad_eliminar', args=[self.pendiente.codigo_verificador]))
+		self.assertRedirects(respuesta, reverse('actividades') + '?estado=pendiente')
+
+	def test_cambiar_el_estado_de_un_compromiso_conserva_los_filtros_de_la_agenda(self):
+		compromiso = self._compromiso(folio='AG-FILTRO')
+		self.client.force_login(self.coordinador)
+		self.client.get(reverse('agenda'), {'estado': 'ingresado'})
+		respuesta = self.client.post(reverse('compromiso_estado', args=[compromiso.pk, 'proceso']))
+		self.assertRedirects(respuesta, reverse('agenda') + '?estado=ingresado')
+		self.client.get(reverse('agenda'))
+		compromiso.refresh_from_db()
+		respuesta = self.client.post(reverse('compromiso_estado', args=[compromiso.pk, 'realizado']))
+		self.assertRedirects(respuesta, reverse('agenda'))
+
+	def test_el_informe_de_actividades_respeta_el_ambito_del_usuario(self):
+		self.client.force_login(self.rural_user)
+		respuesta = self.client.get(reverse('informe'), {'tipo': 'actividades'})
+		self.assertEqual([fila[0] for fila in respuesta.context['filas']], [self.de_rural.codigo_verificador])
+		self.client.force_login(self.coordinador)
+		respuesta = self.client.get(reverse('informe'), {'tipo': 'actividades', 'estado': 'aprobada'})
+		self.assertEqual([fila[0] for fila in respuesta.context['filas']], [self.aprobada.codigo_verificador])
+		self.assertContains(respuesta, 'Informe de actividades')
+
+	def test_un_tipo_de_informe_desconocido_cae_en_actividades(self):
+		self.client.force_login(self.coordinador)
+		self.assertEqual(self.client.get(reverse('informe'), {'tipo': 'otro'}).context['tipo'], 'actividades')
+
+	def test_el_informe_de_compromisos_marca_la_situacion_del_plazo(self):
+		vencido = self._compromiso(folio='INF-VENCIDO')
+		vencido.fecha_comprometida = timezone.localdate() - timedelta(days=2)
+		vencido.save()
+		self.client.force_login(self.coordinador)
+		respuesta = self.client.get(reverse('informe'), {'tipo': 'compromisos', 'plazo': 'vencidos'})
+		self.assertEqual(len(respuesta.context['filas']), 1)
+		self.assertEqual(respuesta.context['filas'][0][0], 'INF-VENCIDO')
+		self.assertEqual(respuesta.context['filas'][0][7], 'Vencido')
+
+	def test_el_informe_de_cumplimiento_usa_los_indicadores(self):
+		meta = Meta.objects.create(item=self.item, funcionario=self.funcionario.funcionario, valor_objetivo=2)
+		Validacion(evidencia=self._evidencia(self.pendiente), funcionario_verificador=self.verificador.funcionario).aprobar_evidencia()
+		Indicador.generar(meta)
+		self.client.force_login(self.coordinador)
+		respuesta = self.client.get(reverse('informe'), {'tipo': 'cumplimiento', 'periodo': self.periodo.pk})
+		self.assertEqual(respuesta.context['columnas'][0], 'Delegación')
+		self.assertEqual([(fila[0], fila[1]) for fila in respuesta.context['filas']], [('Centro', Decimal('50.00'))])
+		filtrado = self.client.get(reverse('informe'), {'tipo': 'cumplimiento', 'periodo': self.periodo.pk, 'delegacion': self.rural.pk})
+		self.assertEqual(filtrado.context['filas'], [])
+
+	def test_el_csv_tiene_bom_separador_y_cabecera_y_queda_auditado(self):
+		self.client.force_login(self.coordinador)
+		respuesta = self.client.get(reverse('informe'), {'tipo': 'actividades', 'estado': 'aprobada', 'formato': 'csv'})
+		self.assertEqual(respuesta['Content-Type'], 'text/csv; charset=utf-8')
+		self.assertIn('informe_actividades_', respuesta['Content-Disposition'])
+		contenido = respuesta.content.decode('utf-8')
+		self.assertTrue(contenido.startswith('﻿Código;Fecha;Delegación'))
+		lineas = contenido.strip().splitlines()
+		self.assertEqual(len(lineas), 2)
+		self.assertIn('Operativo aprobado', lineas[1])
+		registro = Auditoria.objects.get(evento='exportar')
+		self.assertEqual((registro.entidad, registro.identificador_registro), ('Informe', 'actividades'))
+		self.assertEqual(json.loads(registro.valor_nuevo)['filas'], 1)
+
+	def test_la_version_para_imprimir_ofrece_imprimir_y_oculta_los_filtros(self):
+		self.client.force_login(self.coordinador)
+		imprimir = self.client.get(reverse('informe'), {'tipo': 'actividades', 'formato': 'imprimir'})
+		self.assertContains(imprimir, 'window.print()')
+		self.assertNotContains(imprimir, 'Generar informe')
+		normal = self.client.get(reverse('informe'), {'tipo': 'actividades'})
+		self.assertContains(normal, 'Generar informe')
+		self.assertContains(normal, 'formato=csv')
+
+	def test_el_informe_exige_iniciar_sesion(self):
+		self.assertEqual(self.client.get(reverse('informe')).status_code, 302)
+		self.assertEqual(self.client.get(reverse('informe'), {'formato': 'csv'}).status_code, 302)
+		self.assertFalse(Auditoria.objects.filter(evento='exportar').exists())

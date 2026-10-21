@@ -9,10 +9,12 @@ from django.http import Http404
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from .forms import ActividadForm, CompromisoForm, EvidenciaForm
+from .informes import PLAZOS, filtrar_actividades, filtrar_compromisos, situacion_de_plazo
 from .medicion import periodo_vigente, promedio_general, resultados_por_delegacion
-from .models import Actividad, Auditoria, Compromiso, Delegacion, Validacion
+from .models import Actividad, Auditoria, Compromiso, Delegacion, Periodo, Validacion
 from .permisos import ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICADOR, funcionario_de, puede_ver_todo, registrar_acceso_denegado, tiene_rol
 
 # Decisión de la revisión -> método de Validacion que la aplica a cada evidencia pendiente.
@@ -67,6 +69,17 @@ def _obtener_autorizado(request, autorizados, entidad, **filtro):
         if autorizados.model.objects.filter(**filtro).exists():
             registrar_acceso_denegado(request, entidad, str(next(iter(filtro.values()))), 'fuera del ámbito')
         raise Http404(f'{entidad} no encontrada.') from None
+
+
+def _recordar_filtros(request, lista):
+    """Guarda en la sesión los filtros con que se miró una lista, para volver a ella tal como estaba."""
+    request.session[f'filtros_{lista}'] = request.GET.urlencode()
+
+
+def _url_de_lista(request, lista):
+    """URL de la lista con los últimos filtros usados (la lista sin filtros si no hay)."""
+    filtros = request.session.get(f'filtros_{lista}', '')
+    return f'{reverse(lista)}?{filtros}' if filtros else reverse(lista)
 
 
 MENSAJE_SOLO_AUTOR = 'Solo quien registró la actividad o la coordinación puede modificarla.'
@@ -176,15 +189,19 @@ def actividad_nueva(request):
 
 @login_required
 def actividades(request):
+    _recordar_filtros(request, 'actividades')
     query = request.GET.get('q', '').strip()
-    registros = _actividades_autorizadas(request.user)
-    if query:
-        registros = registros.filter(Q(codigo_verificador__icontains=query) | Q(solicitud_problema__icontains=query) | Q(item__nombre__icontains=query))
+    registros = filtrar_actividades(_actividades_autorizadas(request.user), request.GET)
     ve_todo, funcionario = puede_ver_todo(request.user), funcionario_de(request.user)
     registros = list(registros)
     for actividad in registros:
         actividad.bloqueo = _bloqueo_actividad(funcionario, actividad, ve_todo)
-    return render(request, 'delegaciones_app/actividades.html', {'actividades': registros, 'query': query, 'puede_crear': request.user.is_authenticated})
+    return render(request, 'delegaciones_app/actividades.html', {
+        'actividades': registros, 'query': query, 'puede_crear': request.user.is_authenticated,
+        'filtros': request.GET, 'filtrado': any(request.GET.get(clave) for clave in ('q', 'delegacion', 'estado', 'periodo', 'desde', 'hasta')),
+        'delegaciones_filtro': Delegacion.objects.filter(estado=True), 'periodos_filtro': Periodo.objects.order_by('-fecha_inicio'),
+        'estados_filtro': Actividad.ESTADOS,
+    })
 
 
 @login_required
@@ -208,6 +225,7 @@ def actividad_detalle(request, codigo):
     return render(request, 'delegaciones_app/actividad_detalle.html', {
         'actividad': actividad,
         'evidencia_form': evidencia_form,
+        'url_lista': _url_de_lista(request, 'actividades'),
         'puede_validar': tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, VERIFICADOR),
         'puede_anular': tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, VERIFICADOR) and actividad.estado == 'aprobada' and actividad.item.periodo.estado != 'cerrado',
         'hay_pendientes': any(evidencia.estado_revision == 'pendiente' for evidencia in actividad.evidencias.all()),
@@ -332,7 +350,7 @@ def actividad_eliminar(request, codigo):
             )
             actividad.delete()
         messages.success(request, f'Actividad {codigo} eliminada junto con {total_evidencias} evidencia(s).')
-        return redirect('actividades')
+        return redirect(_url_de_lista(request, 'actividades'))
     return render(request, 'delegaciones_app/actividad_confirmar_eliminar.html', {
         'actividad': actividad,
         'total_evidencias': total_evidencias,
@@ -365,10 +383,10 @@ def compromiso_nuevo(request):
 @login_required
 def compromiso_estado(request, pk, estado):
     if request.method != 'POST' or estado not in {'ingresado', 'pendiente', 'proceso', 'realizado'}:
-        return redirect('agenda')
+        return redirect(_url_de_lista(request, 'agenda'))
     funcionario = _funcionario_requerido(request)
     if funcionario is None:
-        return redirect('agenda')
+        return redirect(_url_de_lista(request, 'agenda'))
     compromiso = _obtener_autorizado(request, _compromisos_autorizados(request.user), 'Compromiso', pk=pk)
     anterior = compromiso.estado
     observacion = request.POST.get('observacion', '').strip()
@@ -381,7 +399,7 @@ def compromiso_estado(request, pk, estado):
         messages.error(request, ' '.join(error.messages))
     else:
         messages.success(request, f'El compromiso {compromiso.folio} cambió a {compromiso.get_estado_display()}.')
-    return redirect('agenda')
+    return redirect(_url_de_lista(request, 'agenda'))
 
 
 def _puede_editar_compromiso(user, funcionario, compromiso):
@@ -396,7 +414,7 @@ def compromiso_editar(request, pk):
     if not _puede_editar_compromiso(request.user, funcionario_de(request.user), compromiso):
         registrar_acceso_denegado(request, 'Compromiso', compromiso.folio, 'no es el responsable')
         messages.error(request, 'No tienes permiso para modificar este compromiso.')
-        return redirect('agenda')
+        return redirect(_url_de_lista(request, 'agenda'))
     form = CompromisoForm(request.POST or None, instance=compromiso, user=request.user)
     if request.method == 'POST' and form.is_valid():
         try:
@@ -407,7 +425,7 @@ def compromiso_editar(request, pk):
             form.add_error(None, error)
         else:
             messages.success(request, f'Compromiso {compromiso.folio} actualizado.')
-            return redirect('agenda')
+            return redirect(_url_de_lista(request, 'agenda'))
     return render(request, 'delegaciones_app/compromiso_form.html', {
         'form': form,
         'titulo': f'Modificar compromiso {compromiso.folio}',
@@ -433,7 +451,7 @@ def compromiso_eliminar(request, pk):
             messages.error(request, ' '.join(error.messages))
         else:
             messages.success(request, f'Compromiso {folio} eliminado.')
-        return redirect('agenda')
+        return redirect(_url_de_lista(request, 'agenda'))
     return render(request, 'delegaciones_app/compromiso_confirmar_eliminar.html', {
         'compromiso': compromiso,
         'bloqueo': motivo,
@@ -442,35 +460,20 @@ def compromiso_eliminar(request, pk):
 
 @login_required
 def agenda(request):
-    compromisos = _compromisos_autorizados(request.user)
+    _recordar_filtros(request, 'agenda')
     delegacion_id = request.GET.get('delegacion')
     estado = request.GET.get('estado')
     query = request.GET.get('q', '').strip()
-    if delegacion_id:
-        compromisos = compromisos.filter(delegacion_id=delegacion_id)
-    if estado:
-        compromisos = compromisos.filter(estado=estado)
-    if query:
-        compromisos = compromisos.filter(
-            Q(folio__icontains=query)
-            | Q(descripcion__icontains=query)
-            | Q(solicitante__icontains=query)
-            | Q(delegacion__nombre__icontains=query)
-        )
-    compromisos = list(compromisos)
+    compromisos = list(filtrar_compromisos(_compromisos_autorizados(request.user), request.GET))
     for compromiso in compromisos:
-        if compromiso.vencido:
-            compromiso.estado_display, compromiso.estado_class = 'Vencido', 'danger'
-        elif compromiso.proximo_a_vencer:
-            compromiso.estado_display, compromiso.estado_class = 'Próximo a vencer', 'warning'
-        else:
-            compromiso.estado_display = compromiso.get_estado_display()
-            compromiso.estado_class = 'success' if compromiso.estado == 'realizado' else 'warning'
+        compromiso.estado_display, compromiso.estado_class = situacion_de_plazo(compromiso)
     return render(request, 'delegaciones_app/agenda.html', {
         'compromisos': compromisos,
         'delegaciones_filtro': Delegacion.objects.filter(estado=True),
         'estado_filtro': estado or '',
         'delegacion_filtro': delegacion_id or '',
+        'filtros': request.GET,
+        'plazos_filtro': PLAZOS,
         'query': query,
         'proximos': sum(1 for item in compromisos if item.estado != 'realizado' and not item.vencido),
         'por_vencer': sum(1 for item in compromisos if item.proximo_a_vencer),
