@@ -19,7 +19,7 @@ from .crud import MANTENEDORES
 from .permisos import RolRequeridoMixin, roles_de, rol_requerido, tiene_rol
 from .models import (
 	Actividad, Auditoria, Cargo, Catalogo, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
-	HistorialCompromiso, Indicador, ItemMedible, Meta, MetaMedicion, ParametroVersionado, PerfilUsuario, Periodo,
+	HistorialCompromiso, Indicador, ItemMedible, MedicionDelegacion, Meta, MetaMedicion, ParametroVersionado, PerfilUsuario, Periodo,
 	PeriodoMedicion, Rol, UsuarioMaestro, Validacion,
 )
 from datetime import datetime
@@ -1214,3 +1214,121 @@ class AccesoAutenticadoTests(BaseOperacion):
 	def test_usuario_sin_funcionario_no_ve_compromisos(self):
 		self.client.force_login(User.objects.create_user('suelto-acceso', password='clave-segura'))
 		self.assertNotContains(self.client.get(reverse('agenda')), 'FOL-CENTRO-1')
+
+
+class MedicionVistasTests(BaseOperacion):
+	"""Etapa 5d: portada, dashboard, semáforo y resumen leen los Indicador (RN-005, RN-006, RN-008)."""
+
+	def setUp(self):
+		super().setUp()
+		self.rural_user = crear_funcionario('rural-op', 'funcionario', cargo=self.cargo, delegacion=self.rural)
+		self.meta_centro = Meta.objects.create(item=self.item, funcionario=self.funcionario.funcionario, valor_objetivo=1)
+		self.meta_rural = Meta.objects.create(item=self.item, funcionario=self.rural_user.funcionario, valor_objetivo=4)
+		self._aprobar(self._actividad())
+		self._aprobar(self._actividad(autor=self.rural_user, delegacion=self.rural))
+		self._calcular()
+
+	def _aprobar(self, actividad):
+		Validacion(evidencia=self._evidencia(actividad), funcionario_verificador=self.verificador.funcionario).aprobar_evidencia()
+
+	def _calcular(self):
+		Indicador.objects.all().delete()
+		for meta in Meta.objects.all():
+			Indicador.generar(meta)
+
+	def _filas(self, url='dashboard', usuario=None, **parametros):
+		self.client.force_login(usuario or self.coordinador)
+		respuesta = self.client.get(reverse(url), parametros)
+		return respuesta, {fila['nombre']: fila for fila in respuesta.context['delegaciones']}
+
+	def test_dashboard_muestra_el_cumplimiento_y_el_semaforo_de_cada_delegacion(self):
+		respuesta, filas = self._filas()
+		self.assertEqual(set(filas), {'Centro', 'Rural'})
+		self.assertEqual((filas['Centro']['cumplimiento'], filas['Centro']['estado']), (Decimal('100.00'), 'Verde'))
+		self.assertEqual((filas['Rural']['cumplimiento'], filas['Rural']['estado']), (Decimal('25.00'), 'Rojo'))
+		self.assertEqual(respuesta.context['periodo'], self.periodo)
+		self.assertContains(respuesta, 'Septiembre 2026')
+		self.assertContains(respuesta, 'Tope: 150 %')
+		self.assertEqual(filas['Centro']['detalle'], ['Atencion territorial: 1 de 1 actividades'])
+
+	def test_las_barras_de_progreso_no_usan_coma_decimal(self):
+		self.meta_rural.valor_objetivo = 3
+		self.meta_rural.save()
+		self._calcular()
+		respuesta, filas = self._filas()
+		self.assertEqual(filas['Rural']['cumplimiento'], Decimal('33.33'))
+		self.assertContains(respuesta, 'width: 33.33%')
+		self.assertNotContains(respuesta, 'width: 33,33%')
+
+	def test_el_cumplimiento_de_la_delegacion_pondera_sus_metas(self):
+		otro = crear_funcionario('otro-centro', 'funcionario', cargo=self.cargo, delegacion=self.centro)
+		self.meta_centro.ponderador = 60
+		self.meta_centro.save()
+		meta = Meta.objects.create(item=self.item, funcionario=otro.funcionario, valor_objetivo=10, ponderador=40)
+		indicador = Indicador(meta=meta, periodo=self.periodo, avance=5)
+		indicador.calcular_cumplimiento()
+		indicador.save()
+		self._calcular_solo(self.meta_centro)
+		# 60 % de la meta al 100 % y 40 % de la meta al 50 % dan un 80 % ponderado.
+		self.assertEqual(self.centro.obtener_cumplimiento_global(self.periodo), Decimal('80.00'))
+
+	def _calcular_solo(self, meta):
+		Indicador.objects.filter(meta=meta).delete()
+		Indicador.generar(meta)
+
+	def test_solo_cuenta_el_ultimo_indicador_de_cada_meta(self):
+		self.meta_rural.valor_objetivo = 2
+		self.meta_rural.save()
+		Indicador.generar(self.meta_rural)
+		self.assertEqual(self.rural.obtener_cumplimiento_global(self.periodo), Decimal('50.00'))
+		self.assertEqual(Indicador.objects.filter(meta=self.meta_rural).count(), 2)
+
+	def test_semaforo_segun_lo_esperado_al_dia(self):
+		mitad = date(2026, 9, 15)
+		self.assertEqual(self.periodo.porcentaje_esperado(mitad), Decimal('50.00'))
+		self.assertEqual([self.periodo.calcular_semaforo(Decimal(valor), mitad) for valor in ('50', '30', '29.99')], ['verde', 'ambar', 'rojo'])
+
+	def test_selector_de_periodo_y_busqueda_por_delegacion(self):
+		octubre = Periodo.objects.create(nombre='Octubre 2026', fecha_inicio=date(2026, 10, 1), fecha_termino=date(2026, 10, 31), estado='abierto')
+		item = ItemMedible.objects.create(cargo=self.cargo, periodo=octubre, nombre='Atencion de octubre', ponderacion=100)
+		Indicador.generar(Meta.objects.create(item=item, funcionario=self.funcionario.funcionario, valor_objetivo=5))
+
+		respuesta, filas = self._filas()
+		self.assertEqual((respuesta.context['periodo'], set(filas)), (octubre, {'Centro'}))
+		respuesta, filas = self._filas(periodo=self.periodo.pk)
+		self.assertEqual((respuesta.context['periodo'], set(filas)), (self.periodo, {'Centro', 'Rural'}))
+		self.assertEqual(self._filas(periodo='no-es-un-numero')[0].context['periodo'], octubre)
+		self.assertEqual(set(self._filas(periodo=self.periodo.pk, q='rur')[1]), {'Rural'})
+
+	def test_sin_indicadores_se_avisa_y_una_delegacion_sin_calculo_se_marca(self):
+		Indicador.objects.filter(meta=self.meta_rural).delete()
+		self.assertEqual(self._filas()[1]['Rural']['estado'], 'Sin cálculo')
+		Indicador.objects.all().delete()
+		respuesta, filas = self._filas()
+		self.assertEqual(filas, {})
+		self.assertContains(respuesta, 'Todavía no hay indicadores calculados')
+
+	def test_semaforo_y_resumen_comparten_los_resultados(self):
+		respuesta, filas = self._filas('semaforo')
+		self.assertEqual(filas['Centro']['estado'], 'Verde')
+		self.assertContains(respuesta, 'ámbar desde el 60 %')
+		MedicionDelegacion.objects.create(delegacion=self.centro, cumplimiento=88, meta=92, fecha_datos=date(2026, 8, 24), estado_reportado='verde', observacion='Dato historico importado')
+		respuesta, _ = self._filas('resumen')
+		contexto = respuesta.context
+		self.assertEqual((contexto['promedio'], contexto['mejor']['nombre'], contexto['critico']['nombre']), (Decimal('62.50'), 'Centro', 'Rural'))
+		self.assertFalse(contexto['alcanza_umbral'])
+		self.assertContains(respuesta, 'No alcanza el umbral colectivo de 80')
+		self.assertContains(respuesta, 'Dato historico importado')
+
+	def test_la_portada_usa_el_promedio_de_los_indicadores(self):
+		self.assertEqual(self.client.get(reverse('inicio')).context['promedio'], Decimal('62.50'))
+		Indicador.objects.all().delete()
+		self.assertEqual(self.client.get(reverse('inicio')).context['promedio'], Decimal('0.00'))
+
+	def test_gestionar_metas_solo_para_administracion_y_coordinacion(self):
+		respuesta, _ = self._filas()
+		self.assertContains(respuesta, 'Gestionar metas')
+		self.assertContains(respuesta, '+ Agregar meta')
+		respuesta, _ = self._filas(usuario=self.funcionario)
+		self.assertNotContains(respuesta, 'Gestionar metas')
+		self.assertNotContains(respuesta, '+ Agregar meta')

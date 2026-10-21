@@ -2,65 +2,45 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.utils import timezone
 
-from delegaciones_app.models import MedicionDelegacion, MetaMedicion
+from delegaciones_app.medicion import periodo_vigente, periodos_con_indicadores, promedio_general, resultados_por_delegacion
+from delegaciones_app.models import MedicionDelegacion
 
 
-def _color_porcentaje(cumplimiento):
-    if cumplimiento >= 80:
-        return 'Verde', 'success'
-    if cumplimiento >= 65:
-        return 'Amarillo', 'warning'
-    return 'Rojo', 'danger'
-
-
-def _datos_medicion():
-    """Cumplimiento por delegación calculado en vivo desde la base de datos
-    (modelo MetaMedicion + actividades aprobadas), sin depender de archivos JSON."""
-    metas = list(MetaMedicion.objects.select_related('delegacion').filter(activa=True))
-    hoy = timezone.localdate()
-    resultado = []
-    for meta in metas:
-        cumplimiento = round(meta.cumplimiento, 2)
-        estado, estado_class = _color_porcentaje(cumplimiento)
-        resultado.append({
-            'nombre': meta.delegacion.nombre,
-            'cumplimiento': cumplimiento,
-            'meta': meta.objetivo,
-            'ultimos_datos': meta.periodo_termino,
-            'estado': estado,
-            'estado_class': estado_class,
-            'dias_desde_registro': (hoy - meta.periodo_termino).days,
-            'observacion': f'{meta.nombre}: {meta.avance_calculado} actividades aprobadas.',
-        })
-    return resultado
+def _contexto_medicion(request):
+    """Datos comunes del dashboard, el semáforo y el resumen: período elegido y resultados por delegación."""
+    periodo = periodo_vigente(request.GET.get('periodo'))
+    texto = request.GET.get('q', '').strip()
+    return {
+        'periodo': periodo,
+        'periodos': periodos_con_indicadores(),
+        'query': texto,
+        'delegaciones': resultados_por_delegacion(periodo, texto),
+        'hoy': timezone.localdate(),
+        'esperado': periodo.porcentaje_esperado() if periodo else None,
+        'tope': periodo.obtener_parametro('maximo_cumplimiento', '150') if periodo else None,
+    }
 
 
 @login_required
 def dashboard(request):
-    return render(request, 'gestion_app/dashboard.html', {'delegaciones': _datos_medicion()})
+    return render(request, 'gestion_app/dashboard.html', _contexto_medicion(request))
 
 
 @login_required
 def semaforo(request):
-    return render(request, 'gestion_app/semaforo.html', {'delegaciones': _datos_medicion()})
+    return render(request, 'gestion_app/semaforo.html', _contexto_medicion(request))
 
 
 @login_required
 def resumen(request):
-    delegaciones = _datos_medicion()
-    mediciones_historicas = MedicionDelegacion.objects.select_related('delegacion')[:12]
-
-    total = 0
-    for item in delegaciones:
-        total += item.get('cumplimiento', 0)
-    promedio = round(total / len(delegaciones), 2) if delegaciones else 0
-    mejor = max(delegaciones, key=lambda x: x.get('cumplimiento', 0), default={})
-    critico = min(delegaciones, key=lambda x: x.get('cumplimiento', 0), default={})
-
-    return render(request, 'gestion_app/resumen.html', {
+    contexto = _contexto_medicion(request)
+    delegaciones, periodo = contexto['delegaciones'], contexto['periodo']
+    promedio = promedio_general(delegaciones)
+    contexto.update({
         'promedio': promedio,
-        'mejor': mejor,
-        'critico': critico,
-        'delegaciones': delegaciones,
-        'mediciones_historicas': mediciones_historicas,
+        'mejor': max(delegaciones, key=lambda fila: fila['cumplimiento'], default={}),
+        'critico': min(delegaciones, key=lambda fila: fila['cumplimiento'], default={}),
+        'alcanza_umbral': periodo.alcanza_umbral(promedio) if periodo else None,
+        'mediciones_historicas': MedicionDelegacion.objects.select_related('delegacion')[:12],
     })
+    return render(request, 'gestion_app/resumen.html', contexto)

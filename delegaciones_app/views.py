@@ -5,11 +5,12 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Avg, Q
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import ActividadForm, CompromisoForm, EvidenciaForm
-from .models import Actividad, Auditoria, Compromiso, Delegacion, MetaMedicion, Validacion
+from .medicion import periodo_vigente, promedio_general, resultados_por_delegacion
+from .models import Actividad, Auditoria, Compromiso, Delegacion, Validacion
 from .permisos import ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICADOR, funcionario_de, puede_ver_todo, tiene_rol
 
 # Decisión de la revisión -> método de Validacion que la aplica a cada evidencia pendiente.
@@ -94,11 +95,7 @@ def index(request):
     for compromiso in compromisos:
         _decorar_compromiso(compromiso)
     alertas = sum(1 for item in compromisos if item.estado_display == 'Alerta Roja por Vencimiento')
-    promedio = MetaMedicion.objects.filter(activa=True).aggregate(promedio=Avg('avance'))['promedio']
-    metas_activas = list(MetaMedicion.objects.filter(activa=True))
-    cumplimiento_promedio = round(
-        sum(meta.cumplimiento for meta in metas_activas) / len(metas_activas), 1
-    ) if metas_activas else 0
+    cumplimiento_promedio = promedio_general(resultados_por_delegacion(periodo_vigente()))
     return render(request, 'delegaciones_app/index.html', {
         'ejes': ejes,
         'delegaciones': delegaciones,

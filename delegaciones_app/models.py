@@ -40,17 +40,25 @@ class Delegacion(models.Model):
 		funcionario.delegacion = self
 		funcionario.save(update_fields=['delegacion'])
 
-	def obtener_cumplimiento_global(self, periodo):
-		"""Promedio del último indicador de cada meta de sus funcionarios, ponderado por el ponderador de la meta."""
+	def ultimos_indicadores(self, periodo):
+		"""Último Indicador de cada meta de los funcionarios de la delegación en el período."""
 		ultimos = {}
-		indicadores = Indicador.objects.filter(periodo=periodo, meta__funcionario__delegacion=self).select_related('meta').order_by('fecha_calculo')
+		indicadores = Indicador.objects.filter(periodo=periodo, meta__funcionario__delegacion=self).select_related('meta__item', 'meta__funcionario').order_by('fecha_calculo', 'pk')
 		for indicador in indicadores:
 			ultimos[indicador.meta_id] = indicador
-		total_ponderador = sum(indicador.meta.ponderador for indicador in ultimos.values())
+		return list(ultimos.values())
+
+	@staticmethod
+	def promedio_ponderado(indicadores):
+		"""Cumplimiento promedio de los indicadores, ponderado por el ponderador de cada meta (RN-005)."""
+		total_ponderador = sum(indicador.meta.ponderador for indicador in indicadores)
 		if not total_ponderador:
 			return Decimal('0.00')
-		total_ponderado = sum(indicador.ponderacion for indicador in ultimos.values())
+		total_ponderado = sum(indicador.ponderacion for indicador in indicadores)
 		return (total_ponderado * 100 / total_ponderador).quantize(DOS_DECIMALES)
+
+	def obtener_cumplimiento_global(self, periodo):
+		return self.promedio_ponderado(self.ultimos_indicadores(periodo))
 
 
 class Cargo(models.Model):
@@ -651,6 +659,15 @@ class Periodo(models.Model):
 		transcurridos, total = self._dias_transcurridos(fecha)
 		return (Decimal(transcurridos) * 100 / Decimal(total)).quantize(DOS_DECIMALES)
 
+	def calcular_semaforo(self, cumplimiento, fecha=None):
+		"""RN-008: verde si alcanza lo esperado al día, ámbar si llega al 60 % de lo esperado, rojo si no."""
+		esperado = self.porcentaje_esperado(fecha)
+		if cumplimiento >= esperado:
+			return 'verde'
+		if cumplimiento >= esperado * Decimal('0.6'):
+			return 'ambar'
+		return 'rojo'
+
 	def obtener_parametro(self, clave, defecto=None):
 		parametro = self.parametros.filter(clave=clave).first()
 		return parametro.valor if parametro else defecto
@@ -840,14 +857,8 @@ class Indicador(ControlPeriodoCerradoMixin, models.Model):
 		return self.cumplimiento
 
 	def actualizar_semaforo(self, fecha=None):
-		"""RN-008: verde si alcanza lo esperado al día, ámbar si llega al 60 % de lo esperado, rojo si no."""
-		esperado = self.periodo.porcentaje_esperado(fecha)
-		if self.cumplimiento >= esperado:
-			self.semaforo = 'verde'
-		elif self.cumplimiento >= esperado * Decimal('0.6'):
-			self.semaforo = 'ambar'
-		else:
-			self.semaforo = 'rojo'
+		"""RN-008: el color lo decide el período (ver Periodo.calcular_semaforo)."""
+		self.semaforo = self.periodo.calcular_semaforo(self.cumplimiento, fecha)
 		return self.semaforo
 
 
