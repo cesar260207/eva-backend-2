@@ -1,9 +1,12 @@
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.utils import timezone
 
+from delegaciones_app import medicion
 from delegaciones_app.medicion import periodo_vigente, periodos_con_indicadores, promedio_general, resultados_por_delegacion
 from delegaciones_app.models import MedicionDelegacion
+from delegaciones_app.permisos import funcionario_de, roles_de
 
 
 def _contexto_medicion(request):
@@ -44,3 +47,26 @@ def resumen(request):
         'mediciones_historicas': MedicionDelegacion.objects.select_related('delegacion')[:12],
     })
     return render(request, 'gestion_app/resumen.html', contexto)
+
+
+@login_required
+def ficha_personal(request):
+    """Ficha personal del funcionario: metas, avance, cumplimiento, semáforo, evidencias y compromisos (CU-06, RF-008)."""
+    funcionario = funcionario_de(request.user)
+    if funcionario is None:
+        messages.error(request, 'Tu cuenta no tiene un funcionario asociado, así que no tiene ficha personal.')
+        return redirect('inicio')
+    periodo = medicion.periodo_de_ficha(funcionario, request.GET.get('periodo'))
+    contexto = {
+        'funcionario': funcionario,
+        'roles': sorted(roles_de(request.user)),
+        'periodo': periodo,
+        'periodos': medicion.periodos_de(funcionario),
+        'hoy': timezone.localdate(),
+        'compromisos': medicion.resumen_de_compromisos(funcionario),
+    }
+    if periodo:
+        contexto.update(medicion.ficha_personal(funcionario, periodo))
+        contexto['evidencias'] = medicion.resumen_de_evidencias(funcionario, periodo)
+    return render(request, 'gestion_app/ficha.html', contexto)
+

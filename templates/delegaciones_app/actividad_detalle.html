@@ -37,6 +37,17 @@
             </form>
         </div>
         {% endif %}
+        {% if puede_anular %}
+        <div class="panel mt-4">
+            <div class="section-label mb-2">Anular aprobación</div>
+            <p class="small text-muted">La actividad dejará de sumar al avance y los indicadores se recalcularán. La validación original queda en el historial.</p>
+            <form method="post" action="{% url 'anular_actividad' actividad.codigo_verificador %}">
+                {% csrf_token %}
+                <textarea class="form-control mb-3" name="motivo" rows="2" placeholder="Motivo de la anulación (obligatorio)" required></textarea>
+                <button class="btn btn-outline-danger" type="submit">Anular aprobación</button>
+            </form>
+        </div>
+        {% endif %}
     </div>
     <div class="col-lg-5">
         <div class="panel">

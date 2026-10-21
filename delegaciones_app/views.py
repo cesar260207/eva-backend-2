@@ -79,7 +79,7 @@ def _bloqueo_actividad(funcionario, actividad, ve_todo):
     alteraría ese avance sin revisión. Tampoco se modifica si su período está cerrado (RN-013).
     """
     if actividad.estado == 'aprobada':
-        return 'Actividad aprobada: ya suma al avance de las metas y no se modifica.'
+        return 'Actividad aprobada: ya suma al avance de las metas y no se modifica. Para corregirla, un verificador debe anular su aprobación.'
     if actividad.item_id and actividad.item.periodo.estado == 'cerrado':
         return 'El período de la actividad está cerrado: no se modifica.'
     if not (ve_todo or (funcionario and actividad.funcionario_autor_id == funcionario.pk)):
@@ -209,6 +209,7 @@ def actividad_detalle(request, codigo):
         'actividad': actividad,
         'evidencia_form': evidencia_form,
         'puede_validar': tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, VERIFICADOR),
+        'puede_anular': tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, VERIFICADOR) and actividad.estado == 'aprobada' and actividad.item.periodo.estado != 'cerrado',
         'hay_pendientes': any(evidencia.estado_revision == 'pendiente' for evidencia in actividad.evidencias.all()),
     })
 
@@ -244,6 +245,33 @@ def revisar_actividad(request, codigo, decision):
         messages.error(request, ' '.join(error.messages))
         return redirect('actividad_detalle', codigo=codigo)
     messages.success(request, f'Actividad {actividad.codigo_verificador}: {actividad.get_estado_display()}.')
+    return redirect('actividad_detalle', codigo=codigo)
+
+
+@login_required
+def anular_actividad(request, codigo):
+    """Anula la aprobación de una actividad con un motivo; recalcula los indicadores (CU-07.2)."""
+    if request.method != 'POST':
+        return redirect('actividad_detalle', codigo=codigo)
+    if not tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, VERIFICADOR):
+        registrar_acceso_denegado(request, 'Actividad', codigo)
+        return redirect('actividad_detalle', codigo=codigo)
+    verificador = _funcionario_requerido(request)
+    if verificador is None:
+        return redirect('actividad_detalle', codigo=codigo)
+    actividad = _obtener_autorizado(request, _actividades_autorizadas(request.user), 'Actividad', codigo_verificador=codigo)
+    motivo = request.POST.get('motivo', '').strip()
+    try:
+        with transaction.atomic():
+            actividad.anular_aprobacion(motivo, verificador)
+            Auditoria.registrar_evento(
+                request.user, 'anular_aprobacion', 'Actividad', actividad.codigo_verificador,
+                {'estado': 'aprobada'}, {'estado': actividad.estado, 'motivo': motivo},
+            )
+    except ValidationError as error:
+        messages.error(request, ' '.join(error.messages))
+    else:
+        messages.success(request, f'Se anuló la aprobación de {actividad.codigo_verificador}: ya no suma al avance.')
     return redirect('actividad_detalle', codigo=codigo)
 
 

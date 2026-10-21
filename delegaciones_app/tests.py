@@ -1725,3 +1725,184 @@ class CompromisoReglasTests(BaseOperacion):
 		self.assertTrue(vencido.vencido)
 		self.assertEqual(self.client.get(reverse('admin:delegaciones_app_compromiso_delete', args=[vencido.pk])).status_code, 403)
 		self.assertEqual(self.client.get(reverse('admin:delegaciones_app_compromiso_delete', args=[realizado.pk])).status_code, 200)
+
+
+class FichaPersonalTests(BaseOperacion):
+	"""Lote 3 (CU-06, CU-17, RF-008): ficha personal, diferencia con lo esperado, meta cumplida y detalle de la fórmula."""
+
+	def setUp(self):
+		super().setUp()
+		self.otro = crear_funcionario('otro-centro', 'funcionario', cargo=self.cargo, delegacion=self.centro)
+		self.meta = Meta.objects.create(item=self.item, funcionario=self.funcionario.funcionario, valor_objetivo=2)
+		self.meta_otro = Meta.objects.create(item=self.item, funcionario=self.otro.funcionario, valor_objetivo=5)
+		self.actividad = self._actividad()
+		Validacion(evidencia=self._evidencia(self.actividad), funcionario_verificador=self.verificador.funcionario).aprobar_evidencia()
+		for meta in Meta.objects.all():
+			Indicador.generar(meta)
+
+	def _ficha(self, usuario=None, **parametros):
+		self.client.force_login(usuario or self.funcionario)
+		return self.client.get(reverse('ficha_personal'), parametros)
+
+	def test_la_ficha_solo_muestra_las_metas_del_funcionario(self):
+		respuesta = self._ficha()
+		self.assertEqual(respuesta.status_code, 200)
+		self.assertEqual([fila['meta'] for fila in respuesta.context['filas']], [self.meta])
+		self.assertEqual(respuesta.context['periodo'], self.periodo)
+		fila = respuesta.context['filas'][0]
+		self.assertEqual((fila['avance'], fila['cumplimiento'], fila['estado']), (1, Decimal('50.00'), 'Rojo'))
+		self.assertEqual(respuesta.context['cumplimiento_total'], Decimal('50.00'))
+
+	def test_la_ficha_calcula_la_diferencia_con_lo_esperado(self):
+		esperado = self.periodo.porcentaje_esperado()
+		fila = self._ficha().context['filas'][0]
+		self.assertEqual(fila['diferencia'], Decimal('50.00') - esperado)
+		self.assertTrue(fila['desviacion'])
+
+	def test_la_meta_alcanzada_se_destaca_como_cumplida(self):
+		otra = self._actividad(solicitud_problema='Otra')
+		Validacion(evidencia=self._evidencia(otra), funcionario_verificador=self.verificador.funcionario).aprobar_evidencia()
+		Indicador.generar(self.meta)
+		fila = self._ficha().context['filas'][0]
+		self.assertTrue(fila['cumplida'])
+		self.assertContains(self._ficha(), 'Cumplida')
+
+	def test_el_detalle_explica_la_formula_y_enlaza_las_actividades_que_aportan(self):
+		respuesta = self._ficha()
+		fila = respuesta.context['filas'][0]
+		self.assertIn('1 / 2 × 100 = 50 %', fila['formula'][0])
+		self.assertEqual(list(fila['actividades']), [self.actividad])
+		self.assertContains(respuesta, reverse('actividad_detalle', args=[self.actividad.codigo_verificador]))
+
+	def test_el_detalle_informa_cuando_se_aplica_el_tope(self):
+		self.meta.valor_objetivo = 1
+		self.meta.save()
+		for _ in range(2):
+			extra = self._actividad(solicitud_problema='Extra')
+			Validacion(evidencia=self._evidencia(extra), funcionario_verificador=self.verificador.funcionario).aprobar_evidencia()
+		Indicador.generar(self.meta)
+		fila = self._ficha().context['filas'][0]
+		self.assertEqual(fila['cumplimiento'], Decimal('150.00'))
+		self.assertIn('se aplica el tope', fila['formula'][1])
+
+	def test_una_meta_sin_calculo_se_informa_sin_formula(self):
+		Indicador.objects.filter(meta=self.meta).delete()
+		fila = self._ficha().context['filas'][0]
+		self.assertEqual((fila['estado'], fila['formula'], fila['diferencia']), ('Sin cálculo', [], None))
+
+	def test_resumen_de_evidencias_y_compromisos(self):
+		self._evidencia(self._actividad(solicitud_problema='Pendiente'))
+		pendiente = self._compromiso(folio='FICHA-1')
+		vencido = self._compromiso(folio='FICHA-2')
+		vencido.fecha_comprometida = timezone.localdate() - timedelta(days=3)
+		vencido.save()
+		contexto = self._ficha().context
+		evidencias = {fila['estado']: fila['total'] for fila in contexto['evidencias']}
+		self.assertEqual((evidencias['aprobada'], evidencias['pendiente']), (1, 1))
+		self.assertEqual((contexto['compromisos']['total'], contexto['compromisos']['vencidos'], contexto['compromisos']['vigentes']), (2, 1, 1))
+		self.assertEqual(pendiente.estado, 'ingresado')
+
+	def test_un_usuario_sin_funcionario_es_redirigido_con_un_mensaje(self):
+		sin_ficha = User.objects.create_user('sin-ficha', password='x')
+		self.client.force_login(sin_ficha)
+		respuesta = self.client.get(reverse('ficha_personal'), follow=True)
+		self.assertContains(respuesta, 'no tiene un funcionario asociado')
+
+	def test_el_selector_ignora_un_periodo_ajeno_o_invalido(self):
+		ajeno = Periodo.objects.create(nombre='Octubre 2026', fecha_inicio=date(2026, 10, 1), fecha_termino=date(2026, 10, 31), estado='abierto')
+		for valor in (str(ajeno.pk), 'abc', '9999'):
+			self.assertEqual(self._ficha(periodo=valor).context['periodo'], self.periodo, valor)
+
+	def test_sin_metas_la_ficha_lo_indica(self):
+		sin_metas = crear_funcionario('sin-metas', 'funcionario', cargo=self.cargo, delegacion=self.centro)
+		respuesta = self._ficha(usuario=sin_metas)
+		self.assertIsNone(respuesta.context['periodo'])
+		self.assertContains(respuesta, 'Todavía no tienes metas asignadas')
+
+	def test_exige_iniciar_sesion(self):
+		self.client.logout()
+		self.assertEqual(self.client.get(reverse('ficha_personal')).status_code, 302)
+
+	def test_dashboard_y_resumen_muestran_la_diferencia_y_la_desviacion(self):
+		self.client.force_login(self.coordinador)
+		fila = {f['nombre']: f for f in self.client.get(reverse('dashboard')).context['delegaciones']}['Centro']
+		self.assertEqual(fila['diferencia'], fila['cumplimiento'] - self.periodo.porcentaje_esperado())
+		self.assertEqual(fila['desviacion'], fila['estado'] in ('Ámbar', 'Rojo'))
+		self.assertContains(self.client.get(reverse('resumen')), 'Diferencia')
+		self.assertContains(self.client.get(reverse('semaforo')), 'Diferencia con lo esperado')
+
+
+class AnularAprobacionTests(BaseOperacion):
+	"""Lote 3 (CU-07.2, RN-009, RN-013): anular una aprobación exige motivo, recalcula hacia abajo y conserva el historial."""
+
+	def setUp(self):
+		super().setUp()
+		self.meta = Meta.objects.create(item=self.item, funcionario=self.funcionario.funcionario, valor_objetivo=2)
+		self.actividad = self._actividad()
+		self.evidencia = self._evidencia(self.actividad)
+		Validacion(evidencia=self.evidencia, funcionario_verificador=self.verificador.funcionario).aprobar_evidencia()
+		Indicador.generar(self.meta)
+		self.url = reverse('anular_actividad', args=[self.actividad.codigo_verificador])
+
+	def _ultimo_avance(self):
+		return Indicador.objects.filter(meta=self.meta).latest('fecha_calculo', 'pk').avance
+
+	def test_anular_quita_la_actividad_del_avance_y_recalcula(self):
+		self.assertEqual(self._ultimo_avance(), 1)
+		self.actividad.anular_aprobacion('Evidencia ilegible', self.verificador.funcionario)
+		self.actividad.refresh_from_db()
+		self.evidencia.refresh_from_db()
+		self.assertEqual((self.actividad.estado, self.evidencia.estado_revision), ('rechazada', 'rechazada'))
+		self.assertEqual(self._ultimo_avance(), 0)
+		self.assertEqual(self.meta.actividades_que_aportan().count(), 0)
+
+	def test_la_validacion_original_se_conserva_como_historial(self):
+		self.actividad.anular_aprobacion('Evidencia ilegible', self.verificador.funcionario)
+		decisiones = list(Validacion.objects.filter(evidencia=self.evidencia).order_by('pk').values_list('decision', 'observacion'))
+		self.assertEqual(decisiones, [('aprobada', None), ('rechazada', 'Evidencia ilegible')])
+
+	def test_exige_un_motivo_y_una_actividad_aprobada(self):
+		with self.assertRaises(ValidationError):
+			self.actividad.anular_aprobacion('   ', self.verificador.funcionario)
+		self.assertEqual(Actividad.objects.get(pk=self.actividad.pk).estado, 'aprobada')
+		pendiente = self._actividad(solicitud_problema='Aun pendiente')
+		with self.assertRaises(ValidationError):
+			pendiente.anular_aprobacion('Motivo', self.verificador.funcionario)
+
+	def test_un_periodo_cerrado_no_permite_anular(self):
+		self.periodo.estado = 'cerrado'
+		Periodo.objects.filter(pk=self.periodo.pk).update(estado='cerrado')
+		with self.assertRaises(ValidationError):
+			Actividad.objects.get(pk=self.actividad.pk).anular_aprobacion('Motivo', self.verificador.funcionario)
+		self.assertEqual(Actividad.objects.get(pk=self.actividad.pk).estado, 'aprobada')
+
+	def test_la_vista_anula_audita_y_muestra_el_resultado(self):
+		self.client.force_login(self.verificador)
+		respuesta = self.client.post(self.url, {'motivo': 'Evidencia ilegible'}, follow=True)
+		self.assertContains(respuesta, 'ya no suma al avance')
+		self.assertEqual(Actividad.objects.get(pk=self.actividad.pk).estado, 'rechazada')
+		registro = Auditoria.objects.get(evento='anular_aprobacion')
+		self.assertEqual(registro.identificador_registro, self.actividad.codigo_verificador)
+		self.assertEqual(json.loads(registro.valor_nuevo)['motivo'], 'Evidencia ilegible')
+
+	def test_la_vista_rechaza_un_motivo_vacio_sin_cambios(self):
+		self.client.force_login(self.verificador)
+		respuesta = self.client.post(self.url, {'motivo': ''}, follow=True)
+		self.assertContains(respuesta, 'exige un motivo')
+		self.assertEqual(Actividad.objects.get(pk=self.actividad.pk).estado, 'aprobada')
+		self.assertFalse(Auditoria.objects.filter(evento='anular_aprobacion').exists())
+
+	def test_un_funcionario_no_puede_anular_y_queda_registrado(self):
+		self.client.force_login(self.funcionario)
+		self.client.post(self.url, {'motivo': 'Quiero anularla'})
+		self.assertEqual(Actividad.objects.get(pk=self.actividad.pk).estado, 'aprobada')
+		self.assertTrue(Auditoria.objects.filter(evento='acceso_denegado').exists())
+
+	def test_get_no_anula_y_el_panel_solo_se_ofrece_a_quien_corresponde(self):
+		self.client.force_login(self.verificador)
+		self.client.get(self.url)
+		self.assertEqual(Actividad.objects.get(pk=self.actividad.pk).estado, 'aprobada')
+		detalle = reverse('actividad_detalle', args=[self.actividad.codigo_verificador])
+		self.assertContains(self.client.get(detalle), 'Anular aprobación')
+		self.client.force_login(self.funcionario)
+		self.assertNotContains(self.client.get(detalle), 'Anular aprobación')

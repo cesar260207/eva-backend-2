@@ -15,6 +15,7 @@ urlpatterns = [
     # editar/eliminar deben ir antes de <str:decision>, que tambien los capturaria.
     path('actividad/<str:codigo>/editar/', views.actividad_editar, name='actividad_editar'),
     path('actividad/<str:codigo>/eliminar/', views.actividad_eliminar, name='actividad_eliminar'),
+    path('actividad/<str:codigo>/anular/', views.anular_actividad, name='anular_actividad'),
     path('actividad/<str:codigo>/<str:decision>/', views.revisar_actividad, name='revisar_actividad'),
     # Mantenedores de las tablas maestras (ver crud.py).
     path('administracion/', crud.indice, name='mantenedores'),

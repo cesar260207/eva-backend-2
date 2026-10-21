@@ -235,10 +235,10 @@ class Actividad(VersionOptimistaMixin, models.Model):
 				raise ValidationError('El código verificador de una actividad no se puede modificar.')
 		super().save(*args, **kwargs)
 
-	def cambiar_estado(self, nuevo_estado):
+	def cambiar_estado(self, nuevo_estado, anulando=False):
 		if nuevo_estado not in dict(self.ESTADOS):
 			raise ValidationError(f'Estado de actividad no válido: {nuevo_estado}.')
-		if self.estado == 'aprobada' and nuevo_estado != 'aprobada':
+		if self.estado == 'aprobada' and nuevo_estado != 'aprobada' and not anulando:
 			raise ValidationError('Una actividad aprobada ya suma al avance y no cambia de estado.')
 		self.estado = nuevo_estado
 		self.save(update_fields=['estado', 'actualizada'])
@@ -247,6 +247,22 @@ class Actividad(VersionOptimistaMixin, models.Model):
 		evidencia.actividad = self
 		evidencia.save()
 		evidencia.enviar_a_revision()
+
+	@transaction.atomic
+	def anular_aprobacion(self, motivo, verificador):
+		"""CU-07.2 y RN-009: deja sin efecto la aprobación. La actividad deja de sumar al avance y los
+		indicadores se recalculan hacia abajo. La validación aprobada original se conserva como historial."""
+		if self.estado != 'aprobada':
+			raise ValidationError('Solo se puede anular una actividad aprobada.')
+		if not (motivo or '').strip():
+			raise ValidationError('La anulación de una aprobación exige un motivo.')
+		if self.item_id:
+			self.item.periodo.verificar_editable()  # RN-013
+		for evidencia in self.evidencias.filter(estado_revision='aprobada'):
+			Validacion(evidencia=evidencia, funcionario_verificador=verificador).anular_evidencia(motivo)
+		if self.estado == 'aprobada':  # aprobada sin evidencias, como las importadas del sistema anterior
+			self.cambiar_estado('rechazada', anulando=True)
+		self.actualizar_indicadores()
 
 	def actualizar_indicadores(self):
 		"""Cada validación deja un Indicador nuevo en las metas del ítem; los períodos cerrados quedan congelados (RN-013)."""
@@ -340,7 +356,7 @@ class Validacion(models.Model):
 		return f'{self.evidencia} - {self.get_decision_display()} (v{self.version})'
 
 	@transaction.atomic
-	def _decidir(self, decision, observacion):
+	def _decidir(self, decision, observacion, anulando=False):
 		"""RN-009: la decisión se refleja en la evidencia y en la actividad; solo «aprobada» aporta al avance."""
 		self.decision = decision
 		self.observacion = observacion
@@ -348,8 +364,14 @@ class Validacion(models.Model):
 		self.save()
 		self.evidencia.estado_revision = decision
 		self.evidencia.save(update_fields=['estado_revision'])
-		self.evidencia.actividad.cambiar_estado(decision)
+		self.evidencia.actividad.cambiar_estado(decision, anulando=anulando)
 		return self
+
+	def anular_evidencia(self, motivo):
+		"""CU-07.2: deja sin efecto una evidencia aprobada; la actividad ya no aporta al avance (RN-009)."""
+		if not (motivo or '').strip():
+			raise ValidationError('La anulación de una aprobación exige un motivo.')
+		return self._decidir('rechazada', motivo, anulando=True)
 
 	def aprobar_evidencia(self, observacion=None):
 		return self._decidir('aprobada', observacion)
@@ -729,6 +751,26 @@ class Meta(ControlPeriodoCerradoMixin, models.Model):
 		self.full_clean()
 		self.save(update_fields=['valor_objetivo'])
 
+	def actividades_que_aportan(self, periodo=None):
+		"""RN-003 y RN-009: actividades aprobadas del ítem, dentro del período, con una validación aprobada.
+
+		Si el funcionario de la meta tiene delegación, solo cuentan las de esa delegación.
+		"""
+		periodo = periodo or self.item.periodo
+		# Rango de instantes en hora de Chile; evita __date, que en MySQL exige tablas de zonas horarias.
+		desde = timezone.make_aware(datetime.combine(periodo.fecha_inicio, time.min))
+		hasta = timezone.make_aware(datetime.combine(periodo.fecha_termino + timedelta(days=1), time.min))
+		actividades = Actividad.objects.filter(
+			item=self.item,
+			estado='aprobada',
+			fecha__gte=desde,
+			fecha__lt=hasta,
+			evidencias__validaciones__decision='aprobada',
+		)
+		if self.funcionario.delegacion_id:
+			actividades = actividades.filter(delegacion_id=self.funcionario.delegacion_id)
+		return actividades.distinct()
+
 
 class Indicador(ControlPeriodoCerradoMixin, models.Model):
 	SEMAFOROS = [('verde', 'Verde'), ('ambar', 'Ámbar'), ('rojo', 'Rojo')]
@@ -765,19 +807,7 @@ class Indicador(ControlPeriodoCerradoMixin, models.Model):
 
 		Si el funcionario de la meta tiene delegación, solo cuentan las actividades de esa delegación.
 		"""
-		# Rango de instantes en hora de Chile; evita __date, que en MySQL exige tablas de zonas horarias.
-		desde = timezone.make_aware(datetime.combine(self.periodo.fecha_inicio, time.min))
-		hasta = timezone.make_aware(datetime.combine(self.periodo.fecha_termino + timedelta(days=1), time.min))
-		actividades = Actividad.objects.filter(
-			item=self.meta.item,
-			estado='aprobada',
-			fecha__gte=desde,
-			fecha__lt=hasta,
-			evidencias__validaciones__decision='aprobada',
-		)
-		if self.meta.funcionario.delegacion_id:
-			actividades = actividades.filter(delegacion_id=self.meta.funcionario.delegacion_id)
-		self.avance = actividades.distinct().count()
+		self.avance = self.meta.actividades_que_aportan(self.periodo).count()
 		return self.avance
 
 	def calcular_cumplimiento(self):

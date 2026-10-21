@@ -39,7 +39,7 @@
 <div class="row g-3">
     {% for delegacion in delegaciones %}
     <div class="col-md-6 col-xl-4">
-        <div class="card h-100">
+        <div class="card h-100 {% if delegacion.desviacion %}border-{{ delegacion.estado_class }}{% endif %}">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="mb-0">{{ delegacion.nombre }}</h5>
@@ -52,6 +52,7 @@
                 </div>
                 <ul class="list-unstyled small text-muted mb-0">
                     <li><strong>Esperado al día:</strong> {{ esperado }}%</li>
+                    {% if delegacion.diferencia != None %}<li><strong>Diferencia con lo esperado:</strong> {{ delegacion.diferencia }} puntos{% if delegacion.desviacion %} <span class="badge badge-{% if delegacion.estado_class == 'warning' %}warning{% else %}danger{% endif %}-soft">Desviación</span>{% endif %}</li>{% endif %}
                     <li><strong>Último cálculo:</strong> {{ delegacion.ultimos_datos|date:'d-m-Y'|default:'Sin cálculo' }}</li>
                     {% if delegacion.dias_desde_registro != None %}<li><strong>Días desde el cálculo:</strong> {{ delegacion.dias_desde_registro }}</li>{% endif %}
                     {% for linea in delegacion.detalle %}<li><strong>Meta:</strong> {{ linea }}</li>{% endfor %}

@@ -54,6 +54,7 @@
                 <th>Delegación</th>
                 <th>Esperado al día</th>
                 <th>Cumplimiento</th>
+                <th>Diferencia</th>
                 <th>Estado</th>
                 <th>Último cálculo</th>
                 <th></th>
@@ -61,16 +62,17 @@
         </thead>
         <tbody>
             {% for delegacion in delegaciones %}
-            <tr>
+            <tr class="{% if delegacion.desviacion %}table-{{ delegacion.estado_class }}{% endif %}">
                 <td>{{ delegacion.nombre }}</td>
                 <td>{{ esperado }}%</td>
                 <td>{{ delegacion.cumplimiento }}%</td>
+                <td>{% if delegacion.diferencia != None %}{{ delegacion.diferencia }} puntos{% else %}-{% endif %}</td>
                 <td><span class="badge bg-{{ delegacion.estado_class }} rounded-pill">{{ delegacion.estado }}</span></td>
                 <td>{{ delegacion.ultimos_datos|date:'d-m-Y'|default:'Sin cálculo' }}</td>
                 <td>{% if puede_administrar %}<a class="btn btn-sm btn-outline-sgr" href="{% url 'mantenedor_lista' 'metas' %}?q={{ delegacion.nombre|urlencode }}">Gestionar metas</a>{% endif %}</td>
             </tr>
             {% empty %}
-            <tr><td colspan="6" class="text-center py-4">No hay delegaciones con metas para este criterio de búsqueda.</td></tr>
+            <tr><td colspan="7" class="text-center py-4">No hay delegaciones con metas para este criterio de búsqueda.</td></tr>
             {% endfor %}
         </tbody>
     </table>

@@ -23,6 +23,7 @@
                 </div>
                 <div class="alert alert-{{ delegacion.estado_class }} mb-3">
                     Cumplimiento: {{ delegacion.cumplimiento }}%<br>
+                    {% if delegacion.diferencia != None %}Diferencia con lo esperado: {{ delegacion.diferencia }} puntos{% if delegacion.desviacion %} · <strong>desviación</strong>{% endif %}<br>{% endif %}
                     Último cálculo: {{ delegacion.ultimos_datos|date:'d-m-Y'|default:'Sin cálculo' }}
                 </div>
                 {% if delegacion.dias_desde_registro != None %}<p class="small text-muted mb-3">Días transcurridos desde el último cálculo: {{ delegacion.dias_desde_registro }}</p>{% endif %}
