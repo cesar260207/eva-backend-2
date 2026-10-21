@@ -800,17 +800,23 @@ class Indicador(ControlPeriodoCerradoMixin, models.Model):
 		return indicador
 
 	def calcular_avance(self):
-		"""RN-003 y RN-009: actividades aprobadas del ítem en el período que tienen una validación aprobada."""
+		"""RN-003 y RN-009: actividades aprobadas del ítem en el período que tienen una validación aprobada.
+
+		Si el funcionario de la meta tiene delegación, solo cuentan las actividades de esa delegación.
+		"""
 		# Rango de instantes en hora de Chile; evita __date, que en MySQL exige tablas de zonas horarias.
 		desde = timezone.make_aware(datetime.combine(self.periodo.fecha_inicio, time.min))
 		hasta = timezone.make_aware(datetime.combine(self.periodo.fecha_termino + timedelta(days=1), time.min))
-		self.avance = Actividad.objects.filter(
+		actividades = Actividad.objects.filter(
 			item=self.meta.item,
 			estado='aprobada',
 			fecha_hora__gte=desde,
 			fecha_hora__lt=hasta,
 			evidencias__validaciones__decision='aprobada',
-		).distinct().count()
+		)
+		if self.meta.funcionario.delegacion_id:
+			actividades = actividades.filter(delegacion_id=self.meta.funcionario.delegacion_id)
+		self.avance = actividades.distinct().count()
 		return self.avance
 
 	def calcular_cumplimiento(self):

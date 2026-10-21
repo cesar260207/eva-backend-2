@@ -4,7 +4,9 @@ from datetime import date
 
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, override_settings
+from django.db import connection
+from django.db.migrations.executor import MigrationExecutor
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 
 from django.core.exceptions import ValidationError
@@ -488,7 +490,8 @@ class OrganizacionAccesoTests(TestCase):
 			self.funcionario.reasignar_cargo(no_vigente)
 
 	def test_rol_no_se_repite_para_el_mismo_funcionario(self):
-		rol = Rol.objects.create(nombre_rol='funcionario')
+		# La migración 0010 crea los 6 roles del sistema.
+		rol = Rol.objects.get(nombre_rol='funcionario')
 		FuncionarioRol.objects.create(funcionario=self.funcionario, rol=rol)
 		self.assertQuerySetEqual(self.funcionario.roles.all(), [rol])
 		with self.assertRaises(IntegrityError), transaction.atomic():
@@ -777,3 +780,104 @@ class OperacionTests(TestCase):
 		with self.assertRaises(ValidationError):
 			vieja.set_estado('realizado', self.autor)
 		self.assertEqual(HistorialCompromiso.objects.filter(compromiso=compromiso).count(), 1)
+
+
+class MigracionDatosTests(TransactionTestCase):
+	"""Etapa 4: la migración 0010 copia los datos antiguos al modelo de 17 clases y se puede revertir."""
+
+	antes = [('delegaciones_app', '0009_ampliar_operacion')]
+	despues = [('delegaciones_app', '0010_migrar_datos')]
+
+	def _migrar(self, destino):
+		executor = MigrationExecutor(connection)
+		executor.migrate(destino)
+		return executor.loader.project_state(destino).apps
+
+	def setUp(self):
+		viejo = self._migrar(self.antes)
+		modelo = lambda nombre: viejo.get_model('delegaciones_app', nombre)
+		Usuario = viejo.get_model('auth', 'User')
+		centro = modelo('Delegacion').objects.create(nombre='Centro', territorio='Centro historico', enfasis='Atencion')
+		rural = modelo('Delegacion').objects.create(nombre='Rural', territorio='Localidades rurales', enfasis='Servicios', activa=False)
+		coordinador = Usuario.objects.create(username='coordinador', first_name='Ana', last_name='Rojas')
+		funcionario = Usuario.objects.create(username='funcionario')
+		admin = Usuario.objects.create(username='admin', is_superuser=True, is_staff=True)
+		otro = Usuario.objects.create(username='otro')
+		modelo('PerfilUsuario').objects.create(usuario=coordinador, rol='coordinador', cargo='Coordinador territorial')
+		modelo('PerfilUsuario').objects.create(usuario=funcionario, rol='funcionario', delegacion=centro)
+		modelo('PeriodoMedicion').objects.create(nombre='Trimestre', inicio=date(2026, 7, 1), termino=date(2026, 9, 30), estado='abierto')
+		modelo('CatalogoItem').objects.create(categoria='servicio', codigo='DUP', nombre='Servicio')
+		modelo('CatalogoItem').objects.create(categoria='atencion', codigo='DUP', nombre='Atencion')
+		for delegacion in (centro, rural):
+			modelo('MetaMedicion').objects.create(delegacion=delegacion, nombre='Seguridad', objetivo=10, ponderador=100, periodo_inicio=date(2026, 7, 1), periodo_termino=date(2026, 9, 30))
+		actividad = modelo('Actividad').objects.create(codigo='EVD-MIG-1', funcionario=funcionario, delegacion=centro, fecha=date(2026, 9, 1), tipo_atencion='Solicitud ciudadana', descripcion='Luminaria', accion='Derivacion', item_medicion='Seguridad', telefono='+56 9 1234 5678 anexo 22', estado='aprobada')
+		modelo('Evidencia').objects.create(actividad=actividad, archivo='evidencias/uno.pdf', comentario='Acta', aprobada=True, revisada_por=coordinador)
+		modelo('Evidencia').objects.create(actividad=actividad, archivo='evidencias/dos.pdf')
+		compromiso = modelo('Compromiso').objects.create(folio='LS-1', delegacion=centro, responsable=otro, solicitante='Junta de vecinos', territorio='Centro', descripcion='Poda', fecha_comprometida=date(2026, 9, 30))
+		modelo('HistorialCompromiso').objects.create(compromiso=compromiso, autor=funcionario, estado_anterior='', estado_nuevo='ingresado')
+		modelo('Auditoria').objects.create(usuario=admin, accion='cambio_estado', entidad='Compromiso', identificador='LS-1', detalle={'anterior': 'pendiente', 'nuevo': 'realizado'})
+		modelo('Auditoria').objects.create(usuario=funcionario, accion='editar', entidad='Actividad', identificador='EVD-MIG-1', detalle={'campos': ['accion']})
+
+	def tearDown(self):
+		self._migrar(MigrationExecutor(connection).loader.graph.leaf_nodes())
+
+	def test_migrar_copia_y_transforma_los_datos(self):
+		nuevo = self._migrar(self.despues)
+		modelo = lambda nombre: nuevo.get_model('delegaciones_app', nombre)
+		funcionario = lambda username: modelo('Funcionario').objects.get(usuario__username=username)
+
+		self.assertEqual(modelo('Rol').objects.count(), 6)
+		self.assertEqual(funcionario('coordinador').nombre, 'Ana Rojas')
+		self.assertEqual(funcionario('coordinador').cargo.nombre, 'Coordinador territorial')
+		self.assertEqual(funcionario('funcionario').cargo.nombre, 'Sin cargo asignado')
+		self.assertEqual(list(funcionario('otro').roles.values_list('nombre_rol', flat=True)), ['consulta'])
+		self.assertFalse(modelo('Funcionario').objects.filter(usuario__username='admin').exists())
+		self.assertEqual(modelo('UsuarioMaestro').objects.get().usuario.username, 'admin')
+		rural = modelo('Delegacion').objects.get(nombre='Rural')
+		self.assertEqual((rural.estado, rural.ambito), (False, 'Localidades rurales'))
+
+		periodo = modelo('Periodo').objects.get(nombre='Trimestre')
+		self.assertEqual(periodo.dias_computables, 92)
+		self.assertEqual(modelo('ParametroVersionado').objects.get(periodo=periodo).valor, '150.00')
+		self.assertEqual(set(modelo('Catalogo').objects.values_list('codigo', flat=True)), {'DUP', 'ATE-DUP', 'ATE-SOLICITUD-CIUDADANA'})
+
+		# P2: Rural no tiene funcionarios y recibe un delegado provisional inactivo. P3: ítem compartido al 100 %.
+		item = modelo('ItemMedible').objects.get()
+		self.assertEqual((item.nombre, item.ponderacion), ('Seguridad', 100))
+		meta_rural = modelo('Meta').objects.get(funcionario__delegacion=rural)
+		self.assertFalse(meta_rural.funcionario.usuario.is_active)
+		self.assertEqual(list(meta_rural.funcionario.roles.values_list('nombre_rol', flat=True)), ['delegado'])
+		self.assertEqual(modelo('Meta').objects.filter(item=item, valor_objetivo=10).count(), 2)
+
+		actividad = modelo('Actividad').objects.get(codigo='EVD-MIG-1')
+		self.assertEqual(actividad.codigo_verificador, 'EVD-MIG-1')
+		self.assertEqual(actividad.funcionario_autor, funcionario('funcionario'))
+		self.assertEqual(timezone.localtime(actividad.fecha_hora).replace(tzinfo=None), datetime(2026, 9, 1, 0, 0))
+		self.assertEqual(actividad.contacto_telefono, '+56 9 1234 5678 anex')
+		self.assertEqual((actividad.item, actividad.catalogo.codigo), (item, 'ATE-SOLICITUD-CIUDADANA'))
+
+		evidencias = list(modelo('Evidencia').objects.order_by('pk').values_list('codigo_evidencia', 'estado_revision', 'metadatos'))
+		self.assertEqual(evidencias, [('EVD-MIG-1-01', 'aprobada', {'comentario': 'Acta'}), ('EVD-MIG-1-02', 'pendiente', None)])
+		validacion = modelo('Validacion').objects.get()
+		self.assertEqual((validacion.decision, validacion.funcionario_verificador), ('aprobada', funcionario('coordinador')))
+
+		compromiso = modelo('Compromiso').objects.get()
+		self.assertEqual((compromiso.funcionario_responsable, compromiso.origen), (funcionario('otro'), 'externo'))
+		self.assertEqual(modelo('HistorialCompromiso').objects.get().autor_funcionario, funcionario('funcionario'))
+
+		de_admin = modelo('Auditoria').objects.get(usuario__username='admin')
+		self.assertEqual((de_admin.usuario_maestro.identificador_maestro, de_admin.funcionario), ('admin', None))
+		self.assertEqual((de_admin.evento, de_admin.valor_anterior, de_admin.valor_nuevo), ('cambio_estado', 'pendiente', 'realizado'))
+		del_funcionario = modelo('Auditoria').objects.get(usuario__username='funcionario')
+		self.assertEqual((del_funcionario.funcionario, del_funcionario.valor_nuevo), (funcionario('funcionario'), '{"campos": ["accion"]}'))
+
+	def test_revertir_deja_los_datos_como_antes(self):
+		self._migrar(self.despues)
+		viejo = self._migrar(self.antes)
+		modelo = lambda nombre: viejo.get_model('delegaciones_app', nombre)
+		for nombre in ('Funcionario', 'Rol', 'Cargo', 'Periodo', 'Catalogo', 'ItemMedible', 'Meta', 'Validacion', 'UsuarioMaestro'):
+			self.assertFalse(modelo(nombre).objects.exists(), nombre)
+		self.assertFalse(modelo('Actividad').objects.exclude(codigo_verificador=None).exists())
+		self.assertFalse(viejo.get_model('auth', 'User').objects.filter(username__startswith='delegado.').exists())
+		self.assertEqual(modelo('Evidencia').objects.count(), 2)
+		self.assertEqual(modelo('MetaMedicion').objects.count(), 2)
