@@ -29,7 +29,7 @@ def _funcionario_requerido(request):
 def _actividades_autorizadas(user):
     """Actividades que el usuario puede ver: todas si es administrador o coordinador; las de su
     delegación si tiene una; todas si es verificador sin delegación; si no, solo las que registró."""
-    actividades = Actividad.objects.select_related('delegacion', 'funcionario_autor', 'item__periodo', 'catalogo').order_by('-fecha_hora', '-creada')
+    actividades = Actividad.objects.select_related('delegacion', 'funcionario_autor', 'item__periodo', 'catalogo').order_by('-fecha', '-creada')
     if puede_ver_todo(user):
         return actividades
     funcionario = funcionario_de(user)

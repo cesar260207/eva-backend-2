@@ -239,23 +239,23 @@ class ActividadForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm):
         self.fields['catalogo'].queryset = Catalogo.objects.filter(Q(tipo='atencion', activo=True) | Q(pk=self.instance.catalogo_id))
         self.fields['catalogo'].label_from_instance = lambda elemento: elemento.nombre
         self.fields['compromiso'].queryset = (compromisos if compromisos is not None else Compromiso.objects.all()).select_related('delegacion')
-        for campo in ('item', 'catalogo', 'fecha_hora'):
+        for campo in ('item', 'catalogo', 'fecha'):
             self.fields[campo].required = True
-        self.fields['fecha_hora'].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M']
+        self.fields['fecha'].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M']
         if not self.instance.pk:
-            self.fields['fecha_hora'].initial = timezone.localtime().replace(second=0, microsecond=0)
+            self.fields['fecha'].initial = timezone.localtime().replace(second=0, microsecond=0)
 
     class Meta:
         model = Actividad
-        fields = ['delegacion', 'item', 'catalogo', 'fecha_hora', 'solicitud_problema', 'accion', 'contacto_nombre', 'contacto_telefono', 'compromiso']
+        fields = ['delegacion', 'item', 'catalogo', 'fecha', 'solicitud_problema', 'accion', 'contacto_nombre', 'contacto_telefono', 'compromiso']
         labels = {
-            'item': 'Ítem de medición', 'catalogo': 'Tipo de atención', 'fecha_hora': 'Fecha y hora',
+            'item': 'Ítem de medición', 'catalogo': 'Tipo de atención', 'fecha': 'Fecha y hora',
             'solicitud_problema': 'Solicitud o problema', 'accion': 'Acción ejecutada',
             'contacto_nombre': 'Nombre de contacto', 'contacto_telefono': 'Teléfono de contacto', 'compromiso': 'Compromiso vinculado (opcional)',
         }
         help_texts = {'item': 'Solo ítems de períodos abiertos. La fecha debe caer dentro del período del ítem.'}
         widgets = {
-            'fecha_hora': forms.DateTimeInput(attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
+            'fecha': forms.DateTimeInput(attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
             'solicitud_problema': forms.Textarea(attrs={'rows': 3}),
             'accion': forms.Textarea(attrs={'rows': 3}),
         }

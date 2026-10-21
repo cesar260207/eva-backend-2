@@ -23,8 +23,8 @@ from .crud import MANTENEDORES
 from .permisos import RolRequeridoMixin, roles_de, rol_requerido, tiene_rol
 from .models import (
 	Actividad, Auditoria, Cargo, Catalogo, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
-	HistorialCompromiso, Indicador, ItemMedible, MedicionDelegacion, Meta, MetaMedicion, ParametroVersionado, PerfilUsuario, Periodo,
-	PeriodoMedicion, Rol, UsuarioMaestro, Validacion,
+	HistorialCompromiso, Indicador, ItemMedible, MedicionDelegacion, Meta, ParametroVersionado, Periodo,
+	Rol, UsuarioMaestro, Validacion,
 )
 from datetime import datetime
 from decimal import Decimal
@@ -41,37 +41,12 @@ def crear_funcionario(username, *roles, cargo=None, delegacion=None):
 	return usuario
 
 
-class SGRMVPTests(TestCase):
-	def setUp(self):
-		self.delegacion = Delegacion.objects.create(nombre='Centro', territorio='Centro', enfasis='Atencion territorial')
-		self.funcionario = crear_funcionario('funcionario', 'funcionario', delegacion=self.delegacion)
-
-	def test_meta_cuenta_solo_actividades_aprobadas(self):
-		MetaMedicion.objects.create(delegacion=self.delegacion, nombre='Item', objetivo=2, periodo_inicio=date(2026, 9, 1), periodo_termino=date(2026, 9, 30), ponderador=100)
-		Actividad.objects.create(codigo='EVD-APPROVED', funcionario=self.funcionario, delegacion=self.delegacion, fecha=date(2026, 9, 2), tipo_atencion='Solicitud', descripcion='Aprobada', accion='Accion', item_medicion='Item', estado='aprobada')
-		Actividad.objects.create(codigo='EVD-PENDING', funcionario=self.funcionario, delegacion=self.delegacion, fecha=date(2026, 9, 2), tipo_atencion='Solicitud', descripcion='Pendiente', accion='Accion', item_medicion='Item', estado='pendiente')
-		meta = MetaMedicion.objects.get(nombre='Item')
-		self.assertEqual(meta.avance_calculado, 1)
-		self.assertEqual(meta.cumplimiento, 50)
-
-	def test_periodo_rechaza_termino_anterior(self):
-		periodo = PeriodoMedicion(nombre='Inválido', inicio=date(2026, 9, 30), termino=date(2026, 9, 1))
-		with self.assertRaises(ValidationError):
-			periodo.full_clean()
-
-	def test_logout_invalida_la_sesion(self):
-		self.client.force_login(self.funcionario)
-		response = self.client.post(reverse('logout'))
-		self.assertRedirects(response, reverse('inicio'))
-		self.assertFalse('_auth_user_id' in self.client.session)
-
-
 class OrganizacionAccesoTests(TestCase):
 	"""Etapa 1: métodos de Delegacion, Cargo, Funcionario y Auditoria (se amplían con sus CU en la Etapa 6)."""
 
 	def setUp(self):
-		self.centro = Delegacion.objects.create(nombre='Centro', territorio='Centro', enfasis='Atencion territorial')
-		self.rural = Delegacion.objects.create(nombre='Rural', territorio='Rural', enfasis='Servicios cercanos')
+		self.centro = Delegacion.objects.create(nombre='Centro', ambito='Centro', enfasis='Atencion territorial')
+		self.rural = Delegacion.objects.create(nombre='Rural', ambito='Rural', enfasis='Servicios cercanos')
 		self.cargo = Cargo.objects.create(nombre='Profesional territorial')
 		self.usuario = User.objects.create_user('func.centro', password='clave-segura')
 		self.funcionario = Funcionario.objects.create(usuario=self.usuario, identificador_institucional='func.centro', nombre='Funcionario Centro', cargo=self.cargo, delegacion=self.centro)
@@ -125,7 +100,7 @@ class MedicionTests(TestCase):
 	"""Etapa 2: reglas RN-001 a RN-008 y RN-013 (se amplían con sus CU en la Etapa 6)."""
 
 	def setUp(self):
-		self.centro = Delegacion.objects.create(nombre='Centro', territorio='Centro', enfasis='Atencion territorial')
+		self.centro = Delegacion.objects.create(nombre='Centro', ambito='Centro', enfasis='Atencion territorial')
 		self.cargo = Cargo.objects.create(nombre='Profesional territorial')
 		self.usuario = User.objects.create_user('func.medicion', password='clave-segura')
 		self.funcionario = Funcionario.objects.create(usuario=self.usuario, identificador_institucional='func.medicion', nombre='Funcionario Medicion', cargo=self.cargo, delegacion=self.centro)
@@ -246,7 +221,7 @@ class OperacionTests(TestCase):
 		ajuste_media.enable()
 		self.addCleanup(ajuste_media.disable)
 
-		self.centro = Delegacion.objects.create(nombre='Centro', territorio='Centro', enfasis='Atencion territorial')
+		self.centro = Delegacion.objects.create(nombre='Centro', ambito='Centro', enfasis='Atencion territorial')
 		self.cargo = Cargo.objects.create(nombre='Profesional territorial')
 		self.autor = self._funcionario('autor.operacion')
 		self.verificador = self._funcionario('verificador.operacion')
@@ -259,7 +234,7 @@ class OperacionTests(TestCase):
 		return Funcionario.objects.create(usuario=usuario, identificador_institucional=username, nombre=username, cargo=self.cargo, delegacion=self.centro)
 
 	def _actividad(self, dia=10, **cambios):
-		datos = {'item': self.item, 'catalogo': self.catalogo, 'fecha_hora': timezone.make_aware(datetime(2026, 9, dia, 10, 0)), 'solicitud_problema': 'Consulta vecinal', 'accion': 'Orientacion'}
+		datos = {'item': self.item, 'catalogo': self.catalogo, 'fecha': timezone.make_aware(datetime(2026, 9, dia, 10, 0)), 'solicitud_problema': 'Consulta vecinal', 'accion': 'Orientacion'}
 		datos.update(cambios)
 		return self.autor.registrar_actividad(datos)
 
@@ -272,7 +247,6 @@ class OperacionTests(TestCase):
 	def test_registrar_actividad_genera_codigo_y_toma_la_delegacion_del_autor(self):
 		actividad = self._actividad()
 		self.assertTrue(actividad.codigo_verificador.startswith('EVD-'))
-		self.assertEqual(actividad.codigo, actividad.codigo_verificador)
 		self.assertEqual((actividad.delegacion, actividad.version, actividad.estado), (self.centro, 1, 'pendiente'))
 
 	def test_rn010_codigo_verificador_inmutable(self):
@@ -283,7 +257,7 @@ class OperacionTests(TestCase):
 
 	def test_registrar_actividad_fuera_del_periodo_o_con_periodo_cerrado(self):
 		with self.assertRaises(ValidationError):
-			self._actividad(fecha_hora=timezone.make_aware(datetime(2026, 10, 5, 10, 0)))
+			self._actividad(fecha=timezone.make_aware(datetime(2026, 10, 5, 10, 0)))
 		self.periodo.iniciar_periodo()
 		self.periodo.cerrar_periodo()
 		self.item.refresh_from_db()
@@ -375,7 +349,7 @@ class OperacionTests(TestCase):
 
 		compromiso.refresh_from_db()
 		self.assertEqual((compromiso.estado, compromiso.funcionario_responsable, compromiso.observacion), ('realizado', self.verificador, 'Poda realizada'))
-		historial = list(compromiso.historial.order_by('pk').values_list('estado_anterior', 'estado_nuevo', 'autor_funcionario'))
+		historial = list(compromiso.historial.order_by('pk').values_list('estado_anterior', 'estado_nuevo', 'autor'))
 		self.assertEqual(historial, [('ingresado', 'proceso', self.autor.pk), ('proceso', 'proceso', self.autor.pk), ('proceso', 'realizado', self.verificador.pk)])
 		with self.assertRaises(ValidationError):
 			compromiso.derivar_compromiso(self.autor, self.autor)
@@ -828,7 +802,7 @@ class BaseOperacion(TestCase):
 	def _actividad(self, autor=None, delegacion=None, estado='pendiente', **cambios):
 		datos = {
 			'funcionario_autor': (autor or self.funcionario).funcionario, 'delegacion': delegacion or self.centro,
-			'item': self.item, 'catalogo': self.catalogo, 'fecha_hora': timezone.make_aware(datetime(2026, 9, 1, 10, 0)),
+			'item': self.item, 'catalogo': self.catalogo, 'fecha': timezone.make_aware(datetime(2026, 9, 1, 10, 0)),
 			'solicitud_problema': 'Solicitud original', 'accion': 'Accion', 'estado': estado,
 		}
 		datos.update(cambios)
@@ -836,7 +810,7 @@ class BaseOperacion(TestCase):
 
 	def _datos_actividad(self, **cambios):
 		datos = {
-			'delegacion': self.centro.pk, 'item': self.item.pk, 'catalogo': self.catalogo.pk, 'fecha_hora': '2026-09-01T10:00',
+			'delegacion': self.centro.pk, 'item': self.item.pk, 'catalogo': self.catalogo.pk, 'fecha': '2026-09-01T10:00',
 			'solicitud_problema': 'Solicitud corregida', 'accion': 'Accion', 'contacto_nombre': '', 'contacto_telefono': '',
 		}
 		datos.update(cambios)
@@ -876,8 +850,8 @@ class ActividadVistasTests(BaseOperacion):
 
 	def test_rechaza_una_fecha_fuera_del_periodo_del_item(self):
 		self.client.force_login(self.funcionario)
-		respuesta = self.client.post(reverse('actividad_nueva'), self._datos_actividad(fecha_hora='2026-10-05T10:00'))
-		self.assertIn('fecha_hora', respuesta.context['form'].errors)
+		respuesta = self.client.post(reverse('actividad_nueva'), self._datos_actividad(fecha='2026-10-05T10:00'))
+		self.assertIn('fecha', respuesta.context['form'].errors)
 		self.assertFalse(Actividad.objects.exists())
 
 	def test_usuario_sin_funcionario_no_puede_registrar(self):
@@ -1124,7 +1098,7 @@ class CompromisoVistasTests(BaseOperacion):
 		self.assertTrue(compromiso.folio.startswith('AGR-'))
 		self.assertEqual((compromiso.funcionario_responsable, compromiso.version), (self.funcionario.funcionario, 1))
 		registro = compromiso.historial.get()
-		self.assertEqual((registro.estado_anterior, registro.estado_nuevo, registro.autor_funcionario), ('', 'pendiente', self.funcionario.funcionario))
+		self.assertEqual((registro.estado_anterior, registro.estado_nuevo, registro.autor), ('', 'pendiente', self.funcionario.funcionario))
 		self.assertTrue(Auditoria.objects.filter(evento='crear', entidad='Compromiso', identificador_registro=compromiso.folio).exists())
 		self.assertContains(self.client.get(reverse('agenda')), compromiso.folio)
 
@@ -1214,6 +1188,11 @@ class AccesoAutenticadoTests(BaseOperacion):
 		respuesta = self.client.get(reverse('solicitudes'))
 		self.assertContains(respuesta, 'FOL-CENTRO-1')
 		self.assertContains(respuesta, 'FOL-RURAL-1')
+
+	def test_logout_invalida_la_sesion(self):
+		self.client.force_login(self.funcionario)
+		self.assertRedirects(self.client.post(reverse('logout')), reverse('inicio'))
+		self.assertNotIn('_auth_user_id', self.client.session)
 
 	def test_usuario_sin_funcionario_no_ve_compromisos(self):
 		self.client.force_login(User.objects.create_user('suelto-acceso', password='clave-segura'))
@@ -1431,8 +1410,7 @@ class AdminTests(TestCase):
 	def test_estan_registrados_los_19_modelos(self):
 		self.assertEqual(len(self._modelos()), 19)
 		todos = {modelo.__name__ for modelo in apps.get_app_config('delegaciones_app').get_models()}
-		# Quedan sin admin solo los modelos antiguos que elimina la contracción (Etapa 5f).
-		self.assertEqual(todos - {modelo.__name__ for modelo in self._modelos()}, {'PerfilUsuario', 'CatalogoItem', 'PeriodoMedicion', 'MetaMedicion'})
+		self.assertEqual(todos - {modelo.__name__ for modelo in self._modelos()}, set())
 
 	def test_cada_modelo_se_lista_busca_y_se_abre_para_agregar_y_modificar(self):
 		for modelo in self._modelos():

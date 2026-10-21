@@ -15,7 +15,7 @@
             <div class="row g-3">
                 <div class="col-md-6"><div class="section-label">Delegación</div><strong>{{ actividad.delegacion }}</strong></div>
                 <div class="col-md-6"><div class="section-label">Funcionario</div><strong>{{ actividad.funcionario_autor.nombre|default:'-' }}</strong></div>
-                <div class="col-md-6"><div class="section-label">Fecha y hora</div><strong>{{ actividad.fecha_hora|date:'d-m-Y H:i' }}</strong></div>
+                <div class="col-md-6"><div class="section-label">Fecha y hora</div><strong>{{ actividad.fecha|date:'d-m-Y H:i' }}</strong></div>
                 <div class="col-md-6"><div class="section-label">Tipo de atención</div><strong>{{ actividad.catalogo.nombre|default:'-' }}</strong></div>
                 <div class="col-md-6"><div class="section-label">Ítem de medición</div><strong>{{ actividad.item.nombre|default:'-' }}</strong>{% if actividad.item %}<div class="small text-muted">{{ actividad.item.periodo }}</div>{% endif %}</div>
                 <div class="col-md-6"><div class="section-label">Contacto</div><strong>{{ actividad.contacto_nombre|default:'-' }}</strong>{% if actividad.contacto_telefono %}<div class="small text-muted">{{ actividad.contacto_telefono }}</div>{% endif %}</div>

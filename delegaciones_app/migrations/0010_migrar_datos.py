@@ -226,8 +226,9 @@ class _Migracion:
             actividad.contacto_nombre = actividad.contacto or None
             actividad.contacto_telefono = telefono[:20] or None
             actividad.fecha_hora = datetime.combine(actividad.fecha, time.min, tzinfo=ZONA)
-            if actividad.item_medicion:
-                actividad.item = self.item(actividad.item_medicion, autor.cargo, self.periodo_que_contiene(actividad.fecha))
+            # La contracción exige un ítem en toda actividad: una sin ítem de medición recibe uno genérico.
+            nombre_item = (actividad.item_medicion or '').strip() or 'Sin ítem de medición'
+            actividad.item = self.item(nombre_item, autor.cargo, self.periodo_que_contiene(actividad.fecha))
             actividad.catalogo = self.catalogo_atencion(actividad.tipo_atencion)
             actividad.version = 1
             # update_fields excluye «actualizada», así auto_now no cambia la fecha de modificación.
@@ -244,7 +245,7 @@ class _Migracion:
             numeros[actividad.pk] += 1
             evidencia.codigo_evidencia = f'{actividad.codigo}-{numeros[actividad.pk]:02d}'
             evidencia.funcionario_autor_id = actividad.funcionario_autor_id
-            evidencia.archivo_vinculo = evidencia.archivo.name or None
+            evidencia.archivo_vinculo = evidencia.archivo.name
             evidencia.fecha_carga = evidencia.creada
             evidencia.metadatos = {'comentario': evidencia.comentario} if evidencia.comentario else None
             evidencia.estado_revision = estados[evidencia.aprobada]

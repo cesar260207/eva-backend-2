@@ -85,7 +85,7 @@ class ValidacionInline(admin.TabularInline):
 class HistorialCompromisoInline(admin.TabularInline):
     model = HistorialCompromiso
     extra = 0
-    fields = ['autor_funcionario', 'estado_anterior', 'estado_nuevo', 'observacion', 'fecha']
+    fields = ['autor', 'estado_anterior', 'estado_nuevo', 'observacion', 'fecha']
     readonly_fields = fields
     can_delete = False
 
@@ -219,13 +219,13 @@ class IndicadorAdmin(ProtegePeriodoCerradoAdmin, admin.ModelAdmin):
 
 @admin.register(Actividad)
 class ActividadAdmin(admin.ModelAdmin):
-    list_display = ['codigo_verificador', 'delegacion', 'funcionario_autor', 'fecha_hora', 'estado', 'item']
+    list_display = ['codigo_verificador', 'delegacion', 'funcionario_autor', 'fecha', 'estado', 'item']
     list_filter = ['estado', 'delegacion', 'item__periodo', 'catalogo']
     search_fields = ['codigo_verificador', 'solicitud_problema', 'accion', 'funcionario_autor__nombre']
     autocomplete_fields = ['delegacion', 'funcionario_autor', 'item', 'catalogo', 'compromiso']
-    date_hierarchy = 'fecha_hora'
+    date_hierarchy = 'fecha'
     fields = [
-        'codigo_verificador', 'delegacion', 'funcionario_autor', 'item', 'catalogo', 'compromiso', 'fecha_hora',
+        'codigo_verificador', 'delegacion', 'funcionario_autor', 'item', 'catalogo', 'compromiso', 'fecha',
         'solicitud_problema', 'accion', 'contacto_nombre', 'contacto_telefono', 'estado', 'version', 'creada', 'actualizada',
     ]
     readonly_fields = ['codigo_verificador', 'version', 'creada', 'actualizada']
@@ -271,12 +271,12 @@ class CompromisoAdmin(admin.ModelAdmin):
 
 @admin.register(HistorialCompromiso)
 class HistorialCompromisoAdmin(admin.ModelAdmin):
-    list_display = ['compromiso', 'autor_funcionario', 'estado_anterior', 'estado_nuevo', 'fecha']
+    list_display = ['compromiso', 'autor', 'estado_anterior', 'estado_nuevo', 'fecha']
     list_filter = ['estado_anterior', 'estado_nuevo', 'fecha']
-    search_fields = ['compromiso__folio', 'compromiso__descripcion', 'autor_funcionario__nombre', 'observacion']
-    autocomplete_fields = ['compromiso', 'autor_funcionario']
+    search_fields = ['compromiso__folio', 'compromiso__descripcion', 'autor__nombre', 'observacion']
+    autocomplete_fields = ['compromiso', 'autor']
     date_hierarchy = 'fecha'
-    fields = ['compromiso', 'autor_funcionario', 'estado_anterior', 'estado_nuevo', 'observacion', 'fecha']
+    fields = ['compromiso', 'autor', 'estado_anterior', 'estado_nuevo', 'observacion', 'fecha']
     readonly_fields = ['fecha']
 
 

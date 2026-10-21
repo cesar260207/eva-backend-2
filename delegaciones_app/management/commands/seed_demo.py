@@ -177,7 +177,7 @@ class Command(BaseCommand):
     def _actividad_demo(self, delegacion, autor, verificador, item, tipo_atencion):
         actividad, creada = Actividad.objects.get_or_create(codigo_verificador='EVD-DEMO-0001', defaults={
             'funcionario_autor': autor, 'delegacion': delegacion, 'item': item, 'catalogo': tipo_atencion,
-            'fecha_hora': timezone.make_aware(datetime(2026, 9, 1, 10, 0)),
+            'fecha': timezone.make_aware(datetime(2026, 9, 1, 10, 0)),
             'solicitud_problema': 'Orientacion vecinal sobre reparacion de luminaria.',
             'accion': 'Derivacion a unidad municipal responsable y seguimiento territorial.',
         })

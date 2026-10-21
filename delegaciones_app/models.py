@@ -14,14 +14,13 @@ DOS_DECIMALES = Decimal('0.01')
 
 class Delegacion(models.Model):
 	nombre = models.CharField(max_length=255, unique=True)
-	territorio = models.CharField(max_length=180)
-	enfasis = models.TextField()
-	activa = models.BooleanField(default=True)
-	# Campos del diseño. En la Etapa 4 reemplazan a activa y territorio.
 	estado = models.BooleanField(default=True)
 	ambito = models.CharField(max_length=255, null=True, blank=True)
+	# Ajuste 8: se conserva para no perder el texto que se muestra y se busca en el mantenedor.
+	enfasis = models.TextField(null=True, blank=True)
 
 	class Meta:
+		db_table = 'delegacion'
 		ordering = ['nombre']
 		verbose_name = 'delegación'
 		verbose_name_plural = 'delegaciones'
@@ -127,13 +126,14 @@ class Funcionario(models.Model):
 		if not actividad.delegacion_id:
 			actividad.delegacion_id = self.delegacion_id
 		actividad.generar_codigo_verificador()
-		actividad.full_clean(exclude=Actividad.CAMPOS_ANTIGUOS)
+		actividad.full_clean()
 		actividad.save()
 		return actividad
 
 	def subir_evidencia(self, actividad, archivo, comentario=None):
 		evidencia = Evidencia(actividad=actividad, funcionario_autor=self, archivo_vinculo=archivo, metadatos={'comentario': comentario} if comentario else None)
-		evidencia.full_clean(exclude=Evidencia.CAMPOS_ANTIGUOS)
+		# El código de la evidencia se asigna al guardarla.
+		evidencia.full_clean(exclude=['codigo_evidencia'])
 		actividad.vincular_evidencia(evidencia)
 		return evidencia
 
@@ -167,62 +167,6 @@ class UsuarioMaestro(models.Model):
 		return self.nombre
 
 
-class PerfilUsuario(models.Model):
-	ROLES = [
-		('administrador', 'Administrador'),
-		('coordinador', 'Coordinador'),
-		('delegado', 'Delegado'),
-		('funcionario', 'Funcionario'),
-		('verificador', 'Verificador'),
-		('consulta', 'Consulta'),
-	]
-	usuario = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='perfil')
-	rol = models.CharField(max_length=20, choices=ROLES, default='consulta')
-	delegacion = models.ForeignKey(Delegacion, on_delete=models.PROTECT, null=True, blank=True, related_name='perfiles')
-	cargo = models.CharField(max_length=120, blank=True)
-
-	def __str__(self):
-		return f'{self.usuario.get_full_name() or self.usuario.username} - {self.get_rol_display()}'
-
-
-class CatalogoItem(models.Model):
-	CATEGORIAS = [('actividad', 'Actividad'), ('servicio', 'Servicio'), ('atencion', 'Tipo de atención'), ('item', 'Ítem de medición')]
-	categoria = models.CharField(max_length=20, choices=CATEGORIAS)
-	codigo = models.CharField(max_length=40)
-	nombre = models.CharField(max_length=160)
-	area = models.CharField(max_length=120, blank=True)
-	activo = models.BooleanField(default=True)
-
-	class Meta:
-		constraints = [models.UniqueConstraint(fields=['categoria', 'codigo'], name='catalogo_categoria_codigo_unico')]
-		ordering = ['categoria', 'nombre']
-
-	def __str__(self):
-		return f'{self.get_categoria_display()}: {self.nombre}'
-
-
-class PeriodoMedicion(models.Model):
-	ESTADOS = [('borrador', 'Borrador'), ('abierto', 'Abierto'), ('cerrado', 'Cerrado')]
-	nombre = models.CharField(max_length=120, unique=True)
-	inicio = models.DateField()
-	termino = models.DateField()
-	estado = models.CharField(max_length=20, choices=ESTADOS, default='borrador')
-	version_parametros = models.PositiveIntegerField(default=1)
-	umbral_colectivo = models.DecimalField(max_digits=5, decimal_places=2, default=80)
-	maximo_cumplimiento = models.DecimalField(max_digits=5, decimal_places=2, default=150)
-
-	def clean(self):
-		if self.termino < self.inicio:
-			raise ValidationError('La fecha de término no puede ser anterior al inicio.')
-
-	@property
-	def dias_computables(self):
-		return (self.termino - self.inicio).days + 1
-
-	def __str__(self):
-		return self.nombre
-
-
 class VersionOptimistaMixin:
 	"""RF-034 y RNF-003: control de concurrencia optimista con el campo version."""
 
@@ -244,47 +188,35 @@ class VersionOptimistaMixin:
 
 class Actividad(VersionOptimistaMixin, models.Model):
 	ESTADOS = [('borrador', 'Borrador'), ('pendiente', 'Pendiente de revisión'), ('aprobada', 'Aprobada'), ('rechazada', 'Rechazada'), ('correccion', 'Requiere corrección')]
-	# Campos antiguos que se eliminan en la Etapa 4. Desde la Etapa 3 admiten null para que
-	# los métodos del diseño no dependan de ellos; los formularios actuales los siguen exigiendo.
-	CAMPOS_ANTIGUOS = ['codigo', 'funcionario', 'fecha', 'tipo_atencion', 'descripcion', 'item_medicion']
-	codigo = models.CharField(max_length=32, unique=True, editable=False)
-	funcionario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name='actividades')
-	# Ajuste: se conserva para filtrar y medir por delegación (también la de coordinadores sin delegación).
+	codigo_verificador = models.CharField(max_length=50, unique=True, editable=False)
+	funcionario_autor = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='actividades')
+	# Ajuste 9: se conserva para filtrar y medir por delegación (también la de coordinadores sin delegación).
 	delegacion = models.ForeignKey(Delegacion, on_delete=models.PROTECT, related_name='actividades')
-	fecha = models.DateField(null=True)
-	tipo_atencion = models.CharField(max_length=100, null=True)
-	descripcion = models.TextField(null=True)
+	item = models.ForeignKey('ItemMedible', on_delete=models.PROTECT, related_name='actividades')
+	catalogo = models.ForeignKey('Catalogo', on_delete=models.PROTECT, null=True, blank=True, related_name='actividades')
+	compromiso = models.ForeignKey('Compromiso', on_delete=models.SET_NULL, null=True, blank=True, related_name='actividades')
+	fecha = models.DateTimeField()
+	solicitud_problema = models.TextField()
 	accion = models.TextField()
-	item_medicion = models.CharField(max_length=160, null=True)
-	contacto = models.CharField(max_length=160, blank=True)
-	telefono = models.CharField(max_length=40, blank=True)
+	contacto_nombre = models.CharField(max_length=255, null=True, blank=True)
+	contacto_telefono = models.CharField(max_length=20, null=True, blank=True)
 	estado = models.CharField(max_length=20, choices=ESTADOS, default='pendiente')
+	version = models.PositiveIntegerField(default=1, editable=False)
 	# Ajuste 7: orden de listados.
 	creada = models.DateTimeField(auto_now_add=True)
 	actualizada = models.DateTimeField(auto_now=True)
-	# Campos del diseño.
-	codigo_verificador = models.CharField(max_length=50, unique=True, null=True, editable=False)
-	funcionario_autor = models.ForeignKey(Funcionario, on_delete=models.PROTECT, null=True, blank=True, related_name='actividades')
-	item = models.ForeignKey('ItemMedible', on_delete=models.PROTECT, null=True, blank=True, related_name='actividades')
-	catalogo = models.ForeignKey('Catalogo', on_delete=models.PROTECT, null=True, blank=True, related_name='actividades')
-	compromiso = models.ForeignKey('Compromiso', on_delete=models.SET_NULL, null=True, blank=True, related_name='actividades')
-	# Temporal: en la Etapa 4 reemplaza a fecha y toma su nombre.
-	fecha_hora = models.DateTimeField(null=True, blank=True)
-	solicitud_problema = models.TextField(null=True, blank=True)
-	contacto_nombre = models.CharField(max_length=255, null=True, blank=True)
-	contacto_telefono = models.CharField(max_length=20, null=True, blank=True)
-	version = models.PositiveIntegerField(default=1, editable=False)
 
 	class Meta:
+		db_table = 'actividad'
 		ordering = ['-fecha', '-creada']
 
 	def __str__(self):
-		return f'{self.codigo} - {(self.solicitud_problema or self.descripcion or "")[:50]}'
+		return f'{self.codigo_verificador} - {self.solicitud_problema[:50]}'
 
 	def generar_codigo_verificador(self):
-		"""RN-010: código único; si ya existe el código antiguo, se usa el mismo."""
+		"""RN-010: código único e inmutable, generado al registrar la actividad."""
 		if not self.codigo_verificador:
-			self.codigo_verificador = self.codigo or f'EVD-{timezone.localdate():%Y%m%d}-{uuid.uuid4().hex[:6].upper()}'
+			self.codigo_verificador = f'EVD-{timezone.localdate():%Y%m%d}-{uuid.uuid4().hex[:6].upper()}'
 		return self.codigo_verificador
 
 	def clean(self):
@@ -292,13 +224,11 @@ class Actividad(VersionOptimistaMixin, models.Model):
 		if self.item_id:
 			periodo = self.item.periodo
 			periodo.verificar_editable()
-			if self.fecha_hora and not periodo.fecha_inicio <= timezone.localtime(self.fecha_hora).date() <= periodo.fecha_termino:
-				raise ValidationError({'fecha_hora': f'La fecha de la actividad debe estar dentro del período «{periodo}».'})
+			if self.fecha and not periodo.fecha_inicio <= timezone.localtime(self.fecha).date() <= periodo.fecha_termino:
+				raise ValidationError({'fecha': f'La fecha de la actividad debe estar dentro del período «{periodo}».'})
 
 	def save(self, *args, **kwargs):
 		self.generar_codigo_verificador()
-		if not self.codigo:
-			self.codigo = self.codigo_verificador
 		if not self._state.adding:
 			guardado = Actividad.objects.filter(pk=self.pk).values_list('codigo_verificador', flat=True).first()
 			if guardado and guardado != self.codigo_verificador:
@@ -332,40 +262,33 @@ EXTENSIONES_EVIDENCIA = ['jpg', 'jpeg', 'png', 'pdf']
 
 class Evidencia(models.Model):
 	ESTADOS_REVISION = [('pendiente', 'Pendiente de revisión'), ('aprobada', 'Aprobada'), ('rechazada', 'Rechazada'), ('correccion', 'Requiere corrección')]
-	CAMPOS_ANTIGUOS = ['archivo']
+	codigo_evidencia = models.CharField(max_length=60, unique=True, editable=False)
 	actividad = models.ForeignKey(Actividad, on_delete=models.CASCADE, related_name='evidencias')
-	archivo = models.FileField(upload_to='evidencias/%Y/%m/', validators=[FileExtensionValidator(EXTENSIONES_EVIDENCIA)])
-	comentario = models.TextField(blank=True)
-	aprobada = models.BooleanField(null=True, blank=True)
-	revisada_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name='evidencias_revisadas')
-	creada = models.DateTimeField(auto_now_add=True)
-	# Campos del diseño.
-	codigo_evidencia = models.CharField(max_length=60, unique=True, null=True, editable=False)
-	funcionario_autor = models.ForeignKey(Funcionario, on_delete=models.PROTECT, null=True, blank=True, related_name='evidencias')
-	archivo_vinculo = models.FileField(upload_to='evidencias/%Y/%m/', max_length=255, null=True, blank=True, validators=[FileExtensionValidator(EXTENSIONES_EVIDENCIA)])
-	fecha_carga = models.DateTimeField(null=True, blank=True)
+	funcionario_autor = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='evidencias')
+	archivo_vinculo = models.FileField(upload_to='evidencias/%Y/%m/', max_length=255, validators=[FileExtensionValidator(EXTENSIONES_EVIDENCIA)])
+	fecha_carga = models.DateTimeField(default=timezone.now)
 	metadatos = models.JSONField(null=True, blank=True)
 	estado_revision = models.CharField(max_length=20, choices=ESTADOS_REVISION, default='pendiente')
 
+	class Meta:
+		db_table = 'evidencia'
+
 	def __str__(self):
-		archivo = self.archivo_vinculo or self.archivo
-		return f'{self.actividad.codigo} - {archivo.name if archivo else "sin archivo"}'
+		return f'{self.actividad.codigo_verificador} - {self.archivo_vinculo.name or "sin archivo"}'
 
 	def _siguiente_codigo(self):
 		prefijo = self.actividad.codigo_verificador
-		numero = Evidencia.objects.filter(actividad_id=self.actividad_id).exclude(codigo_evidencia=None).count() + 1
+		numero = Evidencia.objects.filter(actividad_id=self.actividad_id).count() + 1
 		while Evidencia.objects.filter(codigo_evidencia=f'{prefijo}-{numero:02d}').exists():
 			numero += 1
 		return f'{prefijo}-{numero:02d}'
 
 	def save(self, *args, **kwargs):
-		if self._state.adding:
-			self.fecha_carga = self.fecha_carga or timezone.now()
-		else:
+		if not self._state.adding:
 			guardado = Evidencia.objects.filter(pk=self.pk).values_list('codigo_evidencia', flat=True).first()
 			if guardado and guardado != self.codigo_evidencia:
 				raise ValidationError('El código de una evidencia no se puede modificar.')
-		if not self.codigo_evidencia and self.actividad_id and self.actividad.codigo_verificador:
+		if not self.codigo_evidencia and self.actividad_id:
 			self.codigo_evidencia = self._siguiente_codigo()
 		super().save(*args, **kwargs)
 
@@ -380,7 +303,7 @@ class Evidencia(models.Model):
 
 	def reemplazar_archivo(self, nuevo_archivo):
 		self.archivo_vinculo = nuevo_archivo
-		self.full_clean(exclude=self.CAMPOS_ANTIGUOS)
+		self.full_clean()
 		self.save()
 		self.enviar_a_revision()
 
@@ -443,8 +366,9 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 	# Ajuste 4: folio, eje, delegacion, descripcion y fecha_ingreso vienen de data/solicitudes.json.
 	folio = models.CharField(max_length=30, unique=True)
 	delegacion = models.ForeignKey(Delegacion, on_delete=models.PROTECT, related_name='compromisos')
-	# Campo antiguo: se elimina en la Etapa 4.
-	responsable = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, related_name='compromisos')
+	funcionario_responsable = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='compromisos')
+	item = models.ForeignKey('ItemMedible', on_delete=models.PROTECT, null=True, blank=True, related_name='compromisos')
+	origen = models.CharField(max_length=255, choices=ORIGENES)
 	solicitante = models.CharField(max_length=255)
 	territorio = models.CharField(max_length=255)
 	eje = models.CharField(max_length=40, choices=EJES, default='Gestión Social')
@@ -453,16 +377,13 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 	fecha_ingreso = models.DateField(default=timezone.localdate)
 	estado = models.CharField(max_length=20, choices=ESTADOS, default='ingresado')
 	observacion = models.TextField(blank=True)
-	# Ajuste: orden de la agenda.
-	creado = models.DateTimeField(auto_now_add=True)
-	# Campos del diseño.
-	funcionario_responsable = models.ForeignKey(Funcionario, on_delete=models.PROTECT, null=True, blank=True, related_name='compromisos')
-	item = models.ForeignKey('ItemMedible', on_delete=models.PROTECT, null=True, blank=True, related_name='compromisos')
-	origen = models.CharField(max_length=255, choices=ORIGENES, null=True, blank=True)
 	area_apoyo = models.CharField(max_length=255, null=True, blank=True)
+	# Ajuste 10: orden de la agenda.
+	creado = models.DateTimeField(auto_now_add=True)
 	version = models.PositiveIntegerField(default=1, editable=False)
 
 	class Meta:
+		db_table = 'compromiso'
 		ordering = ['-fecha_comprometida', '-creado']
 
 	def __str__(self):
@@ -475,7 +396,7 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 
 	def registrar_historial(self, autor, estado_anterior, observacion=None):
 		HistorialCompromiso.objects.create(
-			compromiso=self, autor_funcionario=autor,
+			compromiso=self, autor=autor,
 			estado_anterior=estado_anterior, estado_nuevo=self.estado, observacion=observacion or '',
 		)
 
@@ -508,43 +429,6 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 		self.registrar_historial(autor, anterior, resolucion)
 
 
-class MetaMedicion(models.Model):
-	delegacion = models.ForeignKey(Delegacion, on_delete=models.PROTECT, related_name='metas')
-	nombre = models.CharField(max_length=160)
-	objetivo = models.PositiveIntegerField(validators=[MinValueValidator(1)])
-	avance = models.PositiveIntegerField(default=0)
-	ponderador = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-	periodo_inicio = models.DateField()
-	periodo_termino = models.DateField()
-	tope_cumplimiento = models.DecimalField(max_digits=5, decimal_places=2, default=150)
-	activa = models.BooleanField(default=True)
-
-	def clean(self):
-		if self.periodo_inicio and self.periodo_termino and self.periodo_termino < self.periodo_inicio:
-			raise ValidationError('El término no puede ser anterior al inicio.')
-		if self.ponderador is not None and self.ponderador > 100:
-			raise ValidationError('El ponderador no puede superar 100%.')
-	@property
-	def avance_calculado(self):
-		return self.delegacion.actividades.filter(
-			fecha__range=(self.periodo_inicio, self.periodo_termino),
-			item_medicion=self.nombre,
-			estado='aprobada',
-		).count()
-
-	@property
-	def cumplimiento(self):
-		avance = self.avance_calculado
-		return min((avance / self.objetivo) * 100, float(self.tope_cumplimiento))
-
-	@property
-	def resultado_ponderado(self):
-		return float(self.ponderador) * self.cumplimiento / 100
-
-	def __str__(self):
-		return f'{self.delegacion.nombre} - {self.nombre}'
-
-
 class MedicionDelegacion(models.Model):
 	ESTADOS = [('verde', 'Verde'), ('amarillo', 'Amarillo'), ('rojo', 'Rojo')]
 	delegacion = models.ForeignKey(Delegacion, on_delete=models.PROTECT, related_name='mediciones')
@@ -555,6 +439,7 @@ class MedicionDelegacion(models.Model):
 	observacion = models.TextField(blank=True)
 
 	class Meta:
+		db_table = 'medicion_delegacion'
 		ordering = ['delegacion__nombre', '-fecha_datos']
 		constraints = [models.UniqueConstraint(fields=['delegacion', 'fecha_datos'], name='medicion_delegacion_fecha_unica')]
 
@@ -840,8 +725,8 @@ class Indicador(ControlPeriodoCerradoMixin, models.Model):
 		actividades = Actividad.objects.filter(
 			item=self.meta.item,
 			estado='aprobada',
-			fecha_hora__gte=desde,
-			fecha_hora__lt=hasta,
+			fecha__gte=desde,
+			fecha__lt=hasta,
 			evidencias__validaciones__decision='aprobada',
 		)
 		if self.meta.funcionario.delegacion_id:
@@ -864,36 +749,34 @@ class Indicador(ControlPeriodoCerradoMixin, models.Model):
 
 class HistorialCompromiso(models.Model):
 	compromiso = models.ForeignKey(Compromiso, on_delete=models.CASCADE, related_name='historial')
-	# Campo antiguo: se elimina en la Etapa 4.
-	autor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True)
 	estado_anterior = models.CharField(max_length=20)
 	estado_nuevo = models.CharField(max_length=20)
-	observacion = models.TextField(blank=True)
+	autor = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='historial_compromisos')
 	fecha = models.DateTimeField(auto_now_add=True)
-	# Temporal: en la Etapa 4 reemplaza a autor y toma su nombre.
-	autor_funcionario = models.ForeignKey(Funcionario, on_delete=models.PROTECT, null=True, blank=True, related_name='historial_compromisos')
+	observacion = models.TextField(null=True, blank=True)
+
+	class Meta:
+		db_table = 'historial_compromiso'
 
 	def __str__(self):
 		return f'{self.compromiso.folio}: {self.estado_anterior or "inicio"} -> {self.estado_nuevo}'
 
 
 class Auditoria(models.Model):
-	usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
-	accion = models.CharField(max_length=80)
-	entidad = models.CharField(max_length=255)
-	identificador = models.CharField(max_length=80)
-	detalle = models.JSONField(default=dict)
-	fecha = models.DateTimeField(auto_now_add=True)
-	# Campos del diseño. En la Etapa 4 reemplazan a usuario, accion, identificador y detalle.
 	funcionario = models.ForeignKey(Funcionario, on_delete=models.PROTECT, null=True, blank=True, related_name='auditorias')
 	usuario_maestro = models.ForeignKey(UsuarioMaestro, on_delete=models.PROTECT, null=True, blank=True, related_name='auditorias')
-	evento = models.CharField(max_length=255, null=True, blank=True)
-	identificador_registro = models.CharField(max_length=255, null=True, blank=True)
+	evento = models.CharField(max_length=255)
+	fecha = models.DateTimeField(auto_now_add=True)
+	entidad = models.CharField(max_length=255)
+	identificador_registro = models.CharField(max_length=255)
 	valor_anterior = models.TextField(null=True, blank=True)
 	valor_nuevo = models.TextField(null=True, blank=True)
 
+	class Meta:
+		db_table = 'auditoria'
+
 	def __str__(self):
-		return f'{self.fecha:%Y-%m-%d %H:%M} - {self.accion} - {self.entidad} {self.identificador}'
+		return f'{self.fecha:%Y-%m-%d %H:%M} - {self.evento} - {self.entidad} {self.identificador_registro}'
 
 	@staticmethod
 	def _como_texto(valor):
@@ -914,8 +797,4 @@ class Auditoria(models.Model):
 			identificador_registro=str(identificador),
 			valor_anterior=cls._como_texto(valor_anterior),
 			valor_nuevo=cls._como_texto(valor_nuevo),
-			# Doble escritura temporal: los campos antiguos son obligatorios hasta la Etapa 4.
-			usuario=usuario,
-			accion=accion,
-			identificador=str(identificador),
 		)
