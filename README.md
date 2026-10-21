@@ -6,33 +6,47 @@ administrable desde Django Admin y desplegable en una instancia AWS EC2.
 
 ## Incluye
 
-- Dashboard territorial, agenda y semaforo de cumplimiento (calculados en vivo desde la BD).
-- Autenticacion Django y perfiles por rol.
-- CRUD de delegaciones para administradores y coordinadores.
-- Ocho mantenedores visuales (dos por integrante para un equipo de cuatro):
-  Delegaciones, Perfiles, Catálogo, Períodos, Actividades, Evidencias,
-  Compromisos y Metas. Todos usan Django ORM y ofrecen búsqueda. Delegaciones,
-  Perfiles, Catálogo, Períodos, Actividades y Evidencias tienen
-  CRUD propio en la aplicación. Compromisos y Metas mantienen sus acciones en
-  Django Admin mientras se implementan sus CRUD propios.
-- Registro persistente de actividades con codigo unico y evidencias.
-- Carga de evidencias y flujo de aprobacion/rechazo.
-- Compromisos colectivos y auditoria de operaciones criticas.
-- Filtrado de actividades por delegacion autorizada.
-- Panel de Django Admin con todas las entidades: crear, modificar, eliminar, buscar y navegar por relaciones.
-- Variables de entorno para toda configuracion sensible (nunca escritas en el codigo).
+- Modelo de 17 clases (más dos tablas adicionales) con las reglas de negocio en los modelos.
+- Dashboard, semáforo y resumen de cumplimiento por delegación, calculados desde los indicadores.
+- Ficha personal del funcionario: metas, avance, diferencia con lo esperado, detalle de la fórmula,
+  evidencias y compromisos.
+- Autenticación Django y permisos por rol (administrador, coordinador, delegado, funcionario,
+  verificador y consulta), con acceso limitado a la delegación de cada usuario.
+- Ocho mantenedores visuales con CRUD propio, búsqueda y baja lógica donde corresponde:
+  Delegaciones, Cargos, Roles, Funcionarios, Catálogo, Períodos, Ítems medibles y Metas.
+- Registro de actividades con código verificador único e inmutable, carga de evidencias
+  (JPG, PNG o PDF, hasta 5 MB), revisión por verificadores y anulación de aprobaciones con motivo.
+- Agenda de compromisos con responsable, plazos, alerta de vencimiento, estados controlados e historial.
+- Filtros en las listas, que se conservan al volver desde un detalle, e informes de actividades,
+  compromisos y cumplimiento en pantalla, para imprimir y en CSV.
+- Control de períodos: un período cerrado no se modifica salvo reapertura con motivo.
+- Control de concurrencia: si dos usuarios editan un mismo registro, el segundo recibe un aviso.
+- Auditoría inmutable de operaciones críticas y de accesos denegados, con consulta para administración.
+- Panel de Django Admin con las 19 tablas: crear, modificar, eliminar, buscar y navegar por relaciones.
+- Variables de entorno para toda configuración sensible (nunca escritas en el código).
 
 ## Arquitectura de datos
 
 Toda la informacion vive en el modelo relacional de `delegaciones_app` (ver
-`delegaciones_app/models.py`): `Delegacion`, `PerfilUsuario`, `CatalogoItem`,
-`PeriodoMedicion`, `Actividad`, `Evidencia`, `Compromiso`, `MetaMedicion`,
-`MedicionDelegacion`, `HistorialCompromiso` y `Auditoria`. `MedicionDelegacion`
-conserva los indicadores iniciales de `metas_delegaciones.json`, incluidos su
-cumplimiento, meta, fecha, estado y observación. Las vistas obtienen los datos exclusivamente
-mediante el ORM de Django (`objects.filter/get/aggregate`, etc.).
+`delegaciones_app/models.py`), que implementa las 17 clases del diseño:
+`Delegacion`, `Cargo`, `Rol`, `Funcionario`, `UsuarioMaestro`, `Periodo`,
+`ParametroVersionado`, `ItemMedible`, `Catalogo`, `Meta`, `Indicador`,
+`Actividad`, `Evidencia`, `Validacion`, `Compromiso`, `HistorialCompromiso` y
+`Auditoria`. Se suman `FuncionarioRol` (la relación entre funcionarios y roles) y
+`MedicionDelegacion`, que conserva los indicadores iniciales de
+`metas_delegaciones.json`. Las vistas obtienen los datos exclusivamente
+mediante el ORM de Django.
 
-La descripción de entidades, relaciones y migración de JSON está en
+Código de la aplicación:
+
+- `models.py`: clases y reglas de negocio.
+- `permisos.py`: roles y control de acceso.
+- `crud.py`, `forms.py`: los ocho mantenedores y sus formularios.
+- `views.py`, `informes.py`, `medicion.py`: actividades, compromisos, informes y cálculo de resultados.
+- `auditoria.py`: auditoría y su consulta.
+- `gestion_app`: dashboard, semáforo, resumen, ficha personal e informes.
+
+La descripción de entidades, reglas, relaciones y migración está en
 [MODELO_DATOS.md](MODELO_DATOS.md).
 
 Los archivos `data/solicitudes.json` y `data/metas_delegaciones.json` de la
@@ -86,8 +100,12 @@ FLUSH PRIVILEGES;
 ```bash
 python manage.py migrate
 python manage.py seed_demo
+python manage.py calcular_indicadores
 python manage.py runserver
 ```
+
+`calcular_indicadores` crea el indicador de cada meta de los períodos abiertos; se
+repite cuando se cargan metas o actividades directamente en la base.
 
 `makemigrations` se usa durante el desarrollo cuando cambian los modelos; al
 instalar o desplegar se aplican las migraciones versionadas con `migrate`.
@@ -98,6 +116,11 @@ Abrir `http://127.0.0.1:8000/`. El panel de administracion esta en
 > ¿No tienes MySQL instalado y solo quieres probar la app rapido? Pon
 > `DB_ENGINE=sqlite` en tu `.env` para usar SQLite localmente. Para la entrega
 > (evidencia de phpMyAdmin) se necesita `DB_ENGINE=mysql`.
+
+Dos reglas son configurables desde el `.env` (ver `.env.example`):
+`EVIDENCIA_TAMANO_MAXIMO_MB` (tamaño máximo de una evidencia, 5 por defecto) y
+`COMPROMISO_DIAS_ALERTA` (días de anticipación para marcar un compromiso como
+próximo a vencer, 3 por defecto).
 
 Configura `DB_PORT` segun el puerto donde escucha tu servidor. En el equipo
 local actual MariaDB usa `3307`; MySQL/MariaDB con configuracion estandar,
@@ -125,22 +148,48 @@ Los datos son sinteticos y solo sirven para demostracion academica.
 - `/`: portada SGR.
 - `/login/`: inicio de sesion.
 - `/solicitudes/`: listado de compromisos (con buscador).
-- `/actividades/`: actividades autorizadas (con buscador).
-- `/actividad/nueva/`: registro persistente de actividades.
-- `/agenda/`: compromisos y agenda colectiva.
-- `/administracion/delegaciones/`: CRUD de delegaciones para roles autorizados.
-- `/administracion/`: índice de los ocho mantenedores requeridos.
-- `/administracion/<mantenedor>/`: listado, búsqueda y controles de cada mantenedor.
-- `/admin/`: administracion completa de Django (todas las entidades).
+- `/actividades/`: actividades autorizadas, con filtros por delegación, estado, período y fechas.
+- `/actividad/nueva/`: registro de actividades; `/actividad/<código>/` muestra su detalle,
+  evidencias, revisión y anulación de la aprobación.
+- `/agenda/`: compromisos y agenda colectiva, con filtros y alerta de vencimiento.
+- `/administracion/`: índice de los ocho mantenedores.
+- `/administracion/<mantenedor>/`: listado, búsqueda y controles de cada mantenedor
+  (`delegaciones`, `cargos`, `roles`, `funcionarios`, `catalogo`, `periodos`, `items`, `metas`).
+- `/administracion/auditoria/`: consulta de solo lectura de la auditoría (administración).
+- `/admin/`: administracion completa de Django (las 19 tablas).
 - `/gestion/`, `/gestion/semaforo/`, `/gestion/resumen/`: medicion y cumplimiento.
+- `/gestion/mi-ficha/`: ficha personal del funcionario.
+- `/gestion/informes/`: informes de actividades, compromisos y cumplimiento (pantalla, imprimir y CSV).
 - `/territorio/`: contexto institucional.
 
-## Validacion
+## Validacion y pruebas
 
 ```bash
 python manage.py check
+python manage.py makemigrations --check --dry-run
 python manage.py test
+python manage.py plan_pruebas
 ```
+
+Las pruebas están en `delegaciones_app`:
+
+- `test_unit_*.py`: pruebas unitarias por caso de uso. Cada una declara en su docstring el CU y
+  los requisitos que verifica, por ejemplo «CU-27.1 Restringir elemento duplicado (RF-004)».
+  Incluyen los 8 casos de login (`test_unit_autenticacion.py`).
+- `test_integracion.py`: pruebas de integración de las vistas, los permisos y la migración de datos.
+- `pruebas_base.py`: datos de apoyo compartidos (no es una prueba).
+
+`plan_pruebas` ejecuta todo y escribe `PLAN_DE_PRUEBAS.md`: cobertura por caso de uso y por
+requisito, la tabla CP, CU, RF, método de prueba y resultado, y las fichas de login.
+
+## Alcance y requisitos pendientes
+
+Todos los casos de uso de la especificación detallada (CU-01 a CU-30, con sus extensiones) tienen pruebas. Entre los requisitos
+funcionales no están completos: RF-015 (atención social por etapas), RF-020 (el cierre de un
+compromiso no alimenta el indicador), RF-021 (resumen colectivo por funcionario), RF-025
+(incentivos y penalizaciones), RF-030 (actividad reciente, parcial), RF-031 (vista global por
+cargos), RF-035 (comentarios) y RF-037 (alertas, solo por vencimiento). El detalle de cada uno está
+en [MODELO_DATOS.md](MODELO_DATOS.md) y en la sección 4 de [PLAN_DE_PRUEBAS.md](PLAN_DE_PRUEBAS.md).
 
 ## Despliegue en AWS EC2
 
@@ -212,8 +261,15 @@ El `.env` nunca se sube a Git.
 ```bash
 python manage.py migrate
 python manage.py seed_demo          # entrega o genera la clave demo una sola vez
+python manage.py calcular_indicadores
 python manage.py collectstatic --noinput
 ```
+
+> Al actualizar una instalación que ya tiene datos del modelo anterior, las
+> migraciones `0011` a `0013` eliminan tablas y campos antiguos y no se pueden
+> deshacer con seguridad. Antes de migrar, hay que respaldar la base
+> (`mysqldump -u gestion_user -p gestion_laserena > respaldo.sql`) y, si es posible,
+> ensayar primero sobre una copia. Más detalle en [MODELO_DATOS.md](MODELO_DATOS.md).
 
 ### 7. Gunicorn como servicio systemd
 
@@ -274,7 +330,7 @@ Se accede con `http://<IP_PUBLICA_EC2>/` (sin https).
 - `git log --oneline`, `git remote -v` y `git status` limpio.
 - `systemctl status` de mysqld, gunicorn, nginx y php-fpm en verde; `nginx -t`.
 - La aplicacion respondiendo en el navegador desde la IP publica.
-- `/admin/` con las 11 entidades: crear, editar, eliminar, buscar y navegar
+- `/admin/` con las 19 tablas: crear, editar, eliminar, buscar y navegar
   relaciones (por ejemplo, Compromiso con su Historial).
 - phpMyAdmin (`/phpmyadmin/`) mostrando tablas, estructura, relaciones y registros.
 
