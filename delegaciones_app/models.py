@@ -7,9 +7,12 @@ from django.utils import timezone
 from datetime import datetime, time, timedelta
 from decimal import Decimal
 import json
+import re
 import uuid
 
 DOS_DECIMALES = Decimal('0.01')
+# RF-010: teléfono de contacto con dígitos, espacios, guiones o paréntesis y un + inicial opcional (6 a 20 caracteres).
+FORMATO_TELEFONO = re.compile(r'^[+(]?[0-9][0-9 ()\-]{5,18}$')
 
 
 class Delegacion(models.Model):
@@ -221,6 +224,8 @@ class Actividad(VersionOptimistaMixin, models.Model):
 
 	def clean(self):
 		super().clean()
+		if self.contacto_telefono and not FORMATO_TELEFONO.match(self.contacto_telefono):
+			raise ValidationError({'contacto_telefono': 'El teléfono debe tener entre 6 y 20 caracteres: dígitos, espacios, guiones o paréntesis, con un + o un paréntesis inicial.'})
 		if self.item_id:
 			periodo = self.item.periodo
 			periodo.verificar_editable()
