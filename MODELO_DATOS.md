@@ -153,6 +153,9 @@ registra las 19 tablas.
   cambia.
 - Rechazar o pedir corrección exige una observación. Solo una validación
   aprobada hace que la actividad aporte al avance.
+- El archivo se abre o descarga desde el detalle de la actividad, por la vista protegida
+  `evidencia_archivo`: exige sesión y los mismos permisos de la actividad, y un intento fuera del ámbito queda
+  en la auditoría. Nginx no publica `/media/`.
 - Django no borra del disco el archivo de una evidencia eliminada o reemplazada.
 
 ### Reglas de los compromisos

@@ -56,6 +56,7 @@
             {% for evidencia in actividad.evidencias.all %}
             <div class="mb-3">
                 <p class="mb-1"><strong>{{ evidencia.codigo_evidencia }}</strong> · {{ evidencia.archivo_vinculo.name }}</p>
+                {% if evidencia.archivo_vinculo %}<p class="mb-1 small"><a href="{% url 'evidencia_archivo' evidencia.codigo_evidencia %}" target="_blank" rel="noopener">Ver archivo</a> · <a href="{% url 'evidencia_archivo' evidencia.codigo_evidencia %}?descargar=1">Descargar</a></p>{% endif %}
                 <small class="text-muted">{{ evidencia.get_estado_revision_display }}</small>
                 {% if evidencia.metadatos.comentario %}<div class="small">{{ evidencia.metadatos.comentario }}</div>{% endif %}
                 {% with ultima=evidencia.validaciones.all.0 %}{% if ultima.observacion %}<div class="small text-muted">Observación del verificador: {{ ultima.observacion }}</div>{% endif %}{% endwith %}

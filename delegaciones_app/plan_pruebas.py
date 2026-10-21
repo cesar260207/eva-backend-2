@@ -68,6 +68,29 @@ OBSERVACIONES_RF = {
     35: 'No implementado: no hay observaciones o comentarios asociados a registros.',
 }
 
+# Responsable de ejecutar las pruebas de cada caso de uso (familia del CU) y de los casos de login.
+# Se edita aquí y se vuelve a generar el plan con `python manage.py plan_pruebas`.
+EQUIPO = ('Dante Fredes', 'César Aranda', 'Faride Luna', 'Vinzenz Lafferte')
+RESPONSABLE_DOCUMENTO = 'Por definir'
+POR_DEFINIR = 'Por definir'
+RESPONSABLES_POR_CU = {
+    'CU-01': 'Dante Fredes', 'CU-09': 'Dante Fredes', 'CU-10': 'Dante Fredes', 'CU-11': 'Dante Fredes',
+    'CU-02': 'Faride Luna', 'CU-05': 'Faride Luna', 'CU-12': 'Faride Luna', 'CU-13': 'Faride Luna', 'CU-14': 'Faride Luna',
+    'CU-26': 'César Aranda',
+    'CU-25': 'Vinzenz Lafferte', 'CU-28': 'Vinzenz Lafferte',
+}
+RESPONSABLE_LOGIN = POR_DEFINIR
+
+
+def responsable_de(registro):
+    """Responsable de una prueba según su primer caso de uso; las de login tienen el suyo."""
+    if registro['modulo'] == 'test_unit_autenticacion':
+        return RESPONSABLE_LOGIN
+    if not registro['cus']:
+        return POR_DEFINIR
+    return RESPONSABLES_POR_CU.get(registro['cus'][0].split('.')[0], POR_DEFINIR)
+
+
 # Ficha de cada caso de login, con los campos del formato del plan de pruebas.
 _USUARIO = 'usuario.prueba'
 FICHAS_LOGIN = {
@@ -210,8 +233,9 @@ def construir_markdown(registros, entorno):
     l += ['# Plan de pruebas del Sistema de Gestión de Delegaciones', '',
           'Generado con `python manage.py plan_pruebas` a partir de los docstrings de las pruebas y de su ejecución. No se edita a mano: se vuelve a generar.', '',
           '## 1. Identificación del documento', '', '| Campo | Información |', '|---|---|',
-          '| Nombre del proyecto | Sistema de Gestión de Delegaciones |', '| Tipo de pruebas | Unitarias y de integración |', '| Versión | 1.0 |',
-          f"| Fecha | {entorno['fecha']} |", f"| Ambiente de pruebas | {entorno['ambiente']} |", f"| Tecnología utilizada | {entorno['tecnologia']} |", '',
+          '| Nombre del proyecto | Sistema de Gestión de Delegaciones |', '| Tipo de pruebas | Unitarias (las de integración se incluyen como complemento) |', '| Versión | 1.0 |',
+          f"| Fecha | {entorno['fecha']} |", f'| Responsable del documento | {RESPONSABLE_DOCUMENTO} |', f"| Equipo de desarrollo | {', '.join(EQUIPO)} |",
+          f"| Ambiente de pruebas | {entorno['ambiente']} |", f"| Tecnología utilizada | {entorno['tecnologia']} |", '',
           '## 2. Resumen de resultados', '', '| Concepto | Cantidad |', '|---|---|',
           f'| Pruebas ejecutadas | {total} |', f'| Unitarias | {unitarias} |', f'| De integración | {total - unitarias} |',
           f'| Aprobadas | {aprobadas} |', f'| Reprobadas o con error | {len(reprobadas)} |', '']
@@ -234,12 +258,12 @@ def construir_markdown(registros, entorno):
     l += ['## 5. Tabla de casos de prueba', '',
           'Una fila por prueba. La columna CU lista los casos de uso que verifica y RF los requisitos (RNF y RN cuando aplican). '
           'En las pruebas de integración, CU y RF son los de su clase.', '',
-          '| CP | CU | RF | Método de prueba | Prueba | Unidad probada | Resultado |', '|---|---|---|---|---|---|---|']
+          '| CP | CU | RF | Método de prueba | Prueba | Unidad probada | Responsable | Resultado |', '|---|---|---|---|---|---|---|---|']
     ordenados = sorted(registros, key=lambda r: (clave_cu(r['cus'][0]) if r['cus'] else ('ZZ', 0, 0), r['cp']))
     for r in ordenados:
         requisitos_texto = ', '.join([f'RF-{n:03d}' for n in r['rfs']] + r['otros']) or '-'
         descripcion = r['detalle'] or r['nombre']
-        l.append(f"| {r['cp']} | {_celda(', '.join(r['cus']) or '-')} | {_celda(requisitos_texto)} | {r['tipo']} | {_celda(descripcion)} | {r['clase']}.{r['metodo']} | {r['resultado']} |")
+        l.append(f"| {r['cp']} | {_celda(', '.join(r['cus']) or '-')} | {_celda(requisitos_texto)} | {r['tipo']} | {_celda(descripcion)} | {r['clase']}.{r['metodo']} | {responsable_de(r)} | {r['resultado']} |")
     login = [r for r in sorted(registros, key=lambda r: r['cp']) if r['cp'] in FICHAS_LOGIN]
     if login:
         l += ['', '## 6. Fichas de los casos de login', '',
@@ -254,6 +278,6 @@ def construir_markdown(registros, entorno):
                   f'| Resultado esperado | {esperado} |',
                   f"| Resultado obtenido | {'Coincide con lo esperado.' if r['resultado'] == 'Aprobado' else 'No coincide: ' + r['resultado']} |",
                   f"| Estado | {marca} Aprobado {'☐' if marca == '☒' else '☒'} Reprobado ☐ No ejecutado |",
-                  f"| Responsable | _a completar_ |", f"| Fecha ejecución | {entorno['fecha']} |", f"| Observaciones | Prueba `{r['clase']}.{r['metodo']}`. |"]
+                  f"| Responsable | {responsable_de(r)} |", f"| Fecha ejecución | {entorno['fecha']} |", f"| Observaciones | Prueba `{r['clase']}.{r['metodo']}`. |"]
     l.append('')
     return '\n'.join(l)

@@ -2,7 +2,7 @@
 from django.test import SimpleTestCase
 
 from .plan_pruebas import (
-    CATALOGO_CU, CATALOGO_RF, FICHAS_LOGIN, asignar_cp, clave_cu, cobertura_por_cu, cobertura_por_rf, construir_markdown, describir, requisitos,
+    CATALOGO_CU, CATALOGO_RF, FICHAS_LOGIN, POR_DEFINIR, asignar_cp, clave_cu, cobertura_por_cu, cobertura_por_rf, construir_markdown, describir, requisitos, responsable_de,
 )
 
 ENTORNO = {'fecha': '01-10-2026', 'ambiente': 'Desarrollo', 'tecnologia': 'Python y Django'}
@@ -100,7 +100,7 @@ class ArmadoDelPlanTests(SimpleTestCase):
         registros.append(registro(resultado='Reprobado', nombre='Con | barra'))
         texto = construir_markdown(registros, ENTORNO)
         for esperado in ('## 2. Resumen de resultados', '## 3. Cobertura por caso de uso', '## 4. Cobertura por requisito funcional',
-                         '## 5. Tabla de casos de prueba', '## 6. Fichas de los casos de login', '| CP | CU | RF | Método de prueba | Prueba | Unidad probada | Resultado |',
+                         '## 5. Tabla de casos de prueba', '## 6. Fichas de los casos de login', '| CP | CU | RF | Método de prueba | Prueba | Unidad probada | Responsable | Resultado |', '| Responsable del documento |', '| Equipo de desarrollo |',
                          '### CP-LOGIN-008', 'Pruebas que no pasaron:'):
             self.assertIn(esperado, texto)
         self.assertIn('| Pruebas ejecutadas | 9 |', texto)
@@ -110,3 +110,22 @@ class ArmadoDelPlanTests(SimpleTestCase):
     def test_hay_una_ficha_por_cada_caso_de_login(self):
         """Sin CU (herramienta de apoyo). Los ocho casos del formato del curso."""
         self.assertEqual(sorted(FICHAS_LOGIN), [f'CP-LOGIN-00{n}' for n in range(1, 9)])
+
+
+class ResponsablesTests(SimpleTestCase):
+    """Sin CU (herramienta de apoyo). Cada prueba del plan muestra a su responsable."""
+
+    def test_el_responsable_sale_de_la_familia_del_primer_caso_de_uso(self):
+        """Sin CU (herramienta de apoyo). CU-11.2 pertenece a CU-11."""
+        self.assertEqual(responsable_de(registro(cus=('CU-11.2',))), 'Dante Fredes')
+        self.assertEqual(responsable_de(registro(cus=('CU-13', 'CU-01'))), 'Faride Luna')
+
+    def test_sin_asignacion_queda_por_definir(self):
+        """Sin CU (herramienta de apoyo). Un caso de uso sin responsable no inventa uno."""
+        self.assertEqual(responsable_de(registro(cus=('CU-30',))), POR_DEFINIR)
+        self.assertEqual(responsable_de(registro(cus=())), POR_DEFINIR)
+
+    def test_las_fichas_de_login_ya_no_dicen_a_completar(self):
+        """Sin CU (herramienta de apoyo). El campo Responsable de las fichas se llena desde la asignación."""
+        registros = [registro(cp=f'CP-LOGIN-00{n}', cus=('HU-26',), rfs=(2,), modulo='test_unit_autenticacion', metodo=f'test_{n}') for n in range(1, 9)]
+        self.assertNotIn('_a completar_', construir_markdown(registros, ENTORNO))
