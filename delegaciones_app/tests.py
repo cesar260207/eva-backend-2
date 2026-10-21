@@ -1,9 +1,13 @@
 import shutil
 import tempfile
+from io import StringIO
 from datetime import date
 
+from django.apps import apps
+from django.contrib import admin
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.test import RequestFactory, TestCase, TransactionTestCase, override_settings
@@ -1332,3 +1336,123 @@ class MedicionVistasTests(BaseOperacion):
 		respuesta, _ = self._filas(usuario=self.funcionario)
 		self.assertNotContains(respuesta, 'Gestionar metas')
 		self.assertNotContains(respuesta, '+ Agregar meta')
+
+
+CLAVE_DEMO = 'Clave-segura-2026'
+
+
+def cargar_demo():
+	call_command('seed_demo', password=CLAVE_DEMO, stdout=StringIO())
+
+
+def contar_filas():
+	"""Número de filas de cada modelo de la aplicación, para comprobar que repetir la carga no duplica."""
+	return {modelo.__name__: modelo.objects.count() for modelo in apps.get_app_config('delegaciones_app').get_models()}
+
+
+class SeedDemoTests(TestCase):
+	"""Etapa 5e: seed_demo crea los datos en el modelo de 17 clases y se puede repetir."""
+
+	def test_carga_el_modelo_nuevo_con_sus_datos_de_demostracion(self):
+		cargar_demo()
+		filas = contar_filas()
+		esperadas = {
+			'Delegacion': 6, 'Funcionario': 9, 'FuncionarioRol': 9, 'UsuarioMaestro': 1, 'Periodo': 1, 'ParametroVersionado': 1,
+			'ItemMedible': 1, 'Meta': 6, 'Catalogo': 5, 'Indicador': 6, 'Compromiso': 8, 'HistorialCompromiso': 8,
+			'Actividad': 1, 'Evidencia': 1, 'Validacion': 1, 'MedicionDelegacion': 6,
+		}
+		for modelo, total in esperadas.items():
+			self.assertEqual(filas[modelo], total, modelo)
+
+	def test_cuentas_demo_y_delegados_inactivos(self):
+		cargar_demo()
+		administrador = User.objects.get(username='admin.demo')
+		self.assertTrue(administrador.check_password(CLAVE_DEMO))
+		self.assertTrue(administrador.is_superuser and administrador.usuario_maestro.estado)
+		self.assertEqual(roles_de(administrador), {'administrador'})
+		centro = User.objects.get(username='funcionario.centro')
+		self.assertEqual((roles_de(centro), centro.funcionario.delegacion.nombre), ({'funcionario'}, 'Centro'))
+		delegado = User.objects.get(username='delegado.las-companias')
+		self.assertFalse(delegado.is_active)
+		self.assertFalse(delegado.has_usable_password())
+		self.assertEqual(delegado.funcionario.delegacion.nombre, 'Las Compañías')
+
+	def test_repetir_la_carga_no_duplica_nada(self):
+		cargar_demo()
+		antes = contar_filas()
+		cargar_demo()
+		self.assertEqual(contar_filas(), antes)
+
+	def test_la_demo_se_ve_en_la_aplicacion(self):
+		cargar_demo()
+		self.assertTrue(self.client.login(username='coordinador.demo', password=CLAVE_DEMO))
+		respuesta = self.client.get(reverse('dashboard'))
+		filas = {fila['nombre']: fila for fila in respuesta.context['delegaciones']}
+		self.assertEqual(len(filas), 6)
+		self.assertEqual((filas['Centro']['cumplimiento'], filas['Rural']['cumplimiento']), (Decimal('10.00'), Decimal('0.00')))
+		self.assertContains(self.client.get(reverse('agenda')), 'LS-2026-014')
+		self.assertEqual(self.client.get(reverse('actividades')).status_code, 200)
+
+	def test_convive_con_datos_ya_migrados_sin_duplicarlos(self):
+		cargo = Cargo.objects.create(nombre='Sin cargo asignado')
+		centro = Delegacion.objects.create(nombre='Centro', ambito='Centro historico', enfasis='Atencion')
+		usuario = User.objects.create_user('funcionario.centro', password='clave-previa')
+		migrado = Funcionario.objects.create(usuario=usuario, identificador_institucional='funcionario.centro', nombre='Funcionario Centro', cargo=cargo, delegacion=centro)
+		FuncionarioRol.objects.create(funcionario=migrado, rol=Rol.objects.get(nombre_rol='funcionario'))
+		periodo = Periodo.objects.create(nombre='Trimestre julio-septiembre 2026', fecha_inicio=date(2026, 7, 1), fecha_termino=date(2026, 9, 30), estado='abierto')
+		item = ItemMedible.objects.create(nombre='Seguridad y prevencion', cargo=cargo, periodo=periodo, ponderacion=100)
+		Meta.objects.create(item=item, funcionario=migrado, valor_objetivo=10)
+
+		cargar_demo()
+
+		self.assertEqual(Funcionario.objects.get(pk=migrado.pk).cargo, cargo)
+		self.assertTrue(User.objects.get(pk=usuario.pk).check_password('clave-previa'))
+		self.assertEqual(Meta.objects.filter(funcionario=migrado).count(), 1)
+		self.assertEqual(ItemMedible.objects.filter(cargo=cargo).count(), 1)
+		self.assertEqual((Funcionario.objects.count(), Meta.objects.count(), Periodo.objects.count()), (9, 6, 1))
+
+
+class AdminTests(TestCase):
+	"""Etapa 5e: el Django Admin administra los 19 modelos (las 17 clases, FuncionarioRol y MedicionDelegacion)."""
+
+	@classmethod
+	def setUpTestData(cls):
+		cargar_demo()
+
+	def setUp(self):
+		self.assertTrue(self.client.login(username='admin.demo', password=CLAVE_DEMO))
+
+	def _modelos(self):
+		return [modelo for modelo in admin.site._registry if modelo._meta.app_label == 'delegaciones_app']
+
+	def _url(self, modelo, accion, *args):
+		return reverse(f'admin:delegaciones_app_{modelo._meta.model_name}_{accion}', args=args)
+
+	def test_estan_registrados_los_19_modelos(self):
+		self.assertEqual(len(self._modelos()), 19)
+		todos = {modelo.__name__ for modelo in apps.get_app_config('delegaciones_app').get_models()}
+		# Quedan sin admin solo los modelos antiguos que elimina la contracción (Etapa 5f).
+		self.assertEqual(todos - {modelo.__name__ for modelo in self._modelos()}, {'PerfilUsuario', 'CatalogoItem', 'PeriodoMedicion', 'MetaMedicion'})
+
+	def test_cada_modelo_se_lista_busca_y_se_abre_para_agregar_y_modificar(self):
+		for modelo in self._modelos():
+			nombre = modelo.__name__
+			self.assertEqual(self.client.get(self._url(modelo, 'changelist')).status_code, 200, nombre)
+			self.assertEqual(self.client.get(self._url(modelo, 'changelist'), {'q': 'demo'}).status_code, 200, nombre)
+			self.assertEqual(self.client.get(self._url(modelo, 'add')).status_code, 200, nombre)
+			objeto = modelo.objects.first()
+			if objeto is not None:
+				self.assertEqual(self.client.get(self._url(modelo, 'change', objeto.pk)).status_code, 200, nombre)
+
+	def test_un_periodo_cerrado_y_lo_que_depende_de_el_no_se_eliminan(self):
+		periodo = Periodo.objects.get()
+		Periodo.objects.filter(pk=periodo.pk).update(estado='cerrado')
+		for modelo, objeto in ((Periodo, periodo), (ItemMedible, ItemMedible.objects.first()), (Meta, Meta.objects.first()), (Indicador, Indicador.objects.first())):
+			self.assertEqual(self.client.get(self._url(modelo, 'delete', objeto.pk)).status_code, 403, modelo.__name__)
+		Periodo.objects.filter(pk=periodo.pk).update(estado='abierto')
+		self.assertEqual(self.client.get(self._url(Periodo, 'delete', periodo.pk)).status_code, 200)
+
+	def test_la_auditoria_solo_la_modifica_el_superusuario(self):
+		empleado = User.objects.create_user('staff-sin-permisos', password=CLAVE_DEMO, is_staff=True)
+		self.client.force_login(empleado)
+		self.assertEqual(self.client.get(self._url(Auditoria, 'add')).status_code, 403)
