@@ -1,3 +1,4 @@
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.utils import timezone
 
@@ -34,14 +35,17 @@ def _datos_medicion():
     return resultado
 
 
+@login_required
 def dashboard(request):
     return render(request, 'gestion_app/dashboard.html', {'delegaciones': _datos_medicion()})
 
 
+@login_required
 def semaforo(request):
     return render(request, 'gestion_app/semaforo.html', {'delegaciones': _datos_medicion()})
 
 
+@login_required
 def resumen(request):
     delegaciones = _datos_medicion()
     mediciones_historicas = MedicionDelegacion.objects.select_related('delegacion')[:12]

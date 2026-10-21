@@ -21,11 +21,11 @@
             <div class="collapse navbar-collapse" id="mainNav">
                 <ul class="navbar-nav ms-auto gap-lg-2">
                     <li class="nav-item"><a class="nav-link" href="{% url 'inicio' %}">Inicio</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'institucional' %}">Territorio</a></li>
+                    {% if user.is_authenticated %}
                     <li class="nav-item"><a class="nav-link" href="{% url 'solicitudes' %}">Agenda</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'actividad_nueva' %}">Registrar actividad</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'dashboard' %}">Medición</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'institucional' %}">Territorio</a></li>
-                    {% if user.is_authenticated %}
                     <li class="nav-item"><a class="nav-link" href="{% url 'actividades' %}">Actividades</a></li>
                     {% if user.is_superuser or user.perfil.rol == 'administrador' or user.perfil.rol == 'coordinador' %}<li class="nav-item"><a class="nav-link" href="{% url 'mantenedores' %}">Administración</a></li>{% endif %}
                     <li class="nav-item"><form method="post" action="{% url 'logout' %}" class="m-0"><button class="nav-link btn btn-link border-0" type="submit">Salir</button>{% csrf_token %}</form></li>

@@ -72,6 +72,16 @@ def _actividades_autorizadas(user):
     return queryset.filter(funcionario=user)
 
 
+def _compromisos_autorizados(user):
+    """Compromisos que el usuario puede ver: todos si es administrador o
+    coordinador; solo los de su delegación si tiene una asignada (CU-29.1)."""
+    compromisos = Compromiso.objects.select_related('delegacion', 'responsable')
+    perfil = _perfil(user)
+    if perfil and perfil.delegacion_id and not _puede_ver_todo(user):
+        compromisos = compromisos.filter(delegacion=perfil.delegacion)
+    return compromisos
+
+
 def _puede_validar(user):
     perfil = _perfil(user)
     return _puede_ver_todo(user) or bool(perfil and perfil.rol == 'verificador')
@@ -132,9 +142,10 @@ def index(request):
     })
 
 
+@login_required
 def solicitudes(request):
     query = request.GET.get('q', '').strip()
-    compromisos = Compromiso.objects.select_related('delegacion')
+    compromisos = _compromisos_autorizados(request.user)
     if query:
         compromisos = compromisos.filter(Q(folio__icontains=query) | Q(descripcion__icontains=query) | Q(delegacion__nombre__icontains=query))
     compromisos = list(compromisos)
@@ -152,8 +163,9 @@ def solicitudes(request):
     return render(request, 'delegaciones_app/solicitudes.html', contexto)
 
 
+@login_required
 def delegacion_detalle(request, nombre):
-    compromisos = list(Compromiso.objects.select_related('delegacion').filter(delegacion__nombre=nombre))
+    compromisos = list(_compromisos_autorizados(request.user).filter(delegacion__nombre=nombre))
     for compromiso in compromisos:
         _decorar_compromiso(compromiso)
 
@@ -667,11 +679,9 @@ def meta_eliminar(request, pk):
     })
 
 
+@login_required
 def agenda(request):
-    perfil = _perfil(request.user) if request.user.is_authenticated else None
-    compromisos = Compromiso.objects.select_related('delegacion', 'responsable').all()
-    if perfil and perfil.delegacion_id and not _puede_ver_todo(request.user):
-        compromisos = compromisos.filter(delegacion=perfil.delegacion)
+    compromisos = _compromisos_autorizados(request.user)
     delegacion_id = request.GET.get('delegacion')
     estado = request.GET.get('estado')
     query = request.GET.get('q', '').strip()

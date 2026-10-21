@@ -37,11 +37,25 @@ class SGRMVPTests(TestCase):
 		self.client.force_login(self.coordinador)
 		response = self.client.get(reverse('mantenedores'))
 		self.assertContains(response, 'Ocho mantenedores')
-		for slug in ('delegaciones', 'perfiles', 'catalogo', 'periodos', 'actividades', 'evidencias', 'compromisos', 'metas'):
+		# Perfiles es exclusivo del Administrador (CU-26, RNF-005): el coordinador ve la tarjeta deshabilitada.
+		self.assertContains(response, 'Disponible para administradores')
+		for slug in ('delegaciones', 'catalogo', 'periodos', 'actividades', 'evidencias', 'compromisos', 'metas'):
 			response = self.client.get(reverse('mantenedor_lista', args=[slug]))
-			self.assertEqual(response.status_code, 200)
+			self.assertEqual(response.status_code, 200, slug)
 			self.assertContains(response, 'Agregar')
 			self.assertContains(response, 'Buscar')
+
+	def test_coordinador_no_puede_entrar_a_perfiles(self):
+		self.client.force_login(self.coordinador)
+		response = self.client.get(reverse('perfiles_usuario'))
+		self.assertRedirects(response, reverse('inicio'))
+
+	def test_administrador_entra_a_perfiles(self):
+		administrador = User.objects.create_user('administrador', password='clave-segura')
+		PerfilUsuario.objects.create(usuario=administrador, rol='administrador')
+		self.client.force_login(administrador)
+		response = self.client.get(reverse('perfiles_usuario'))
+		self.assertEqual(response.status_code, 200)
 
 	def test_actividad_genera_codigo_y_auditoria(self):
 		self.client.force_login(self.funcionario)
@@ -390,3 +404,46 @@ class EvidenciaCRUDTests(TestCase):
 			self.assertRedirects(self.client.post(reverse('evidencia_eliminar', args=[evidencia.pk])), reverse('inicio'))
 
 		self.assertTrue(Evidencia.objects.filter(pk=evidencia.pk, comentario='Original').exists())
+
+
+class AccesoAutenticadoTests(TestCase):
+	"""RNF-004 (acceso con identidad individual) y CU-29.1 (resultados limitados al ámbito)."""
+
+	def setUp(self):
+		self.centro = Delegacion.objects.create(nombre='Centro', territorio='Centro', enfasis='Atencion territorial')
+		self.rural = Delegacion.objects.create(nombre='Rural', territorio='Rural', enfasis='Servicios cercanos')
+		self.coordinador = User.objects.create_user('coordinador-acceso', password='clave-segura')
+		PerfilUsuario.objects.create(usuario=self.coordinador, rol='coordinador')
+		self.funcionario = User.objects.create_user('funcionario-acceso', password='clave-segura')
+		PerfilUsuario.objects.create(usuario=self.funcionario, rol='funcionario', delegacion=self.centro)
+		datos = {'responsable': self.coordinador, 'solicitante': 'Junta de vecinos demo', 'territorio': 'Sector demo', 'descripcion': 'Compromiso demo', 'fecha_comprometida': date(2026, 12, 31)}
+		Compromiso.objects.create(folio='FOL-CENTRO-1', delegacion=self.centro, **datos)
+		Compromiso.objects.create(folio='FOL-RURAL-1', delegacion=self.rural, **datos)
+
+	def test_vistas_internas_exigen_inicio_de_sesion(self):
+		urls = (
+			reverse('solicitudes'), reverse('agenda'), reverse('delegacion_detalle', args=['Centro']),
+			reverse('dashboard'), reverse('semaforo'), reverse('resumen'),
+		)
+		for url in urls:
+			response = self.client.get(url)
+			self.assertRedirects(response, f"{reverse('login')}?next={url}")
+
+	def test_portada_y_territorio_siguen_publicos(self):
+		self.assertEqual(self.client.get(reverse('inicio')).status_code, 200)
+		self.assertEqual(self.client.get(reverse('institucional')).status_code, 200)
+
+	def test_funcionario_solo_ve_compromisos_de_su_delegacion(self):
+		self.client.force_login(self.funcionario)
+		for url in (reverse('solicitudes'), reverse('agenda')):
+			response = self.client.get(url)
+			self.assertContains(response, 'FOL-CENTRO-1')
+			self.assertNotContains(response, 'FOL-RURAL-1')
+		response = self.client.get(reverse('delegacion_detalle', args=['Rural']))
+		self.assertNotContains(response, 'FOL-RURAL-1')
+
+	def test_coordinador_ve_compromisos_de_todas_las_delegaciones(self):
+		self.client.force_login(self.coordinador)
+		response = self.client.get(reverse('solicitudes'))
+		self.assertContains(response, 'FOL-CENTRO-1')
+		self.assertContains(response, 'FOL-RURAL-1')
