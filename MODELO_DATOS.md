@@ -295,10 +295,12 @@ al avance (RN-009).
 - La contracción elimina tablas y campos: no tiene vuelta atrás segura sobre
   datos reales. Antes de migrar hay que hacer un respaldo (`mysqldump`) y, para
   volver atrás, se restaura ese respaldo.
-- La migración se ensayó sobre SQLite con datos del esquema anterior (las
-  cantidades de registros se conservaron y las llaves foráneas quedaron
-  consistentes). Las migraciones `0011` a `0013` aún no se ejecutaron sobre
-  MySQL: conviene ensayarlas primero sobre una copia de la base.
+- La migración se ensayó primero sobre SQLite y después sobre MySQL 8.4, con
+  una copia de la base real del servidor. En ambos casos las cantidades de
+  registros se conservaron y las llaves foráneas quedaron consistentes. El
+  21-10-2026 se aplicó en el servidor con el mismo resultado. En cualquier otra
+  instalación con datos del modelo anterior conviene repetir el ensayo sobre
+  una copia de la base antes de migrar.
 
 ## Alcance y requisitos pendientes
 
