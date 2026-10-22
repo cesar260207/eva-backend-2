@@ -155,6 +155,7 @@ Los datos son sinteticos y solo sirven para demostracion academica.
 - `/actividades/`: actividades autorizadas, con filtros por delegación, estado, período y fechas.
 - `/actividad/nueva/`: registro de actividades; `/actividad/<código>/` muestra su detalle,
   evidencias, revisión y anulación de la aprobación.
+- `/evidencia/<código>/archivo/`: abre o descarga el archivo de una evidencia, con los mismos permisos de su actividad.
 - `/agenda/`: compromisos y agenda colectiva, con filtros y alerta de vencimiento.
 - `/administracion/`: índice de los ocho mantenedores.
 - `/administracion/<mantenedor>/`: listado, búsqueda y controles de cada mantenedor
@@ -308,8 +309,11 @@ sudo systemctl enable --now gunicorn
 
 ### 8. Nginx como proxy inverso
 
-Archivo `/etc/nginx/conf.d/eva-backend-2.conf`: sirve `/static/` y `/media/`
-directamente, y pasa el resto al socket de Gunicorn.
+Archivo `/etc/nginx/conf.d/eva-backend-2.conf`: sirve `/static/` directamente
+y pasa el resto al socket de Gunicorn. **No publica `/media/`**: los archivos de
+evidencia se entregan solo por la vista `evidencia/<código>/archivo/`, que exige
+sesión y revisa que el usuario pueda ver la actividad (RNF-017). Si la
+configuración tiene un bloque `location /media/`, se elimina.
 
 ```bash
 sudo nginx -t && sudo systemctl reload nginx

@@ -1,3 +1,4 @@
+import os
 import uuid
 from datetime import datetime
 
@@ -5,7 +6,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
-from django.http import Http404
+from django.http import FileResponse, Http404
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
@@ -14,7 +15,7 @@ from django.urls import reverse
 from .forms import ActividadForm, CompromisoForm, EvidenciaForm
 from .informes import PLAZOS, filtrar_actividades, filtrar_compromisos, resumen_por_responsable, situacion_de_plazo
 from .medicion import periodo_vigente, promedio_general, resultados_por_delegacion
-from .models import Actividad, Auditoria, Compromiso, Delegacion, Periodo, Validacion
+from .models import Actividad, Auditoria, Compromiso, Delegacion, Evidencia, Periodo, Validacion
 from .permisos import ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICADOR, funcionario_de, puede_ver_todo, registrar_acceso_denegado, tiene_rol
 
 # Decisión de la revisión -> método de Validacion que la aplica a cada evidencia pendiente.
@@ -230,6 +231,21 @@ def actividad_detalle(request, codigo):
         'puede_anular': tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, VERIFICADOR) and actividad.estado == 'aprobada' and actividad.item.periodo.estado != 'cerrado',
         'hay_pendientes': any(evidencia.estado_revision == 'pendiente' for evidencia in actividad.evidencias.all()),
     })
+
+
+@login_required
+def evidencia_archivo(request, codigo):
+    """CU-09 E2: abre o descarga el archivo de una evidencia solo si el usuario puede ver su actividad (RNF-017).
+    Los archivos no se publican directamente: siempre pasan por esta vista y sus permisos."""
+    evidencia = get_object_or_404(Evidencia.objects.select_related('actividad'), codigo_evidencia=codigo)
+    _obtener_autorizado(request, _actividades_autorizadas(request.user), 'Actividad', codigo_verificador=evidencia.actividad.codigo_verificador)
+    if not evidencia.archivo_vinculo:
+        raise Http404('La evidencia no tiene archivo.')
+    try:
+        archivo = evidencia.archivo_vinculo.open('rb')
+    except FileNotFoundError:
+        raise Http404('El archivo de la evidencia no está disponible.') from None
+    return FileResponse(archivo, as_attachment=request.GET.get('descargar') == '1', filename=os.path.basename(evidencia.archivo_vinculo.name))
 
 
 @login_required

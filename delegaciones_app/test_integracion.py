@@ -2129,3 +2129,59 @@ class ResumenYActividadRecienteVistasTests(BaseOperacion):
         respuesta = self.client.get(reverse('informe'), {'tipo': 'reciente', 'formato': 'csv'})
         self.assertTrue(respuesta.content.decode('utf-8').startswith('﻿Funcionario;Delegación;Registros'))
         self.assertTrue(Auditoria.objects.filter(evento='exportar', identificador_registro='reciente').exists())
+
+
+class EvidenciaArchivoTests(BaseOperacion):
+    """CU-09 (RF-012, RNF-017). El archivo de una evidencia se abre o descarga solo a través de la aplicación y de sus permisos."""
+
+    def _evidencia_con_archivo(self, delegacion=None):
+        actividad = self._actividad(delegacion=delegacion)
+        return Evidencia.objects.create(actividad=actividad, funcionario_autor=actividad.funcionario_autor, archivo_vinculo=self._archivo())
+
+    def test_el_autor_abre_el_archivo_en_el_navegador(self):
+        """CU-09 Registro de evidencia fotográfica (RF-012). Quien puede ver la actividad abre su archivo."""
+        evidencia = self._evidencia_con_archivo()
+        self.client.force_login(self.funcionario)
+        respuesta = self.client.get(reverse('evidencia_archivo', args=[evidencia.codigo_evidencia]))
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(b''.join(respuesta.streaming_content), b'%PDF-1.4 prueba')
+        self.assertTrue(respuesta['Content-Disposition'].startswith('inline'))
+
+    def test_el_verificador_descarga_el_archivo(self):
+        """CU-11 Validación de actividades (RF-013). El verificador descarga la evidencia que revisa."""
+        evidencia = self._evidencia_con_archivo()
+        self.client.force_login(self.verificador)
+        respuesta = self.client.get(reverse('evidencia_archivo', args=[evidencia.codigo_evidencia]), {'descargar': '1'})
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertTrue(respuesta['Content-Disposition'].startswith('attachment'))
+
+    def test_un_funcionario_de_otra_delegacion_no_accede_y_queda_auditado(self):
+        """CU-26.1 Denegar acceso por ámbito (RF-012, RNF-005). El archivo de otra delegación no se entrega."""
+        evidencia = self._evidencia_con_archivo()
+        intruso = crear_funcionario('rural-evidencia', 'funcionario', cargo=self.cargo, delegacion=self.rural)
+        self.client.force_login(intruso)
+        respuesta = self.client.get(reverse('evidencia_archivo', args=[evidencia.codigo_evidencia]))
+        self.assertEqual(respuesta.status_code, 404)
+        self.assertTrue(Auditoria.objects.filter(evento='acceso_denegado', identificador_registro=evidencia.actividad.codigo_verificador).exists())
+
+    def test_sin_sesion_se_pide_iniciar_sesion(self):
+        """CU-09 Registro de evidencia fotográfica (RNF-004). Sin sesión no se entrega ningún archivo."""
+        evidencia = self._evidencia_con_archivo()
+        url = reverse('evidencia_archivo', args=[evidencia.codigo_evidencia])
+        self.assertRedirects(self.client.get(url), f"{reverse('login')}?next={url}")
+
+    def test_un_archivo_que_falta_en_el_disco_responde_404(self):
+        """CU-09 Registro de evidencia fotográfica (RF-012). Si el archivo ya no está, se informa sin error del sistema."""
+        actividad = self._actividad()
+        evidencia = self._evidencia(actividad)
+        self.client.force_login(self.funcionario)
+        self.assertEqual(self.client.get(reverse('evidencia_archivo', args=[evidencia.codigo_evidencia])).status_code, 404)
+
+    def test_el_detalle_de_la_actividad_enlaza_ver_y_descargar(self):
+        """CU-09 Registro de evidencia fotográfica (RF-012). El detalle ofrece abrir y descargar cada archivo."""
+        evidencia = self._evidencia_con_archivo()
+        self.client.force_login(self.funcionario)
+        respuesta = self.client.get(reverse('actividad_detalle', args=[evidencia.actividad.codigo_verificador]))
+        url = reverse('evidencia_archivo', args=[evidencia.codigo_evidencia])
+        self.assertContains(respuesta, f'href="{url}"')
+        self.assertContains(respuesta, f'href="{url}?descargar=1"')
