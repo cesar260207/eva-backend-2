@@ -2,7 +2,8 @@
 
 Aplicacion web (Django) del Sistema de Gestion de Resultados para las Delegaciones
 Municipales de La Serena. Persistencia 100% en base de datos relacional (MySQL),
-administrable desde Django Admin y desplegable en una instancia AWS EC2.
+administrable desde pantallas propias (Django Templates + Bootstrap, **sin Django Admin**) y
+desplegable en una instancia AWS EC2.
 
 ## Incluye
 
@@ -10,8 +11,13 @@ administrable desde Django Admin y desplegable en una instancia AWS EC2.
 - Dashboard, semáforo y resumen de cumplimiento por delegación, calculados desde los indicadores.
 - Ficha personal del funcionario: metas, avance, diferencia con lo esperado, detalle de la fórmula,
   evidencias y compromisos.
-- Autenticación Django y permisos por rol (administrador, coordinador, delegado, funcionario,
-  verificador y consulta), con acceso limitado a la delegación de cada usuario.
+- Autenticación Django (login, logout, vistas protegidas) con tres **perfiles de acceso** que son
+  grupos de Django con permisos: **Administrador** (acceso total), **Supervisor** (permisos
+  intermedios) y **Administrativo** (permisos mínimos). Ver «Seguridad y perfiles».
+- **Panel distinto por perfil** al iniciar sesión (`/gestion/panel/`).
+- **Recuperación de contraseña por correo** con token seguro de un solo uso.
+- Roles de trabajo (administrador, coordinador, delegado, funcionario, verificador y consulta),
+  con acceso limitado a la delegación de cada usuario.
 - Ocho mantenedores visuales con CRUD propio, búsqueda y baja lógica donde corresponde:
   Delegaciones, Cargos, Roles, Funcionarios, Catálogo, Períodos, Ítems medibles y Metas.
 - Registro de actividades con código verificador único e inmutable, carga de evidencias
@@ -25,7 +31,8 @@ administrable desde Django Admin y desplegable en una instancia AWS EC2.
 - Control de períodos: un período cerrado no se modifica salvo reapertura con motivo.
 - Control de concurrencia: si dos usuarios editan un mismo registro, el segundo recibe un aviso.
 - Auditoría inmutable de operaciones críticas y de accesos denegados, con consulta para administración.
-- Panel de Django Admin con las 19 tablas: crear, modificar, eliminar, buscar y navegar por relaciones.
+- Gestión de usuarios propia: crear cuentas, asignar perfil (grupo) y roles, activar o desactivar,
+  desde el mantenedor «Funcionarios y usuarios». Django Admin no está instalado ni publicado.
 - Variables de entorno para toda configuración sensible (nunca escritas en el código).
 
 ## Arquitectura de datos
@@ -113,8 +120,8 @@ repite cuando se cargan metas o actividades directamente en la base.
 `makemigrations` se usa durante el desarrollo cuando cambian los modelos; al
 instalar o desplegar se aplican las migraciones versionadas con `migrate`.
 
-Abrir `http://127.0.0.1:8000/`. El panel de administracion esta en
-`http://127.0.0.1:8000/admin/`.
+Abrir `http://127.0.0.1:8000/` e ingresar con una cuenta demo: cada perfil llega a su panel.
+La administración se hace desde **Administración** en el menú (`/administracion/`).
 
 > ¿No tienes MySQL instalado y solo quieres probar la app rapido? Pon
 > `DB_ENGINE=sqlite` en tu `.env` para usar SQLite localmente. Para la entrega
@@ -138,36 +145,96 @@ Las cuentas se crean con la clave que se indique al cargar los datos
 entorno `DEMO_PASSWORD`, o con una clave aleatoria que el comando muestra una
 sola vez si no se indica ninguna. No hay claves fijas en el repositorio.
 
-| Usuario | Rol | Ambito |
-|---|---|---|
-| `admin.demo` | Administrador (superusuario, accede a `/admin/`) | Todas las delegaciones |
-| `coordinador.demo` | Coordinador | Todas las delegaciones |
-| `funcionario.centro` | Funcionario | Centro |
-| `verificador.demo` | Verificador | Revision de evidencias |
+| Usuario | Perfil (grupo) | Rol | Ambito |
+|---|---|---|---|
+| `admin.demo` | Administrador | Administrador | Todas las delegaciones |
+| `coordinador.demo` | Supervisor | Coordinador | Todas las delegaciones |
+| `funcionario.centro` | Administrativo | Funcionario | Centro: registra actividades y sube evidencias |
+| `verificador.demo` | Administrativo | Delegado + Verificador | Delegado de Centro: revisa las evidencias de Centro |
+
+Las cuentas demo no tienen correo. Para probar la recuperación de contraseña, entra como
+`admin.demo`, abre **Administración → Funcionarios y usuarios**, edita la cuenta y escribe un
+correo real.
 
 Los datos son sinteticos y solo sirven para demostracion academica.
 
 ## Rutas principales
 
 - `/`: portada SGR.
-- `/login/`: inicio de sesion.
+- `/login/`: inicio de sesion (lleva a `/gestion/panel/`, el panel de tu perfil).
+- `/recuperar/`: recuperación de contraseña por correo.
 - `/solicitudes/`: listado de compromisos (con buscador).
 - `/actividades/`: actividades autorizadas, con filtros por delegación, estado, período y fechas.
 - `/actividad/nueva/`: registro de actividades; `/actividad/<código>/` muestra su detalle,
   evidencias, revisión y anulación de la aprobación.
 - `/evidencia/<código>/archivo/`: abre o descarga el archivo de una evidencia, con los mismos permisos de su actividad.
 - `/agenda/`: compromisos y agenda colectiva, con filtros y alerta de vencimiento.
+- `/actividad/<código>/evidencia/`: subir evidencia a una actividad.
+- `/coordinacion/delegados/`: delegados por delegación, su carga y su asignación (coordinación).
 - `/administracion/`: índice de los ocho mantenedores.
 - `/administracion/<mantenedor>/`: listado, búsqueda y controles de cada mantenedor
   (`delegaciones`, `cargos`, `roles`, `funcionarios`, `catalogo`, `periodos`, `items`, `metas`).
-- `/administracion/auditoria/`: consulta de solo lectura de la auditoría (administración).
-- `/admin/`: administracion completa de Django (las 19 tablas).
+- `/administracion/auditoria/`: consulta de solo lectura de la auditoría (perfil Administrador).
+- `/administracion/perfiles/`: perfiles, sus permisos y sus usuarios (perfil Administrador).
 - `/gestion/`, `/gestion/semaforo/`, `/gestion/resumen/`: medicion y cumplimiento.
 - `/gestion/mi-ficha/`: ficha personal del funcionario.
 - `/gestion/informes/`: informes de actividades, compromisos, resumen por responsable, actividad reciente
   y cumplimiento (pantalla, imprimir y CSV).
 - `/gestion/alertas/`: alertas según tu rol y tu ámbito.
 - `/territorio/`: contexto institucional.
+
+## Roles de trabajo y flujo
+
+| Rol | Qué hace | Qué ve |
+|---|---|---|
+| Coordinador | Gestiona a los delegados: los asigna a su delegación (`/coordinacion/delegados/`) y les asigna compromisos | Todas las delegaciones |
+| Delegado | Trabaja su delegación: revisa (aprueba o rechaza) las evidencias de su delegación y registra compromisos tomados en terreno | Solo su delegación (registros y métricas) |
+| Verificador | Revisa evidencias | Su delegación si tiene una; si no, todas |
+| Funcionario | Registra actividades, sube evidencias y registra compromisos de su delegación | Su delegación |
+
+- **Compromisos:** los crea la coordinación (eligiendo la delegación y el delegado responsable) o
+  el delegado/funcionario para su propia delegación, quedando a su cargo. Solo coordinación y
+  administración los eliminan.
+- **Evidencias:** se suben desde el botón «Subir evidencia» (lista o detalle), separado de
+  «Modificar». La lista de actividades indica si cada una tiene evidencia cargada.
+- **Revisión:** aprobar, o rechazar indicando el motivo. Quien registró corrige y sube una evidencia
+  nueva, y la actividad vuelve a revisión. Nadie revisa una actividad que registró él mismo.
+
+## Seguridad y perfiles
+
+| Perfil (grupo Django) | Nivel | Puede | No puede |
+|---|---|---|---|
+| Administrador | Acceso total | Los 8 mantenedores, gestión de usuarios y perfiles, todas las transacciones, auditoría, visión global | — |
+| Supervisor | Intermedio | 6 mantenedores (delegaciones, cargos, catálogo, períodos, ítems, metas), transacciones, información operacional | Usuarios, roles, perfiles, auditoría |
+| Administrativo | Mínimo | Registrar y seguir sus actividades, evidencias y compromisos; su ficha | Mantenedores, usuarios, eliminar compromisos, cerrar períodos, auditoría |
+
+- Los grupos y sus permisos (`view`, `add`, `change`, `delete` de cada tabla) los crea la migración
+  `0015_perfiles_de_acceso`, que además asigna perfil a los usuarios existentes según sus roles.
+- Cada vista de mantenedor exige el permiso de Django de su acción (`PermisoRequeridoMixin` en
+  `delegaciones_app/permisos.py`); los botones Agregar, Modificar y Eliminar se muestran según esos permisos.
+- El perfil se asigna al crear o editar un usuario en el mantenedor de funcionarios.
+- Un funcionario desactivado pierde los permisos de su perfil (`delegaciones_app/backends.py`).
+- Recuperación de contraseña: `/recuperar/` pide el correo, Django genera un token firmado de un
+  solo uso que vence en `PASSWORD_RESET_TIMEOUT` segundos (1 hora), se envía el enlace por SMTP,
+  el enlace valida el token, permite fijar la nueva contraseña y confirma el cambio, que queda en la auditoría.
+
+### Configurar el correo
+
+Sin variables de correo, el mensaje de recuperación se imprime en la consola donde corre Django.
+Para enviarlo de verdad (por ejemplo con Gmail), agrega al `.env`:
+
+```env
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_HOST_USER=tu-cuenta@gmail.com
+EMAIL_HOST_PASSWORD=contrasena-de-aplicacion-de-16-caracteres
+DEFAULT_FROM_EMAIL=SGR La Serena <tu-cuenta@gmail.com>
+```
+
+En Gmail, la contraseña de aplicación se crea en la cuenta de Google con la verificación en dos
+pasos activa. AWS bloquea el puerto 25 de salida, por eso se usa el 587.
 
 ## Validacion y pruebas
 
@@ -257,10 +324,23 @@ GRANT ALL PRIVILEGES ON gestion_laserena.* TO 'gestion_user'@'localhost';
 ```bash
 cp .env.example .env
 chmod 600 .env
-nano .env   # SECRET_KEY, DEBUG=False, ALLOWED_HOSTS=<IP_PUBLICA_EC2>, datos de la base
+nano .env   # SECRET_KEY, DEBUG=False, ALLOWED_HOSTS=<IP_PUBLICA_EC2>, datos de la base y del correo
 ```
 
-El `.env` nunca se sube a Git.
+El `.env` nunca se sube a Git. Para la recuperación de contraseña se agregan las variables
+`EMAIL_*` de la sección «Configurar el correo».
+
+**Actualizar un servidor ya desplegado** (por ejemplo, para la Evaluación Sumativa 3):
+
+```bash
+mysqldump -u gestion_user -p gestion_laserena > respaldo_$(date +%F).sql
+git pull
+source venv/bin/activate && pip install -r requirements.txt
+nano .env                                  # agregar EMAIL_BACKEND, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD...
+python manage.py migrate                   # 0015 crea los perfiles y asigna uno a cada usuario
+python manage.py collectstatic --noinput
+sudo systemctl restart gunicorn
+```
 
 ### 6. Migraciones, datos demo y estaticos
 
@@ -339,8 +419,9 @@ Se accede con `http://<IP_PUBLICA_EC2>/` (sin https).
 - `git log --oneline`, `git remote -v` y `git status` limpio.
 - `systemctl status` de mysqld, gunicorn, nginx y php-fpm en verde; `nginx -t`.
 - La aplicacion respondiendo en el navegador desde la IP publica.
-- `/admin/` con las 19 tablas: crear, editar, eliminar, buscar y navegar
-  relaciones (por ejemplo, Compromiso con su Historial).
+- Login con cada cuenta demo y su panel (Administrador, Supervisor, Administrativo).
+- Mantenedores con CRUD y búsqueda; restricciones al entrar con un perfil sin permiso.
+- Recuperación de contraseña: solicitud, correo recibido, enlace, cambio e ingreso con la nueva clave.
 - phpMyAdmin (`/phpmyadmin/`) mostrando tablas, estructura, relaciones y registros.
 
 ## Evidencia de uso de IA

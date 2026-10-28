@@ -15,7 +15,7 @@ from .forms import CatalogoForm, FuncionarioForm
 from .informes import filas_de_actividades, filas_de_cumplimiento, respuesta_csv
 from .models import Actividad, Auditoria, Catalogo, Cargo, Delegacion, Funcionario, Indicador, Meta, Periodo, Rol, UsuarioMaestro
 from .permisos import (
-    ADMINISTRADOR, COORDINADOR, MENSAJE_SIN_PERMISO, ROLES_DEL_SISTEMA, funcionario_de, puede_ver_todo, registrar_acceso_denegado,
+    ADMINISTRADOR, MENSAJE_SIN_PERMISO, ROLES_DEL_SISTEMA, funcionario_de, puede_ver_todo, registrar_acceso_denegado,
     rol_requerido, roles_de, tiene_rol,
 )
 from .pruebas_base import EscenarioBase, crear_funcionario
@@ -315,11 +315,14 @@ class MantenedoresUnitTests(TestCase):
             self.assertTrue(config.columnas and config.busqueda, slug)
 
     def test_roles_y_funcionarios_son_solo_de_administracion(self):
-        """CU-26.1 Denegar acceso por ámbito (RF-002). La coordinación no administra cuentas ni roles."""
+        """CU-26.1 Denegar acceso por ámbito (RF-002). El perfil Supervisor no administra cuentas ni roles."""
+        supervisor = crear_funcionario('coord-permisos', 'coordinador')
+        administrador = crear_funcionario('adm-permisos', 'administrador')
         for slug in ('roles', 'funcionarios'):
-            self.assertEqual(crud.MANTENEDORES[slug].roles, (ADMINISTRADOR,), slug)
+            self.assertFalse(any(crud.MANTENEDORES[slug].permisos_de(supervisor).values()), slug)
+            self.assertTrue(all(crud.MANTENEDORES[slug].permisos_de(administrador).values()), slug)
         for slug in ('delegaciones', 'cargos', 'catalogo', 'periodos', 'items', 'metas'):
-            self.assertEqual(crud.MANTENEDORES[slug].roles, (ADMINISTRADOR, COORDINADOR), slug)
+            self.assertTrue(all(crud.MANTENEDORES[slug].permisos_de(supervisor).values()), slug)
 
     def test_los_roles_del_sistema_no_se_eliminan_pero_uno_propio_si(self):
         """CU-26 Administración de usuarios y roles (RF-002). Los permisos consultan esos nombres."""

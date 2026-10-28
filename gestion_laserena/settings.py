@@ -38,8 +38,8 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1', 'te
 
 # Application definition
 
+# Sin django.contrib.admin: la administración se hace desde las pantallas propias del sistema.
 INSTALLED_APPS = [
-    'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -152,9 +152,25 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+# ModelBackend con una regla: un funcionario desactivado no recibe los permisos de su perfil.
+AUTHENTICATION_BACKENDS = ['delegaciones_app.backends.PerfilBackend']
+
 LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = 'inicio'
+LOGIN_REDIRECT_URL = 'panel'  # cada perfil llega a su propio panel
 LOGOUT_REDIRECT_URL = 'inicio'
+
+# Correo para la recuperación de contraseña. Sin EMAIL_BACKEND en el .env los correos se muestran
+# en la consola (útil en desarrollo); en EC2 se usa SMTP, por ejemplo Gmail con una contraseña de aplicación.
+EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = env('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = env.int('EMAIL_PORT', default=587)
+EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
+EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
+EMAIL_TIMEOUT = env.int('EMAIL_TIMEOUT', default=20)
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER or 'no-responder@sgr.local')
+# Vigencia del enlace de recuperación, en segundos (1 hora por defecto).
+PASSWORD_RESET_TIMEOUT = env.int('PASSWORD_RESET_TIMEOUT', default=3600)
 
 # Reglas configurables sin tocar el código (RNF-015): tamaño máximo de una evidencia en MB (RNF-017)
 # días de anticipación con que un compromiso se marca como próximo a vencer (RF-019)

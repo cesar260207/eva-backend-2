@@ -1,0 +1,13 @@
+<div class="panel h-100">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="section-label mb-0">Alertas en tu ámbito</div>
+        <a class="btn btn-sm btn-outline-sgr" href="{% url 'alertas' %}">Ver todas</a>
+    </div>
+    <ul class="list-unstyled mb-0">
+    {% for alerta in alertas %}
+        <li class="mb-2"><span class="badge bg-{{ alerta.nivel }}">{{ alerta.etiqueta }}</span> <a class="text-dark" href="{{ alerta.url }}">{{ alerta.motivo }}</a></li>
+    {% empty %}
+        <li class="text-muted">No hay alertas por ahora.</li>
+    {% endfor %}
+    </ul>
+</div>

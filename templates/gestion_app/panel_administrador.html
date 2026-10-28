@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block title %}Panel Administrador | SGR{% endblock %}
+{% block content %}
+{% include 'gestion_app/_panel_encabezado.html' with descripcion='Acceso total: todos los mantenedores, todas las transacciones, gestión de usuarios y visión global del sistema.' %}
+
+<div class="section-label mb-2">Visión global</div>
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-2"><div class="metric h-100"><small>Usuarios activos</small><strong>{{ usuarios_activos }}</strong><small>{{ usuarios_inactivos }} inactivos</small></div></div>
+    <div class="col-6 col-lg-2"><div class="metric navy h-100"><small>Delegaciones activas</small><strong>{{ delegaciones_activas }}</strong><small>{{ funcionarios_activos }} funcionarios</small></div></div>
+    <div class="col-6 col-lg-2"><div class="metric amber h-100"><small>Cumplimiento promedio</small><strong>{{ promedio }} %</strong><small>{{ periodo|default:'Sin período vigente' }}</small></div></div>
+    <div class="col-6 col-lg-2"><div class="metric h-100"><small>Actividades</small><strong>{{ actividades_total }}</strong><small>{{ actividades_pendientes }} por revisar</small></div></div>
+    <div class="col-6 col-lg-2"><div class="metric coral h-100"><small>Compromisos abiertos</small><strong>{{ compromisos_abiertos }}</strong><small>{{ compromisos_vencidos }} vencidos</small></div></div>
+    <div class="col-6 col-lg-2"><div class="metric navy h-100"><small>Períodos abiertos</small><strong>{{ periodos_abiertos }}</strong><small>{{ evidencias_pendientes }} evidencias pendientes</small></div></div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-4"><div class="panel h-100">
+        <div class="section-label">Gestión de usuarios</div>
+        <table class="table table-sm align-middle">
+            <thead><tr><th>Perfil</th><th class="text-end">Usuarios activos</th></tr></thead>
+            <tbody>{% for nombre, total in perfiles %}<tr><td>{{ nombre }}</td><td class="text-end">{{ total }}</td></tr>{% endfor %}</tbody>
+        </table>
+        <div class="d-grid gap-2">
+            <a class="btn btn-sgr" href="{% url 'mantenedor_nuevo' 'funcionarios' %}">Crear usuario</a>
+            <a class="btn btn-outline-sgr" href="{% url 'mantenedor_lista' 'funcionarios' %}">Usuarios y asignación de perfil</a>
+            <a class="btn btn-outline-sgr" href="{% url 'perfiles' %}">Perfiles y permisos</a>
+        </div>
+    </div></div>
+    <div class="col-lg-4"><div class="panel h-100">
+        <div class="section-label">Transacciones</div>
+        <div class="d-grid gap-2">
+            <a class="btn btn-outline-sgr" href="{% url 'actividad_nueva' %}">Registrar actividad con evidencia</a>
+            <a class="btn btn-outline-sgr" href="{% url 'actividades' %}?estado=pendiente">Revisar evidencias pendientes</a>
+            <a class="btn btn-outline-sgr" href="{% url 'compromiso_nuevo' %}">Asignar compromiso a un delegado</a>
+            <a class="btn btn-outline-sgr" href="{% url 'delegados' %}">Delegados y asignaciones</a>
+            <a class="btn btn-outline-sgr" href="{% url 'agenda' %}">Seguimiento de compromisos</a>
+            <a class="btn btn-outline-sgr" href="{% url 'mantenedor_lista' 'periodos' %}">Abrir, cerrar o reabrir períodos</a>
+        </div>
+    </div></div>
+    <div class="col-lg-4">{% include 'gestion_app/_panel_alertas.html' %}</div>
+</div>
+
+<div class="section-label mb-2">Todos los mantenedores</div>
+<div class="row g-3 mb-4">
+    {% for m in mantenedores %}
+    <div class="col-6 col-md-3"><a class="text-decoration-none" href="{% url 'mantenedor_lista' m.slug %}"><div class="panel h-100">
+        <h2 class="h6 text-dark mb-1">{{ m.titulo }}</h2>
+        <small class="text-muted">{{ m.descripcion }}</small>
+    </div></a></div>
+    {% endfor %}
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6"><div class="panel h-100">
+        <div class="section-label">Cumplimiento por delegación</div>
+        <table class="table table-sm align-middle">
+            <thead><tr><th>Delegación</th><th class="text-end">Cumplimiento</th><th>Estado</th></tr></thead>
+            <tbody>
+            {% for fila in delegaciones %}<tr><td>{{ fila.nombre }}</td><td class="text-end">{{ fila.cumplimiento }} %</td><td><span class="badge bg-{{ fila.estado_class }}">{{ fila.estado }}</span></td></tr>
+            {% empty %}<tr><td colspan="3" class="text-muted">Sin indicadores para el período vigente.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div></div>
+    <div class="col-lg-6"><div class="panel h-100">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="section-label mb-0">Auditoría reciente</div>
+            <a class="btn btn-sm btn-outline-sgr" href="{% url 'auditoria_consulta' %}">Consultar</a>
+        </div>
+        <table class="table table-sm align-middle">
+            <thead><tr><th>Fecha</th><th>Evento</th><th>Entidad</th><th>Usuario</th></tr></thead>
+            <tbody>
+            {% for evento in auditoria_reciente %}<tr><td>{{ evento.fecha|date:'d-m-Y H:i' }}</td><td>{{ evento.evento }}</td><td>{{ evento.entidad }}</td><td>{{ evento.usuario_maestro|default:evento.funcionario|default:'-' }}</td></tr>
+            {% empty %}<tr><td colspan="4" class="text-muted">Sin eventos.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div></div>
+</div>
+{% endblock %}

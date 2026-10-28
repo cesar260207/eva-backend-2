@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}Perfiles y permisos | SGR{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+    <div>
+        <div class="page-kicker">Administración · <a href="{% url 'mantenedores' %}" class="text-reset">Mantenedores</a></div>
+        <h1 class="page-title">Perfiles y permisos</h1>
+        <p class="page-intro mb-0">Cada perfil es un grupo de Django con permisos asignados. El perfil de un usuario se asigna al crearlo o modificarlo en el mantenedor de funcionarios.</p>
+    </div>
+    <a class="btn btn-sgr" href="{% url 'mantenedor_lista' 'funcionarios' %}">Gestionar usuarios</a>
+</div>
+<div class="row g-3">
+    {% for perfil in perfiles %}
+    <div class="col-lg-4"><div class="panel h-100">
+        <div class="section-label">Perfil {{ forloop.counter }}</div>
+        <h2 class="h4">{{ perfil.nombre }}</h2>
+        <p class="text-muted small">{{ perfil.total }} permisos · {{ perfil.usuarios|length }} usuario{{ perfil.usuarios|length|pluralize }} activo{{ perfil.usuarios|length|pluralize }}</p>
+        <table class="table table-sm align-middle">
+            <thead><tr><th>Tabla</th><th>Acciones permitidas</th></tr></thead>
+            <tbody>
+            {% for modelo, acciones in perfil.permisos %}
+                <tr><td>{{ modelo }}</td><td>{{ acciones|join:', ' }}</td></tr>
+            {% empty %}
+                <tr><td colspan="2" class="text-muted">Sin permisos.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        <div class="section-label mt-3">Usuarios</div>
+        <p class="small mb-0">{% for usuario in perfil.usuarios %}{{ usuario.username }}{% if not forloop.last %}, {% endif %}{% empty %}Sin usuarios asignados.{% endfor %}</p>
+    </div></div>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -10,7 +10,7 @@
         <p class="page-intro mb-0">Lectura rápida del estado de las delegaciones para acompañar decisiones y priorizar apoyo.</p>
     </div>
     <div class="d-flex gap-2">
-        {% if puede_administrar %}<a href="{% url 'mantenedor_nuevo' 'metas' %}" class="btn btn-sgr">+ Agregar meta</a>{% endif %}
+        {% if perms.delegaciones_app.add_meta %}<a href="{% url 'mantenedor_nuevo' 'metas' %}" class="btn btn-sgr">+ Agregar meta</a>{% endif %}
         <a href="{% url 'semaforo' %}" class="btn btn-outline-sgr">Abrir semáforo</a>
     </div>
 </div>
@@ -69,7 +69,7 @@
                 <td>{% if delegacion.diferencia != None %}{{ delegacion.diferencia }} puntos{% else %}-{% endif %}</td>
                 <td><span class="badge bg-{{ delegacion.estado_class }} rounded-pill">{{ delegacion.estado }}</span></td>
                 <td>{{ delegacion.ultimos_datos|date:'d-m-Y'|default:'Sin cálculo' }}</td>
-                <td>{% if puede_administrar %}<a class="btn btn-sm btn-outline-sgr" href="{% url 'mantenedor_lista' 'metas' %}?q={{ delegacion.nombre|urlencode }}">Gestionar metas</a>{% endif %}</td>
+                <td>{% if perms.delegaciones_app.view_meta %}<a class="btn btn-sm btn-outline-sgr" href="{% url 'mantenedor_lista' 'metas' %}?q={{ delegacion.nombre|urlencode }}">Gestionar metas</a>{% endif %}</td>
             </tr>
             {% empty %}
             <tr><td colspan="7" class="text-center py-4">No hay delegaciones con metas para este criterio de búsqueda.</td></tr>

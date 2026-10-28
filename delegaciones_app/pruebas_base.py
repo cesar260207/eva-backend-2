@@ -10,17 +10,20 @@ from django.utils import timezone
 from .models import (
     Actividad, Cargo, Catalogo, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol, ItemMedible, Periodo, Rol,
 )
+from .permisos import asignar_perfil
 
 CLAVE_PRUEBA = 'clave-segura'
 
 
 def crear_funcionario(username, *roles, cargo=None, delegacion=None):
-    """Usuario de Django con su Funcionario y roles (la migración 0010 crea los seis roles del sistema)."""
+    """Usuario de Django con su Funcionario, roles y el perfil que corresponde a esos roles, como lo deja el
+    mantenedor de funcionarios (la migración 0010 crea los seis roles y la 0015 los tres perfiles)."""
     usuario = User.objects.create_user(username, password=CLAVE_PRUEBA)
     cargo = cargo or Cargo.objects.get_or_create(nombre='Profesional territorial')[0]
     funcionario = Funcionario.objects.create(usuario=usuario, identificador_institucional=username, nombre=username, cargo=cargo, delegacion=delegacion)
     for rol in roles:
         FuncionarioRol.objects.create(funcionario=funcionario, rol=Rol.objects.get(nombre_rol=rol))
+    asignar_perfil(usuario)
     return usuario
 
 

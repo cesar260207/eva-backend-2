@@ -1,0 +1,161 @@
+"""Pruebas de los ajustes de la revisión del equipo: carga de evidencia en su propia pantalla, indicador de
+evidencia, revisión aprobar/rechazar, ámbito del delegado, coordinación de delegados y creación de compromisos."""
+from django.test import TestCase
+from django.urls import reverse
+
+from .models import Auditoria, Indicador, Meta, Validacion
+from .pruebas_base import EscenarioBase, crear_funcionario
+
+
+class EvidenciaEnListadoYDetalleTests(EscenarioBase, TestCase):
+    """Indicador de evidencia en el listado y botón «Subir evidencia» separado de «Modificar»."""
+
+    def setUp(self):
+        self.crear_escenario()
+
+    def test_el_listado_indica_si_la_actividad_tiene_evidencia(self):
+        """CU-09 Indicar evidencia cargada (RF-012). Con y sin evidencia se distinguen en la lista."""
+        sin = self.nueva_actividad(solicitud_problema='Sin respaldo')
+        con = self.nueva_actividad(solicitud_problema='Con respaldo')
+        self.nueva_evidencia(con)
+        self.client.force_login(self.usuario_autor)
+        filas = {a.pk: a for a in self.client.get(reverse('actividades')).context['actividades']}
+        self.assertEqual((filas[sin.pk].total_evidencias, filas[con.pk].total_evidencias), (0, 1))
+        respuesta = self.client.get(reverse('actividades'))
+        self.assertContains(respuesta, 'Sin evidencia')
+        self.assertContains(respuesta, 'Cargada (1)')
+
+    def test_el_autor_ve_el_boton_subir_evidencia(self):
+        """CU-09 Subir evidencia (RF-012). Botón propio en la lista y en el detalle."""
+        actividad = self.nueva_actividad()
+        url = reverse('evidencia_subir', args=[actividad.codigo_verificador])
+        self.client.force_login(self.usuario_autor)
+        self.assertContains(self.client.get(reverse('actividades')), url)
+        self.assertContains(self.client.get(reverse('actividad_detalle', args=[actividad.codigo_verificador])), url)
+        self.assertTemplateUsed(self.client.get(url), 'delegaciones_app/evidencia_subir.html')
+
+    def test_quien_solo_revisa_no_ve_carga_de_archivos(self):
+        """CU-11 Revisión sin elementos de carga (RF-013). El revisor ve la decisión, no el formulario de carga."""
+        actividad = self.nueva_actividad()
+        self.nueva_evidencia(actividad)
+        self.client.force_login(self.usuario_verificador)
+        detalle = self.client.get(reverse('actividad_detalle', args=[actividad.codigo_verificador]))
+        self.assertNotContains(detalle, 'type="file"')
+        self.assertNotContains(detalle, reverse('evidencia_subir', args=[actividad.codigo_verificador]))
+        self.assertContains(detalle, reverse('revisar_actividad', args=[actividad.codigo_verificador, 'rechazar']))
+        self.assertRedirects(self.client.get(reverse('evidencia_subir', args=[actividad.codigo_verificador])), reverse('actividad_detalle', args=[actividad.codigo_verificador]))
+
+
+class RevisionPorDelegadoTests(EscenarioBase, TestCase):
+    """El delegado revisa las evidencias de su delegación, nunca las propias."""
+
+    def setUp(self):
+        self.crear_escenario()
+        self.delegado = crear_funcionario('delegado-centro', 'delegado', cargo=self.cargo, delegacion=self.centro)
+        self.actividad = self.nueva_actividad()
+        self.nueva_evidencia(self.actividad)
+
+    def _revisar(self, usuario, actividad, decision='aprobar', observacion=''):
+        self.client.force_login(usuario)
+        return self.client.post(reverse('revisar_actividad', args=[actividad.codigo_verificador, decision]), {'observacion': observacion})
+
+    def test_el_delegado_aprueba_una_actividad_de_su_delegacion(self):
+        """CU-11 Validación por el delegado (RF-013). Revisa lo registrado en su delegación."""
+        self._revisar(self.delegado, self.actividad)
+        self.assertEqual(Validacion.objects.get().funcionario_verificador, self.delegado.funcionario)
+
+    def test_el_delegado_no_revisa_otra_delegacion_ni_lo_propio(self):
+        """CU-11.1 Restringir revisión (RF-013, RF-036). Otra delegación queda fuera; lo propio no se autoaprueba."""
+        de_rural = crear_funcionario('delegado-rural', 'delegado', cargo=self.cargo, delegacion=self.rural)
+        self.assertEqual(self._revisar(de_rural, self.actividad).status_code, 404)
+        propia = self.nueva_actividad(funcionario_autor=self.delegado.funcionario)
+        self.nueva_evidencia(propia)
+        respuesta = self._revisar(self.delegado, propia)
+        self.assertContains(self.client.get(respuesta.url), 'No puedes revisar una actividad que registraste')
+        self.assertFalse(Validacion.objects.exists())
+
+    def test_rechazar_exige_motivo(self):
+        """CU-11.1 Rechazar con motivo (RF-013). Sin motivo no se rechaza; con motivo queda rechazada."""
+        self._revisar(self.delegado, self.actividad, 'rechazar')
+        self.assertFalse(Validacion.objects.exists())
+        self._revisar(self.delegado, self.actividad, 'rechazar', 'La foto no corresponde')
+        self.actividad.refresh_from_db()
+        self.assertEqual(self.actividad.estado, 'rechazada')
+
+
+class AmbitoDelDelegadoTests(EscenarioBase, TestCase):
+    """Un delegado ve solo la información y las métricas de su delegación."""
+
+    def setUp(self):
+        self.crear_escenario()
+        for funcionario in (self.autor, crear_funcionario('func-rural', 'funcionario', cargo=self.cargo, delegacion=self.rural).funcionario):
+            Indicador.generar(Meta.objects.create(item=self.item, funcionario=funcionario, valor_objetivo=10))
+        self.delegado = crear_funcionario('delegado-ambito', 'delegado', cargo=self.cargo, delegacion=self.centro)
+        self.coordinador = crear_funcionario('coord-ambito', 'coordinador', cargo=self.cargo)
+
+    def test_las_metricas_del_delegado_son_solo_de_su_delegacion(self):
+        """CU-29.1 Restricción por ámbito (RF-029, RF-032). Medición, semáforo y resumen solo muestran su delegación."""
+        self.client.force_login(self.delegado)
+        for nombre in ('dashboard', 'semaforo', 'resumen'):
+            respuesta = self.client.get(reverse(nombre))
+            self.assertEqual({fila['nombre'] for fila in respuesta.context['delegaciones']}, {'Centro'}, nombre)
+        self.client.force_login(self.coordinador)
+        self.assertEqual({fila['nombre'] for fila in self.client.get(reverse('dashboard')).context['delegaciones']}, {'Centro', 'Rural'})
+
+    def test_el_panel_del_delegado_muestra_su_delegacion(self):
+        """CU-18.1 Consolidar datos de delegación (RF-028, RF-029). El panel muestra su cumplimiento y el acceso a su delegación."""
+        self.client.force_login(self.delegado)
+        respuesta = self.client.get(reverse('panel'))
+        self.assertEqual([fila['nombre'] for fila in respuesta.context['resultado_delegacion']], ['Centro'])
+        self.assertContains(respuesta, reverse('delegacion_detalle', args=['Centro']))
+
+    def test_el_delegado_no_abre_otra_delegacion(self):
+        """CU-26.1 Denegar acceso por ámbito (RF-029). La delegación ajena lo devuelve a la suya."""
+        self.client.force_login(self.delegado)
+        self.assertRedirects(self.client.get(reverse('delegacion_detalle', args=['Rural'])), reverse('delegacion_detalle', args=['Centro']))
+        self.assertEqual([d.nombre for d in self.client.get(reverse('actividades')).context['delegaciones_filtro']], ['Centro'])
+
+
+class CoordinacionDeDelegadosTests(EscenarioBase, TestCase):
+    """El coordinador gestiona y asigna delegados; el delegado trabaja su delegación."""
+
+    def setUp(self):
+        self.crear_escenario()
+        self.coordinador = crear_funcionario('coord-del', 'coordinador', cargo=self.cargo)
+        self.delegado = crear_funcionario('delegado-sin', 'delegado', cargo=self.cargo)
+
+    def test_el_coordinador_asigna_un_delegado_a_una_delegacion(self):
+        """CU-26 Asignar delegado (RF-001, RF-017). Queda en la delegación y en la auditoría."""
+        self.client.force_login(self.coordinador)
+        self.assertEqual(self.client.get(reverse('delegados')).status_code, 200)
+        self.client.post(reverse('delegados'), {'funcionario': self.delegado.funcionario.pk, 'delegacion': self.rural.pk})
+        self.delegado.funcionario.refresh_from_db()
+        self.assertEqual(self.delegado.funcionario.delegacion, self.rural)
+        self.assertTrue(Auditoria.objects.filter(evento='asignar_delegado').exists())
+
+    def test_el_delegado_no_entra_a_la_coordinacion(self):
+        """CU-26.1 Separar coordinador y delegado (RF-002). La gestión de delegados es de la coordinación."""
+        self.client.force_login(crear_funcionario('delegado-centro2', 'delegado', cargo=self.cargo, delegacion=self.centro))
+        self.assertRedirects(self.client.get(reverse('delegados')), reverse('inicio'))
+
+    def test_el_coordinador_asigna_compromisos_a_delegados_de_la_delegacion(self):
+        """CU-02.1 Validar datos de compromiso (RF-016, RF-017). El responsable debe ser de la delegación elegida."""
+        self.client.force_login(self.coordinador)
+        datos = {
+            'delegacion': self.rural.pk, 'funcionario_responsable': self.autor.pk, 'origen': 'externo', 'solicitante': 'Junta',
+            'territorio': 'Rural', 'eje': 'Seguridad', 'descripcion': 'Compromiso cruzado', 'fecha_comprometida': '2026-12-30', 'estado': 'pendiente',
+        }
+        respuesta = self.client.post(reverse('compromiso_nuevo'), datos)
+        self.assertIn('funcionario_responsable', respuesta.context['form'].errors)
+        self.assertContains(self.client.get(reverse('compromiso_nuevo')), 'Delegado responsable')
+
+    def test_la_agenda_explica_quien_crea_compromisos(self):
+        """CU-12 Agenda compartida (RF-016). La agenda dice quién crea y quién elimina."""
+        self.client.force_login(self.coordinador)
+        self.assertContains(self.client.get(reverse('agenda')), 'Asignar compromiso a un delegado')
+        self.nuevo_compromiso()
+        self.client.force_login(self.usuario_autor)
+        agenda = self.client.get(reverse('agenda'))
+        self.assertContains(agenda, '¿Quién crea los compromisos?')
+        self.assertContains(agenda, 'Registrar compromiso de mi delegación')
+        self.assertNotContains(agenda, 'Eliminar</a>')

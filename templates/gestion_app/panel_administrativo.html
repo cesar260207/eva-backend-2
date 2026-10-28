@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block title %}Panel Administrativo | SGR{% endblock %}
+{% block content %}
+{% include 'gestion_app/_panel_encabezado.html' with descripcion='Permisos mínimos: solo las funciones asignadas a tu cuenta. Las operaciones críticas quedan restringidas.' %}
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3"><div class="metric h-100"><small>Actividades en tu ámbito</small><strong>{{ actividades_total }}</strong><small>{{ actividades_pendientes }} esperando revisión</small></div></div>
+    <div class="col-6 col-lg-3"><div class="metric navy h-100"><small>Aprobadas</small><strong>{{ actividades_aprobadas }}</strong><small>suman al avance de las metas</small></div></div>
+    <div class="col-6 col-lg-3"><div class="metric coral h-100"><small>Compromisos vencidos</small><strong>{{ compromisos_vencidos }}</strong><small>{{ compromisos_por_vencer }} por vencer</small></div></div>
+    <div class="col-6 col-lg-3"><div class="metric amber h-100"><small>Compromisos abiertos</small><strong>{{ compromisos_abiertos }}</strong><small>{% if delegacion_propia %}en {{ delegacion_propia.nombre }}{% else %}en tu ámbito{% endif %}</small></div></div>
+</div>
+
+{% for fila in resultado_delegacion %}
+<div class="panel mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+    <div>
+        <div class="section-label">Tu delegación</div>
+        <h2 class="h4 mb-0">{{ fila.nombre }}</h2>
+    </div>
+    <div class="d-flex align-items-center gap-3">
+        <div class="text-end"><small class="text-muted d-block">Cumplimiento</small><strong class="fs-4">{{ fila.cumplimiento }} %</strong></div>
+        <span class="badge bg-{{ fila.estado_class }}">{{ fila.estado }}</span>
+        <a class="btn btn-outline-sgr" href="{% url 'delegacion_detalle' fila.nombre %}">Ver mi delegación</a>
+    </div>
+</div>
+{% endfor %}
+<div class="row g-3 mb-4">
+    <div class="col-lg-4"><div class="panel h-100">
+        <div class="section-label">Tus funciones</div>
+        <div class="d-grid gap-2">
+            <a class="btn btn-sgr" href="{% url 'actividad_nueva' %}">Registrar actividad con evidencia</a>
+            <a class="btn btn-outline-sgr" href="{% url 'actividades' %}">Mis actividades</a>
+            {% if puede_revisar %}<a class="btn btn-outline-sgr" href="{% url 'actividades' %}?estado=pendiente">Revisar evidencias de mi delegación</a>{% endif %}
+            {% if puede_registrar_compromiso %}<a class="btn btn-outline-sgr" href="{% url 'compromiso_nuevo' %}">Registrar compromiso de mi delegación</a>{% endif %}
+            <a class="btn btn-outline-sgr" href="{% url 'agenda' %}">Agenda de compromisos</a>
+            <a class="btn btn-outline-sgr" href="{% url 'ficha_personal' %}">Mi ficha y mis metas</a>
+        </div>
+    </div></div>
+    <div class="col-lg-4"><div class="panel h-100">
+        <div class="section-label">Restringido para tu perfil</div>
+        <ul class="small mb-0">
+            <li>Mantenedores (delegaciones, cargos, catálogo, períodos, ítems, metas).</li>
+            <li>Crear usuarios, asignar perfiles o roles.</li>
+            <li>Eliminar compromisos y abrir o cerrar períodos.</li>
+            <li>Aprobar o rechazar evidencias fuera de tu delegación (los delegados y verificadores revisan las de su ámbito).</li>
+            <li>Ver métricas y registros de otras delegaciones.</li>
+            <li>Asignar delegados o compromisos a otros (lo hace la coordinación).</li>
+            <li>Consultar la auditoría.</li>
+        </ul>
+    </div></div>
+    <div class="col-lg-4">{% include 'gestion_app/_panel_alertas.html' %}</div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6"><div class="panel h-100">
+        <div class="section-label">Tus últimas actividades</div>
+        <table class="table table-sm align-middle">
+            <thead><tr><th>Código</th><th>Fecha</th><th>Estado</th></tr></thead>
+            <tbody>
+            {% for actividad in mis_actividades %}<tr><td><a href="{% url 'actividad_detalle' actividad.codigo_verificador %}">{{ actividad.codigo_verificador }}</a></td><td>{{ actividad.fecha|date:'d-m-Y' }}</td><td>{{ actividad.get_estado_display }}</td></tr>
+            {% empty %}<tr><td colspan="3" class="text-muted">Aún no registras actividades.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div></div>
+    <div class="col-lg-6"><div class="panel h-100">
+        <div class="section-label">Compromisos a tu cargo</div>
+        <table class="table table-sm align-middle">
+            <thead><tr><th>Folio</th><th>Plazo</th><th>Estado</th></tr></thead>
+            <tbody>
+            {% for compromiso in mis_compromisos %}<tr><td>{{ compromiso.folio }}</td><td>{{ compromiso.fecha_comprometida|date:'d-m-Y' }}</td><td>{{ compromiso.get_estado_display }}{% if compromiso.vencido %} <span class="badge bg-danger">Vencido</span>{% endif %}</td></tr>
+            {% empty %}<tr><td colspan="3" class="text-muted">No tienes compromisos abiertos.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div></div>
+</div>
+{% endblock %}

@@ -1,5 +1,5 @@
 from django import forms
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -7,7 +7,10 @@ from django.db.models import Q
 from django.utils import timezone
 
 from .models import Actividad, Cargo, Catalogo, Compromiso, Delegacion, Evidencia, Funcionario, ItemMedible, Meta, Periodo, Rol, VersionOptimistaMixin
-from .permisos import ADMINISTRADOR, ROLES_DEL_SISTEMA, funcionario_de, puede_ver_todo
+from .permisos import (
+    ADMINISTRADOR, COORDINADOR, PERFIL_ADMINISTRADOR, PERFIL_ADMINISTRATIVO, PERFILES, ROLES_DEL_SISTEMA, asignar_perfil, funcionario_de,
+    perfil_sugerido, puede_ver_todo,
+)
 
 
 class FormularioBootstrap:
@@ -59,12 +62,18 @@ class RolForm(FormularioBootstrap, forms.ModelForm):
 
 
 class FuncionarioForm(FormularioBootstrap, forms.ModelForm):
-    """Alta y edición de un Funcionario junto con su cuenta de acceso y sus roles."""
+    """Alta y edición de un Funcionario junto con su cuenta de acceso, su perfil (grupo de Django) y sus roles."""
 
     campos_sin_auditar = ('password', 'password_confirm')
 
     username = forms.CharField(max_length=150, label='Nombre de usuario', help_text='Es también el identificador institucional.', widget=forms.TextInput(attrs={'autocomplete': 'username'}))
     email = forms.EmailField(required=False, label='Correo electrónico', widget=forms.EmailInput(attrs={'autocomplete': 'email'}))
+    perfil = forms.ModelChoiceField(
+        queryset=Group.objects.filter(name__in=PERFILES).order_by('name'), required=False, label='Perfil de acceso',
+        empty_label='Según sus roles',
+        help_text='Administrador: acceso total y gestión de usuarios. Supervisor: mantenedores operativos y transacciones. '
+                  'Administrativo: solo sus actividades y compromisos. Si lo dejas vacío, se deduce de los roles.',
+    )
     roles = forms.ModelMultipleChoiceField(queryset=Rol.objects.all(), label='Roles', help_text='Mantén Ctrl presionado para elegir más de uno.')
     password = forms.CharField(required=False, label='Contraseña', widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}), help_text='Obligatoria al crear. Déjala vacía al editar para conservar la actual.')
     password_confirm = forms.CharField(required=False, label='Confirmar contraseña', widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}))
@@ -75,7 +84,7 @@ class FuncionarioForm(FormularioBootstrap, forms.ModelForm):
         labels = {'cargo': 'Cargo', 'delegacion': 'Delegación', 'estado': 'Cuenta activa'}
         help_texts = {'delegacion': 'Déjala vacía para roles de alcance global (administrador, coordinador).'}
 
-    field_order = ['username', 'nombre', 'email', 'cargo', 'delegacion', 'roles', 'estado', 'password', 'password_confirm']
+    field_order = ['username', 'nombre', 'email', 'cargo', 'delegacion', 'perfil', 'roles', 'estado', 'password', 'password_confirm']
 
     def __init__(self, *args, actor=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -88,6 +97,7 @@ class FuncionarioForm(FormularioBootstrap, forms.ModelForm):
             self.fields['username'].initial = usuario.username
             self.fields['email'].initial = usuario.email
             self.fields['roles'].initial = self.instance.roles.all()
+            self.fields['perfil'].initial = usuario.groups.filter(name__in=PERFILES).values_list('pk', flat=True).first()
         else:
             self.fields['password'].required = True
             self.fields['password_confirm'].required = True
@@ -120,7 +130,23 @@ class FuncionarioForm(FormularioBootstrap, forms.ModelForm):
             roles = cleaned_data.get('roles')
             if roles is not None and self.instance.roles.filter(nombre_rol=ADMINISTRADOR).exists() and not any(rol.nombre_rol == ADMINISTRADOR for rol in roles):
                 self.add_error('roles', 'No puedes quitarte el rol administrador.')
+            perfil = cleaned_data.get('perfil')
+            if perfil and perfil.name != PERFIL_ADMINISTRADOR and self.instance.usuario.groups.filter(name=PERFIL_ADMINISTRADOR).exists():
+                self.add_error('perfil', 'No puedes quitarte el perfil Administrador.')
+        self._validar_perfil_y_roles(cleaned_data)
         return cleaned_data
+
+    def _validar_perfil_y_roles(self, cleaned_data):
+        """El perfil no puede dar menos alcance que los roles: un administrador o coordinador
+        con perfil Administrativo tendría el alcance de su rol sin los permisos para usarlo."""
+        perfil, roles = cleaned_data.get('perfil'), cleaned_data.get('roles')
+        if not perfil or roles is None:
+            return
+        nombres = {rol.nombre_rol for rol in roles}
+        if ADMINISTRADOR in nombres and perfil.name != PERFIL_ADMINISTRADOR:
+            self.add_error('perfil', 'El rol administrador requiere el perfil Administrador.')
+        elif COORDINADOR in nombres and perfil.name == PERFIL_ADMINISTRATIVO:
+            self.add_error('perfil', 'El rol coordinador requiere el perfil Supervisor o Administrador.')
 
     @transaction.atomic
     def save(self, commit=True):
@@ -138,6 +164,7 @@ class FuncionarioForm(FormularioBootstrap, forms.ModelForm):
         funcionario.identificador_institucional = usuario.username
         funcionario.save()
         funcionario.roles.set(datos['roles'])
+        asignar_perfil(usuario, datos.get('perfil') or perfil_sugerido({rol.nombre_rol for rol in datos['roles']}))
         return funcionario
 
 
@@ -285,7 +312,11 @@ class CompromisoForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm)
             delegaciones &= Q(pk=funcionario.delegacion_id)
             responsables = Q(pk=funcionario.pk)
         self.fields['delegacion'].queryset = Delegacion.objects.filter(delegaciones | Q(pk=self.instance.delegacion_id))
-        self.fields['funcionario_responsable'].queryset = Funcionario.objects.filter(responsables | Q(pk=self.instance.funcionario_responsable_id))
+        self.fields['funcionario_responsable'].queryset = Funcionario.objects.filter(responsables | Q(pk=self.instance.funcionario_responsable_id)).select_related('delegacion')
+        self.fields['funcionario_responsable'].label_from_instance = lambda f: f'{f.nombre} · {f.delegacion or "sin delegación"}'
+        if ve_todo:
+            self.fields['funcionario_responsable'].label = 'Delegado responsable'
+            self.fields['funcionario_responsable'].help_text = 'La coordinación asigna el compromiso a un delegado de la delegación elegida.'
         self.fields['item'].queryset = ItemMedible.objects.exclude(periodo__estado='cerrado').select_related('cargo', 'periodo')
         for campo in ('funcionario_responsable', 'origen'):
             self.fields[campo].required = True
@@ -293,6 +324,13 @@ class CompromisoForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm)
         if self.instance.pk:
             # El estado cambia con las acciones de la agenda, que dejan su historial.
             del self.fields['estado']
+
+    def clean(self):
+        cleaned_data = super().clean()
+        delegacion, responsable = cleaned_data.get('delegacion'), cleaned_data.get('funcionario_responsable')
+        if delegacion and responsable and responsable.delegacion_id and responsable.delegacion_id != delegacion.pk:
+            self.add_error('funcionario_responsable', f'{responsable.nombre} pertenece a la delegación {responsable.delegacion}, no a {delegacion}.')
+        return cleaned_data
 
     class Meta:
         model = Compromiso

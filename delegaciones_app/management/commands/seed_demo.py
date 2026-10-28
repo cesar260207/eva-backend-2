@@ -14,7 +14,7 @@ from delegaciones_app.models import (
     Actividad, Cargo, Catalogo, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol, Indicador, ItemMedible,
     MedicionDelegacion, Meta, ParametroVersionado, Periodo, Rol, UsuarioMaestro, Validacion,
 )
-from delegaciones_app.permisos import ROLES_DEL_SISTEMA
+from delegaciones_app.permisos import PERFIL_ADMINISTRADOR, PERFILES, ROLES_DEL_SISTEMA, asignar_perfil
 
 PERIODO = 'Trimestre julio-septiembre 2026'
 ITEM = 'Seguridad y prevencion'
@@ -72,7 +72,9 @@ class Command(BaseCommand):
         administrador = self._funcionario('admin.demo', 'Administrador', 'administrador', cargos['administrador'])
         self._funcionario('coordinador.demo', 'Coordinador SGR', 'coordinador', cargos['coordinador'])
         centro = self._funcionario('funcionario.centro', 'Funcionario Centro', 'funcionario', cargos['delegado'], delegaciones['Centro'])
-        verificador = self._funcionario('verificador.demo', 'Verificador SGR', 'verificador', cargos['verificador'])
+        # El verificador demo es el delegado de Centro: revisa las evidencias de su delegación.
+        verificador = self._funcionario('verificador.demo', 'Verificador SGR', 'verificador', cargos['verificador'], delegaciones['Centro'])
+        FuncionarioRol.objects.get_or_create(funcionario=verificador, rol=self.roles['delegado'])
         self._configurar_administrador(administrador)
 
         # Un delegado por delegación; las que no tienen funcionario reciben uno con cuenta inactiva,
@@ -95,7 +97,7 @@ class Command(BaseCommand):
         if clave_generada:
             self.stdout.write(self.style.WARNING(f'Clave generada para las cuentas demo NUEVAS (se muestra una sola vez): {clave}'))
         self.stdout.write(f'{len(delegaciones)} delegaciones, {len(metas)} metas, {compromisos} compromisos, {mediciones} mediciones historicas, {indicadores} indicadores nuevos.')
-        self.stdout.write(self.style.SUCCESS('Datos demo cargados. Cuentas demo: admin.demo, coordinador.demo, funcionario.centro, verificador.demo'))
+        self.stdout.write(self.style.SUCCESS('Datos demo cargados. Cuentas demo: admin.demo (Administrador), coordinador.demo (Supervisor), funcionario.centro y verificador.demo, delegado de Centro (Administrativo)'))
 
     def _funcionario(self, username, nombre, rol, cargo_nombre, delegacion=None, activo=True):
         usuario, creado = User.objects.get_or_create(username=username, defaults={'first_name': nombre, 'is_active': activo})
@@ -112,12 +114,16 @@ class Command(BaseCommand):
                 cargo=Cargo.objects.get_or_create(nombre=cargo_nombre)[0],
             )
         FuncionarioRol.objects.get_or_create(funcionario=funcionario, rol=self.roles[rol])
+        # El perfil (grupo) se deduce del rol solo si la cuenta aún no tiene uno: no pisa uno asignado a mano.
+        if not usuario.groups.filter(name__in=PERFILES).exists():
+            asignar_perfil(usuario)
         return funcionario
 
     def _configurar_administrador(self, funcionario):
         usuario = funcionario.usuario
         usuario.is_staff = usuario.is_superuser = True
         usuario.save(update_fields=['is_staff', 'is_superuser'])
+        asignar_perfil(usuario, PERFIL_ADMINISTRADOR)
         UsuarioMaestro.objects.get_or_create(
             usuario=usuario,
             defaults={'identificador_maestro': usuario.username, 'nombre': funcionario.nombre, 'nivel_dominio': 'total'},

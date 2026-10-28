@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}Delegados | SGR{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+    <div>
+        <div class="page-kicker">Coordinación</div>
+        <h1 class="page-title mb-2">Delegados y asignaciones</h1>
+        <p class="page-intro mb-0">Cada delegado trabaja solo su delegación. Desde aquí la coordinación ve todas las delegaciones, asigna a cada delegado su delegación y le asigna compromisos.</p>
+    </div>
+    <a class="btn btn-sgr" href="{% url 'compromiso_nuevo' %}">+ Asignar compromiso</a>
+</div>
+
+<div class="panel mb-4">
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead><tr><th>Delegación</th><th>Delegado(s)</th><th class="text-end">Compromisos abiertos</th><th class="text-end">Vencidos</th><th class="text-end">Actividades por revisar</th><th class="text-end">Cumplimiento</th><th>Acciones</th></tr></thead>
+            <tbody>
+            {% for fila in filas %}
+                <tr>
+                    <td><strong>{{ fila.delegacion.nombre }}</strong></td>
+                    <td>{% for delegado in fila.delegados %}{{ delegado.nombre }}{% if not forloop.last %}, {% endif %}{% empty %}<span class="badge badge-danger-soft">Sin delegado activo</span>{% endfor %}</td>
+                    <td class="text-end">{{ fila.compromisos_abiertos }}</td>
+                    <td class="text-end">{% if fila.compromisos_vencidos %}<span class="badge badge-danger-soft">{{ fila.compromisos_vencidos }}</span>{% else %}0{% endif %}</td>
+                    <td class="text-end">{{ fila.actividades_pendientes }}</td>
+                    <td class="text-end">{% if fila.cumplimiento %}<span class="badge bg-{{ fila.cumplimiento.estado_class }}">{{ fila.cumplimiento.cumplimiento }} %</span>{% else %}-{% endif %}</td>
+                    <td><div class="d-flex flex-wrap gap-2">
+                        <a class="btn btn-sm btn-outline-sgr" href="{% url 'compromiso_nuevo' %}?delegacion={{ fila.delegacion.pk }}">Asignar compromiso</a>
+                        <a class="btn btn-sm btn-outline-sgr" href="{% url 'agenda' %}?delegacion={{ fila.delegacion.pk }}">Ver agenda</a>
+                    </div></td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6"><div class="panel h-100">
+        <div class="section-label mb-2">Asignar delegado a una delegación</div>
+        {% if candidatos %}
+        <form method="post" class="row g-2">
+            {% csrf_token %}
+            <div class="col-md-6">
+                <label class="form-label" for="funcionario">Delegado</label>
+                <select class="form-select" id="funcionario" name="funcionario" required>
+                    {% for f in candidatos %}<option value="{{ f.pk }}">{{ f.nombre }} · {{ f.delegacion|default:'sin delegación' }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="delegacion">Delegación</label>
+                <select class="form-select" id="delegacion" name="delegacion" required>
+                    {% for fila in filas %}<option value="{{ fila.delegacion.pk }}">{{ fila.delegacion.nombre }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-12 d-flex justify-content-end"><button class="btn btn-sgr" type="submit">Asignar</button></div>
+        </form>
+        {% else %}
+        <p class="text-muted mb-0">No hay funcionarios activos con el rol delegado. Pide a un administrador que cree uno o que active una cuenta.</p>
+        {% endif %}
+    </div></div>
+    <div class="col-lg-6"><div class="panel h-100">
+        <div class="section-label mb-2">Delegados sin delegación</div>
+        <ul class="mb-0">{% for f in sin_delegacion %}<li>{{ f.nombre }}</li>{% empty %}<li class="text-muted">Todos los delegados activos tienen delegación.</li>{% endfor %}</ul>
+    </div></div>
+</div>
+{% endblock %}

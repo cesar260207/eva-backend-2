@@ -1,14 +1,16 @@
 """Mantenedores de las ocho tablas maestras.
 
-Cada mantenedor se describe una sola vez en MANTENEDORES (modelo, formulario, columnas, búsqueda,
-roles). Las cuatro vistas genéricas (lista, nuevo, editar y eliminar o desactivar) leen esa
-descripción, así que no se repite código por tabla.
+Cada mantenedor se describe una sola vez en MANTENEDORES (modelo, formulario, columnas, búsqueda).
+Las cuatro vistas genéricas (lista, nuevo, editar y eliminar o desactivar) leen esa descripción, así
+que no se repite código por tabla. Cada vista exige el permiso de Django del modelo que le corresponde
+(view, add, change o delete), que el usuario recibe por su perfil (grupo).
 """
 import datetime
 from dataclasses import dataclass
 from typing import Callable, Optional
 
 from django.contrib import messages
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import ProtectedError, Q
@@ -21,9 +23,7 @@ from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 from .auditoria import cambios_de_formulario
 from .forms import CargoForm, CatalogoForm, DelegacionForm, FuncionarioForm, ItemMedibleForm, MetaForm, PeriodoForm, RolForm
 from .models import Auditoria, Cargo, Catalogo, Delegacion, Funcionario, Indicador, ItemMedible, Meta, Periodo, Rol
-from .permisos import ADMINISTRADOR, COORDINADOR, ROLES_DEL_SISTEMA, RolRequeridoMixin, rol_requerido, tiene_rol
-
-ADMIN_Y_COORDINADOR = (ADMINISTRADOR, COORDINADOR)
+from .permisos import PERFILES, ROLES_DEL_SISTEMA, PermisoRequeridoMixin, permiso_requerido
 
 
 @dataclass
@@ -36,7 +36,6 @@ class Mantenedor:
     form: type
     columnas: list  # (etiqueta, nombre de atributo o función del objeto)
     busqueda: tuple
-    roles: tuple = ADMIN_Y_COORDINADOR
     baja: str = ''  # campo booleano que se desactiva en vez de eliminar la fila
     select_related: tuple = ()
     prefetch_related: tuple = ()
@@ -54,6 +53,13 @@ class Mantenedor:
 
     def consulta(self):
         return self.modelo.objects.select_related(*self.select_related).prefetch_related(*self.prefetch_related)
+
+    def permiso(self, accion):
+        """Permiso de Django para una acción (view, add, change o delete) sobre el modelo."""
+        return f'{self.modelo._meta.app_label}.{accion}_{self.modelo._meta.model_name}'
+
+    def permisos_de(self, user):
+        return {accion: user.has_perm(self.permiso(accion)) for accion in ('view', 'add', 'change', 'delete')}
 
 
 # Comportamiento propio de cada mantenedor
@@ -123,23 +129,24 @@ MANTENEDORES = {mantenedor.slug: mantenedor for mantenedor in (
         baja='vigencia',
     ),
     Mantenedor(
-        'roles', 'Roles', 'rol', 'Roles que definen los permisos del sistema.',
+        'roles', 'Roles', 'rol', 'Funciones de los funcionarios en el flujo de trabajo (delegado, verificador, consulta...).',
         Rol, RolForm,
         [('Rol', 'nombre_rol'), ('Funcionarios', lambda r: r.funcionarios.count())],
         ('nombre_rol__icontains',),
-        roles=(ADMINISTRADOR,), bloqueo=_bloqueo_rol,
+        bloqueo=_bloqueo_rol,
     ),
     Mantenedor(
-        'funcionarios', 'Funcionarios', 'funcionario', 'Cuentas de acceso con su cargo, delegación y roles.',
+        'funcionarios', 'Funcionarios y usuarios', 'funcionario', 'Cuentas de acceso con su perfil, cargo, delegación y roles.',
         Funcionario, FuncionarioForm,
         [
-            ('Nombre', 'nombre'), ('Usuario', 'identificador_institucional'), ('Cargo', 'cargo'), ('Delegación', 'delegacion'),
+            ('Nombre', 'nombre'), ('Usuario', 'identificador_institucional'), ('Correo', lambda f: f.usuario.email), ('Cargo', 'cargo'), ('Delegación', 'delegacion'),
+            ('Perfil', lambda f: ', '.join(grupo.name for grupo in f.usuario.groups.all() if grupo.name in PERFILES)),
             ('Roles', lambda f: ', '.join(rol.nombre_rol for rol in f.roles.all())),
         ],
-        ('nombre__icontains', 'identificador_institucional__icontains', 'usuario__email__icontains', 'cargo__nombre__icontains', 'delegacion__nombre__icontains', 'roles__nombre_rol__icontains'),
-        roles=(ADMINISTRADOR,), baja='estado', select_related=('cargo', 'delegacion', 'usuario'), prefetch_related=('roles',),
+        ('nombre__icontains', 'identificador_institucional__icontains', 'usuario__email__icontains', 'cargo__nombre__icontains', 'delegacion__nombre__icontains', 'roles__nombre_rol__icontains', 'usuario__groups__name__icontains'),
+        baja='estado', select_related=('cargo', 'delegacion', 'usuario'), prefetch_related=('roles', 'usuario__groups'),
         con_actor=True, cambiar_baja=_cambiar_funcionario, bloqueo=_bloqueo_funcionario,
-        ayuda='Al crear un funcionario también se crea su cuenta de acceso. Al editar, deja la contraseña vacía para conservarla.',
+        ayuda='Al crear un funcionario también se crea su cuenta de acceso y se le asigna su perfil (grupo). Al editar, deja la contraseña vacía para conservarla. El correo se usa para recuperar la contraseña.',
     ),
     Mantenedor(
         'catalogo', 'Catálogo', 'elemento de catálogo', 'Actividades, servicios, tipos de atención e ítems normalizados.',
@@ -206,22 +213,26 @@ def _motivo_de_proteccion(error):
 
 # Vistas genéricas
 
-class MantenedorMixin(RolRequeridoMixin):
-    """Busca el mantenedor por el slug de la URL y aplica sus roles permitidos."""
+class MantenedorMixin(PermisoRequeridoMixin):
+    """Busca el mantenedor por el slug de la URL y exige el permiso de la acción sobre su modelo."""
+
+    accion = 'view'
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
         self.config = MANTENEDORES.get(kwargs.get('slug'))
         if self.config is None:
             raise Http404('Mantenedor no encontrado.')
-        self.roles_permitidos = self.config.roles
+
+    def get_permiso_requerido(self):
+        return self.config.permiso(self.accion)
 
     def get_queryset(self):
         return self.config.consulta()
 
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)
-        contexto.update(config=self.config, volver_url=self.url_lista())
+        contexto.update(config=self.config, volver_url=self.url_lista(), puede=self.config.permisos_de(self.request.user))
         return contexto
 
     def url_lista(self):
@@ -293,16 +304,19 @@ class MantenedorFormularioMixin(MantenedorMixin):
 
 
 class MantenedorNuevo(MantenedorFormularioMixin, CreateView):
+    accion = 'add'
     accion_titulo = 'Agregar'
 
 
 class MantenedorEditar(MantenedorFormularioMixin, UpdateView):
+    accion = 'change'
     accion_titulo = 'Modificar'
 
 
 class MantenedorEliminar(MantenedorMixin, DeleteView):
     """Confirma y elimina la fila o, si el mantenedor tiene `baja`, la activa o desactiva."""
 
+    accion = 'delete'
     template_name = 'delegaciones_app/mantenedor_confirmar_eliminar.html'
 
     def _bloqueo(self):
@@ -363,10 +377,10 @@ class MantenedorEliminar(MantenedorMixin, DeleteView):
         return redirect(self.get_success_url())
 
 
-class PeriodoAccion(RolRequeridoMixin, View):
+class PeriodoAccion(PermisoRequeridoMixin, View):
     """Iniciar, cerrar y reabrir un período (las reglas están en los métodos del modelo)."""
 
-    roles_permitidos = ADMIN_Y_COORDINADOR
+    permiso_requerido = 'delegaciones_app.change_periodo'
     ACCIONES = {'iniciar': 'iniciado', 'cerrar': 'cerrado', 'reabrir': 'reabierto'}
 
     def post(self, request, pk, accion):
@@ -390,11 +404,47 @@ class PeriodoAccion(RolRequeridoMixin, View):
         return redirect('mantenedor_lista', slug='periodos')
 
 
-@rol_requerido(*ADMIN_Y_COORDINADOR)
-def indice(request):
-    """Índice de los ocho mantenedores; los que el usuario no puede usar aparecen deshabilitados."""
-    tarjetas = [
-        {'slug': m.slug, 'titulo': m.titulo, 'descripcion': m.descripcion, 'permitido': tiene_rol(request.user, *m.roles)}
+def mantenedores_visibles(user):
+    """Tarjetas de los ocho mantenedores con lo que el usuario puede hacer en cada uno según sus permisos."""
+    return [
+        {'slug': m.slug, 'titulo': m.titulo, 'descripcion': m.descripcion, 'permitido': user.has_perm(m.permiso('view')), 'puede': m.permisos_de(user)}
         for m in MANTENEDORES.values()
     ]
-    return render(request, 'delegaciones_app/mantenedores.html', {'tarjetas': tarjetas, 'puede_auditar': tiene_rol(request.user, ADMINISTRADOR)})
+
+
+PERMISOS_DE_MANTENEDORES = tuple(m.permiso('view') for m in MANTENEDORES.values())
+
+
+@permiso_requerido(*PERMISOS_DE_MANTENEDORES)
+def indice(request):
+    """Índice de los ocho mantenedores; los que el usuario no puede usar aparecen deshabilitados."""
+    return render(request, 'delegaciones_app/mantenedores.html', {
+        'tarjetas': mantenedores_visibles(request.user),
+        'puede_auditar': request.user.has_perm('delegaciones_app.view_auditoria'),
+        'puede_ver_perfiles': request.user.has_perm('auth.view_group'),
+    })
+
+
+ACCIONES_PERMISO = {'view': 'Ver', 'add': 'Agregar', 'change': 'Modificar', 'delete': 'Eliminar'}
+
+
+@permiso_requerido('auth.view_group')
+def perfiles(request):
+    """Perfiles de acceso (grupos de Django) con sus permisos y sus usuarios. Es de solo lectura:
+    el perfil de cada usuario se asigna en el mantenedor de funcionarios."""
+    filas = []
+    for grupo in Group.objects.filter(name__in=PERFILES).prefetch_related('permissions__content_type'):
+        por_modelo = {}
+        for permiso in grupo.permissions.all():
+            accion, _, _ = permiso.codename.partition('_')
+            modelo = permiso.content_type.model_class()
+            nombre = modelo._meta.verbose_name_plural.capitalize() if modelo else permiso.content_type.model
+            por_modelo.setdefault(nombre, []).append(ACCIONES_PERMISO.get(accion, accion))
+        filas.append({
+            'nombre': grupo.name,
+            'usuarios': grupo.user_set.filter(is_active=True).order_by('username'),
+            'permisos': sorted(por_modelo.items()),
+            'total': grupo.permissions.count(),
+        })
+    filas.sort(key=lambda fila: PERFILES.index(fila['nombre']))
+    return render(request, 'delegaciones_app/crud/perfiles.html', {'perfiles': filas})

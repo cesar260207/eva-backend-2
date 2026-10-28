@@ -11,7 +11,7 @@
         <p class="page-intro mb-0">{% if periodo %}Período: {{ periodo.nombre }} ({{ periodo.fecha_inicio|date:'d-m-Y' }} a {{ periodo.fecha_termino|date:'d-m-Y' }}). {% endif %}El resultado se calcula con actividades aprobadas y metas configurables.</p>
     </div>
     <div class="d-flex gap-2">
-        {% if puede_administrar %}<a href="{% url 'mantenedor_nuevo' 'metas' %}" class="btn btn-sgr">+ Agregar meta</a>{% endif %}
+        {% if perms.delegaciones_app.add_meta %}<a href="{% url 'mantenedor_nuevo' 'metas' %}" class="btn btn-sgr">+ Agregar meta</a>{% endif %}
         <a href="{% url 'resumen' %}" class="btn btn-outline-sgr">Resumen ejecutivo</a>
     </div>
 </div>
@@ -59,7 +59,7 @@
                 </ul>
                 <div class="d-flex flex-wrap gap-2 mt-3">
                     <a class="btn btn-sm btn-outline-sgr" href="{% url 'delegacion_detalle' delegacion.nombre %}">Ver registros de origen</a>
-                    {% if puede_administrar %}<a class="btn btn-sm btn-outline-sgr" href="{% url 'mantenedor_lista' 'metas' %}?q={{ delegacion.nombre|urlencode }}">Gestionar metas</a>{% endif %}
+                    {% if perms.delegaciones_app.view_meta %}<a class="btn btn-sm btn-outline-sgr" href="{% url 'mantenedor_lista' 'metas' %}?q={{ delegacion.nombre|urlencode }}">Gestionar metas</a>{% endif %}
                 </div>
             </div>
         </div>

@@ -1,79 +1,65 @@
-# Checklist de la entrega
+# Checklist de la entrega — Evaluación Sumativa 3
 
-Este documento resume la pauta compartida por el equipo. El proyecto se migró al modelo de 17 clases, se revisó en local y se desplegó en EC2 el 21-10-2026 (ver la sección «EC2» y el README.md).
+Pauta: aplicación web con CRUD, autenticación, perfiles, recuperación de contraseña y sin Django Admin.
+Equipo de cuatro integrantes: se exigen 8 mantenedores y 4 transacciones.
 
-## Requisito de equipo
+## Autenticación (15 pts)
 
-- [x] Completar los CRUD de exactamente **8 mantenedores visuales**, dos por cada integrante del equipo de cuatro:
-  Delegaciones, Cargos, Roles, Funcionarios, Catálogo, Períodos, Ítems medibles y Metas.
-  - [x] Los ocho comparten las vistas genéricas de `crud.py` (listado con búsqueda, nuevo, modificar y eliminar o desactivar con confirmación).
-  - [x] Roles y Funcionarios son solo de administración; los demás, de administración y coordinación.
-  - [x] Actividades (`/actividades/`) y compromisos (`/agenda/`) tienen sus propias pantallas y no cuentan como mantenedores adicionales.
-- [x] Administrar cualquier entidad adicional del modelo en Django Admin, sin convertirla en un noveno mantenedor visual. `MedicionDelegacion` es una entidad adicional para conservar los indicadores importados.
+- [x] Ingreso con usuario y contraseña (`/login/`) y cierre de sesión (Salir, POST a `/logout/`).
+- [x] Vistas protegidas con `@login_required`, `PermisoRequeridoMixin` y `permiso_requerido`.
+- [x] Al ingresar, cada usuario llega al panel de su perfil (`LOGIN_REDIRECT_URL = 'panel'`).
 
-## Base de datos y Django ORM
+## Perfiles y permisos (15 pts)
 
-- [x] Definir modelos relacionales, relaciones y claves foráneas: las 17 clases del diseño más `FuncionarioRol` y `MedicionDelegacion`.
-- [x] Crear migraciones para las entidades del proyecto (`0007` a `0014` llevan los datos al modelo de 17 clases).
-- [x] Importar los datos de `solicitudes.json` y `metas_delegaciones.json` mediante `seed_demo`.
-- [x] Verificar localmente que los registros de ambos JSON se cargaron y que no faltan registros.
-- [x] Confirmar que los modelos coinciden con las migraciones (`makemigrations --check --dry-run`).
-- [ ] Sincronizar el esquema y los registros con la base de datos SQL compatible destinada a la entrega.
-- [x] Confirmar que las vistas obtienen datos mediante consultas Django ORM y plantillas Django.
-- [x] Preparar una explicación de entidades, relaciones y finalidad de las tablas (`MODELO_DATOS.md`).
+- [x] Tres grupos de Django con permisos: Administrador, Supervisor y Administrativo (migración `0015_perfiles_de_acceso`).
+- [x] Creación de usuarios y asignación de grupo desde **Administración → Funcionarios y usuarios**.
+- [x] Restricciones funcionales: los mantenedores, la auditoría y los perfiles exigen el permiso de Django correspondiente.
+- [x] Página de consulta de perfiles y permisos: `/administracion/perfiles/`.
 
-## Django Admin y aplicación
+## Recuperación de contraseña (15 pts)
 
-- [x] Registrar todas las entidades del modelo en Django Admin (las 19 tablas; la auditoría solo se consulta).
-- [ ] Verificar en Admin creación, visualización, búsqueda, edición, eliminación y navegación por relaciones.
-- [ ] Revisar listados, tablas/tarjetas y enlaces de navegación Bootstrap.
-- [ ] Mostrar Agregar, Modificar, Eliminar y Buscar en cada vista de listado. La pauta permite marcadores de posición para los botones del sitio en esta evaluación; el entregable también menciona CRUD operativo, así que Admin debe tener CRUD funcional.
+- [x] Solicitud por correo (`/recuperar/`), token seguro de Django, enlace por correo, validación del token, nueva contraseña y confirmación.
+- [x] Enlace en la pantalla de login; el cambio queda en la auditoría.
+- [ ] Configurar `EMAIL_*` en el `.env` de EC2 (Gmail con contraseña de aplicación) y probar con un correo real.
+- [ ] Poner un correo real a las cuentas que se usarán en la demostración.
 
-## GitHub y documentación
+## Dashboard por perfil (10 pts)
 
-- [ ] Confirmar que el repositorio GitHub propio contiene el código completo y el historial de desarrollo.
-- [ ] Subir los cambios en commits y comprobar el remoto.
-- [ ] Mantener README y `.gitignore`; no subir `.env` ni credenciales.
-- [ ] Preparar documento técnico PDF o Word: descripción y objetivo, funcionalidades, arquitectura, carpetas/apps y base de datos.
-- [ ] Documentar prompts de IA, respuestas y aplicación en el proyecto.
+- [x] Panel Administrador: visión global, gestión de usuarios, los 8 mantenedores, transacciones, auditoría reciente.
+- [x] Panel Supervisor: mantenedores autorizados, transacciones, cumplimiento y alertas operacionales.
+- [x] Panel Administrativo: solo sus funciones y la lista de operaciones restringidas.
 
-## Evidencias para la revisión presencial
+## Mantenedores (20 pts) y transacciones (10 pts)
 
-- [x] Django Admin: modelos, migraciones, registros y operaciones CRUD.
-- [x] phpMyAdmin: todas las tablas, estructura, relaciones y registros.
-- [x] GitHub: repositorio remoto, commits, remoto configurado y clonación.
-- [x] EC2: conexión SSH, proyecto clonado, entorno virtual y aplicación ejecutándose.
-- [ ] Capturas de AWS, terminal Linux, aplicación, GitHub, migraciones/modelos, tablas phpMyAdmin y uso de IA.
+- [x] 8 mantenedores con crear, buscar, listar, modificar y eliminar o desactivar: Delegaciones, Cargos, Roles,
+  Funcionarios y usuarios, Catálogo, Períodos, Ítems medibles y Metas.
+- [x] Transacciones: registro de actividad con evidencia, revisión de evidencias (Validacion), compromisos con
+  historial de estados y apertura, cierre y reapertura de períodos.
 
-## EC2
+## Ajustes de la revisión del equipo
 
-- [x] Crear/preparar instancia EC2 Linux con Python, venv, Django, Git, servidor web y base de datos compatible.
-- [x] Clonar desde el repositorio GitHub, configurar variables de entorno, instalar dependencias, migrar y cargar datos (versión anterior del modelo).
-- [x] Verificar aplicación y phpMyAdmin desde EC2.
-- [x] Actualizar el servidor al modelo de 17 clases (21-10-2026): respaldo con `mysqldump`, ensayo previo de las migraciones sobre una copia de la base, `git pull`, `migrate`, `calcular_indicadores`, `collectstatic` y reinicio de Gunicorn. Los conteos de registros coincidieron antes y después y las pantallas se verificaron en el navegador.
+- [x] Quién crea compromisos: coordinación (asigna a un delegado) o delegado/funcionario en su delegación; explicado en la agenda.
+- [x] Botón «Subir evidencia» con pantalla propia, separado de «Modificar».
+- [x] Indicador de evidencia (cargada / sin evidencia) en el listado de actividades.
+- [x] Vista de revisión sin elementos de carga sobrantes.
+- [x] Revisión: solo aprobar o rechazar con motivo (se quitó «solicitar corrección»).
+- [x] El delegado ve solo su delegación (registros, filtros, medición, semáforo, resumen, informes).
+- [x] Coordinador separado del delegado: pantalla «Delegados» para asignarlos y asignarles compromisos; el delegado revisa las evidencias de su delegación.
+- [x] Diseño más ordenado: menú agrupado, esquinas rectas, tablas y paneles uniformes.
+
+## Sin Django Admin
+
+- [x] `django.contrib.admin` fuera de `INSTALLED_APPS`, sin ruta `/admin/` y sin `admin.py`.
+
+## Base de datos, EC2, GitHub, IA
+
+- [x] Modelos, relaciones y migraciones (`makemigrations --check` sin cambios pendientes).
+- [ ] EC2: `git pull`, `.env` con correo, `migrate`, `collectstatic` y reinicio de Gunicorn (ver README, «Actualizar un servidor ya desplegado»).
+- [ ] Subir los cambios a GitHub en commits.
+- [x] Evidencia de IA actualizada en `evidencias_ia.md`.
+- [ ] Documento técnico PDF/Word con capturas (login, recuperación, 3 paneles, mantenedores, transacciones, EC2, GitHub, IA).
 
 ## Pruebas
 
-- [x] Pruebas unitarias por caso de uso con el CU y los RF en el docstring (`test_unit_*.py`) y los 8 casos de login.
-- [x] Pruebas de integración en `test_integracion.py`.
-- [x] `PLAN_DE_PRUEBAS.md` con la tabla CP, CU, RF, método de prueba y resultado, generado con `python manage.py plan_pruebas`.
-- [x] Implementados RF-021, RF-030 y RF-037 (resumen colectivo, actividad reciente y alertas), sin migraciones nuevas.
-- [ ] Los requisitos RF-015, 020, 025, 031 y 035 quedan declarados como pendientes: necesitan modelos nuevos o decisiones de diseño que el informe no define.
-
-## Notas del estado actual
-
-- `MODELO_DATOS.md` explica las 17 clases y las dos tablas adicionales, sus reglas de negocio, sus relaciones, la migración al modelo nuevo y los requisitos pendientes.
-- `settings.py` exige `SECRET_KEY` desde `.env`; no hay clave secreta de respaldo en el codigo.
-- WhiteNoise esta configurado para servir archivos estaticos con `DEBUG=False`; Gunicorn se instala solo en sistemas distintos de Windows.
-- Se conserva `fecha_ingreso` importada, Agenda permite buscar y Resumen consulta el historico de `MedicionDelegacion`.
-- `Auditoria` es inmutable: no se modifica ni se elimina, ni siquiera desde Django Admin, que solo permite consultarla. Registra también los accesos denegados.
-- Los ocho mantenedores tienen CRUD propio.
-
-- El proyecto cuenta con ocho entradas en `MANTENEDORES`.
-- Las 19 tablas del modelo están registradas en Admin.
-- La base local provisional se migró y recibió los datos de demostración; las verificaciones de Django y consistencia de migraciones pasaron.
-- Despliegue real en EC2: Amazon Linux 2023, MySQL 8.4 (no MariaDB), Gunicorn como servicio systemd, Nginx como proxy inverso y phpMyAdmin con PHP-FPM protegido con doble autenticación.
-- La base local con XAMPP/MariaDB 10.4 no era compatible con Django 5.2; por eso la base definitiva es MySQL 8.4 en la EC2.
-- XAMPP reportó un error de checksum de Aria al configurar privilegios de un usuario de aplicación local; `gestion_user` quedó sin privilegios sobre la base.
-- El despliegue del modelo de 17 clases se ensayó primero sobre una copia de la base real: las migraciones `0007` a `0014` se aplicaron sin errores sobre MySQL 8.4. En el servidor quedan dos respaldos de la base anteriores al cambio.
-- La migración creó delegados provisionales inactivos para las delegaciones sin funcionarios y el período «Período 11-2026»; conviene revisarlos y reemplazarlos desde los mantenedores.
+- [x] `python manage.py test`: 530 pruebas en verde, incluidas las de `test_unit_seguridad.py` y `test_unit_delegaciones.py`.
+- [x] `PLAN_DE_PRUEBAS.md` regenerado con `python manage.py plan_pruebas`.

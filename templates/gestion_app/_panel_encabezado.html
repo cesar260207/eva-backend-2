@@ -1,0 +1,12 @@
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+    <div>
+        <div class="page-kicker">Panel · Perfil {{ perfil }}</div>
+        <h1 class="page-title mb-2">Hola, {{ funcionario.nombre|default:user.get_username }}</h1>
+        <p class="page-intro mb-0">{{ descripcion }}</p>
+    </div>
+    <div class="text-end">
+        <span class="badge bg-dark fs-6">{{ perfil }}</span>
+        {% if roles %}<div class="small text-muted mt-1">Roles: {{ roles|join:', ' }}</div>{% endif %}
+        {% if funcionario.delegacion %}<div class="small text-muted">Delegación {{ funcionario.delegacion }}</div>{% endif %}
+    </div>
+</div>

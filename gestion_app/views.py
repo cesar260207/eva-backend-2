@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import Group, User
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
@@ -11,9 +12,20 @@ from delegaciones_app.informes import (
     filtrar_actividades, filtrar_compromisos, respuesta_csv,
 )
 from delegaciones_app.medicion import periodo_vigente, periodos_con_indicadores, promedio_general, resultados_por_delegacion
-from delegaciones_app.models import Actividad, Auditoria, Compromiso, Delegacion, MedicionDelegacion, Periodo
-from delegaciones_app.permisos import funcionario_de, roles_de
+from delegaciones_app.crud import mantenedores_visibles
+from delegaciones_app.models import Actividad, Auditoria, Compromiso, Delegacion, Evidencia, Funcionario, MedicionDelegacion, Periodo
+from delegaciones_app.permisos import (
+    ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICADOR, PERFIL_ADMINISTRADOR, PERFIL_SUPERVISOR, PERFILES, delegacion_propia, funcionario_de,
+    perfil_de, roles_de, tiene_rol,
+)
+from delegaciones_app.views import _delegaciones_visibles
 from delegaciones_app.views import _actividades_autorizadas, _compromisos_autorizados
+
+
+def _solo_su_delegacion(user, resultados):
+    """Resultados por delegación que el usuario puede ver: un delegado ve solo los de su delegación."""
+    propia = delegacion_propia(user)
+    return [fila for fila in resultados if fila['nombre'] == propia.nombre] if propia else resultados
 
 
 def _contexto_medicion(request):
@@ -24,11 +36,85 @@ def _contexto_medicion(request):
         'periodo': periodo,
         'periodos': periodos_con_indicadores(),
         'query': texto,
-        'delegaciones': resultados_por_delegacion(periodo, texto),
+        'delegacion_propia': delegacion_propia(request.user),
+        'delegaciones': _solo_su_delegacion(request.user, resultados_por_delegacion(periodo, texto)),
         'hoy': timezone.localdate(),
         'esperado': periodo.porcentaje_esperado() if periodo else None,
         'tope': periodo.obtener_parametro('maximo_cumplimiento', '150') if periodo else None,
     }
+
+
+def _resumen_operacional(user):
+    """Cifras de actividades y compromisos dentro del ámbito del usuario, comunes a los tres paneles."""
+    actividades = _actividades_autorizadas(user)
+    abiertos = list(_compromisos_autorizados(user).exclude(estado='realizado'))
+    return {
+        'actividades_total': actividades.count(),
+        'actividades_pendientes': actividades.filter(estado='pendiente').count(),
+        'actividades_aprobadas': actividades.filter(estado='aprobada').count(),
+        'compromisos_abiertos': len(abiertos),
+        'compromisos_vencidos': sum(1 for c in abiertos if c.vencido),
+        'compromisos_por_vencer': sum(1 for c in abiertos if not c.vencido and c.proximo_a_vencer),
+    }
+
+
+@login_required
+def panel(request):
+    """Panel de inicio según el perfil autenticado (Administrador, Supervisor o Administrativo).
+
+    Cada perfil ve un panel distinto: el administrador, la visión global con todos los mantenedores,
+    las transacciones y la gestión de usuarios; el supervisor, los mantenedores y transacciones que
+    sus permisos autorizan y la información operacional; el administrativo, solo sus funciones.
+    """
+    user = request.user
+    perfil = perfil_de(user)
+    contexto = {
+        'perfil': perfil,
+        'funcionario': funcionario_de(user),
+        'roles': sorted(roles_de(user)),
+        'alertas': alertas_de(user)[:5],
+        **_resumen_operacional(user),
+    }
+    if perfil in (PERFIL_ADMINISTRADOR, PERFIL_SUPERVISOR):
+        periodo = periodo_vigente()
+        delegaciones = resultados_por_delegacion(periodo) if periodo else []
+        contexto.update({
+            'mantenedores': [m for m in mantenedores_visibles(user) if m['permitido']],
+            'periodo': periodo,
+            'delegaciones': delegaciones,
+            'promedio': promedio_general(delegaciones),
+            'evidencias_pendientes': Evidencia.objects.filter(actividad__in=_actividades_autorizadas(user), estado_revision='pendiente').count(),
+        })
+    if perfil == PERFIL_ADMINISTRADOR:
+        contexto.update({
+            'usuarios_activos': User.objects.filter(is_active=True).count(),
+            'usuarios_inactivos': User.objects.filter(is_active=False).count(),
+            'perfiles': [
+                (grupo.name, grupo.user_set.filter(is_active=True).count())
+                for grupo in sorted(Group.objects.filter(name__in=PERFILES), key=lambda g: PERFILES.index(g.name))
+            ],
+            'funcionarios_activos': Funcionario.objects.filter(estado=True).count(),
+            'delegaciones_activas': Delegacion.objects.filter(estado=True).count(),
+            'periodos_abiertos': Periodo.objects.filter(estado='abierto').count(),
+            'auditoria_reciente': Auditoria.objects.select_related('funcionario', 'usuario_maestro').order_by('-pk')[:6],
+        })
+        plantilla = 'gestion_app/panel_administrador.html'
+    elif perfil == PERFIL_SUPERVISOR:
+        plantilla = 'gestion_app/panel_supervisor.html'
+    else:
+        propio = contexto['funcionario']
+        periodo = periodo_vigente()
+        contexto.update({
+            'delegacion_propia': delegacion_propia(user),
+            'resultado_delegacion': _solo_su_delegacion(user, resultados_por_delegacion(periodo))[:1] if periodo and delegacion_propia(user) else [],
+            'mis_actividades': Actividad.objects.filter(funcionario_autor=propio).select_related('delegacion').order_by('-fecha')[:5] if propio else [],
+            'mis_compromisos': Compromiso.objects.filter(funcionario_responsable=propio).exclude(estado='realizado').order_by('fecha_comprometida')[:5] if propio else [],
+            # Las mismas reglas que compromiso_nuevo: un verificador o una cuenta de consulta no registra compromisos.
+            'puede_registrar_compromiso': tiene_rol(user, ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO),
+            'puede_revisar': tiene_rol(user, DELEGADO, VERIFICADOR),
+        })
+        plantilla = 'gestion_app/panel_administrativo.html'
+    return render(request, plantilla, contexto)
 
 
 @login_required
@@ -51,7 +137,10 @@ def resumen(request):
         'mejor': max(delegaciones, key=lambda fila: fila['cumplimiento'], default={}),
         'critico': min(delegaciones, key=lambda fila: fila['cumplimiento'], default={}),
         'alcanza_umbral': periodo.alcanza_umbral(promedio) if periodo else None,
-        'mediciones_historicas': MedicionDelegacion.objects.select_related('delegacion')[:12],
+        'mediciones_historicas': (
+            MedicionDelegacion.objects.select_related('delegacion').filter(delegacion=contexto['delegacion_propia'])
+            if contexto['delegacion_propia'] else MedicionDelegacion.objects.select_related('delegacion')
+        )[:12],
     })
     return render(request, 'gestion_app/resumen.html', contexto)
 
@@ -99,7 +188,7 @@ def informe(request):
         actividades = filtrar_actividades(_actividades_autorizadas(request.user), {**request.GET.dict(), 'periodo': ''})
         columnas, filas = filas_de_actividad_reciente(medicion.actividad_reciente(actividades, periodo))
     else:
-        resultados = resultados_por_delegacion(periodo, '')
+        resultados = _solo_su_delegacion(request.user, resultados_por_delegacion(periodo, ''))
         if request.GET.get('delegacion', '').isdigit():
             elegida = Delegacion.objects.filter(pk=int(request.GET['delegacion'])).first()
             resultados = [fila for fila in resultados if elegida and fila['nombre'] == elegida.nombre]
@@ -112,7 +201,7 @@ def informe(request):
     return render(request, 'gestion_app/informe.html', {
         'tipo': tipo, 'nombre_tipo': dict(TIPOS_INFORME)[tipo], 'tipos': TIPOS_INFORME, 'columnas': columnas, 'filas': filas, 'filtros': request.GET,
         'imprimir': formato == 'imprimir', 'consulta': parametros.urlencode(), 'hoy': timezone.localdate(),
-        'delegaciones_filtro': Delegacion.objects.filter(estado=True), 'periodos_filtro': Periodo.objects.order_by('-fecha_inicio'),
+        'delegaciones_filtro': _delegaciones_visibles(request.user), 'periodos_filtro': Periodo.objects.order_by('-fecha_inicio'),
         'estados_filtro': Actividad.ESTADOS if tipo in ('actividades', 'reciente') else Compromiso.ESTADOS,
         'periodo_informe': periodo,
     })

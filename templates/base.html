@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}SGR | Municipalidad de La Serena{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'bootstrap/css/bootstrap.min.css' %}">
-    <link rel="stylesheet" href="{% static 'css/sgr.css' %}?v=red-20260908">
+    <link rel="stylesheet" href="{% static 'css/sgr.css' %}?v=eva3-20261027">
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark sticky-top sgr-nav">
@@ -19,20 +19,38 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="mainNav">
-                <ul class="navbar-nav ms-auto gap-lg-2">
+                <ul class="navbar-nav ms-auto gap-lg-1 align-items-lg-center">
+                    {% if user.is_authenticated %}
+                    <li class="nav-item"><a class="nav-link" href="{% url 'panel' %}">Mi panel</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'actividades' %}">Actividades</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'agenda' %}">Compromisos</a></li>
+                    {% if es_coordinacion %}<li class="nav-item"><a class="nav-link" href="{% url 'delegados' %}">Delegados</a></li>
+                    {% elif mi_delegacion %}<li class="nav-item"><a class="nav-link" href="{% url 'delegacion_detalle' mi_delegacion.nombre %}">Mi delegación</a></li>{% endif %}
+                    <li class="nav-item dropdown">
+                        <button class="nav-link dropdown-toggle btn btn-link border-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">Medición</button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{% url 'dashboard' %}">Cumplimiento</a></li>
+                            <li><a class="dropdown-item" href="{% url 'semaforo' %}">Semáforo</a></li>
+                            <li><a class="dropdown-item" href="{% url 'resumen' %}">Resumen</a></li>
+                            <li><a class="dropdown-item" href="{% url 'informe' %}">Informes</a></li>
+                            <li><a class="dropdown-item" href="{% url 'alertas' %}">Alertas</a></li>
+                        </ul>
+                    </li>
+                    {% if puede_administrar %}<li class="nav-item"><a class="nav-link" href="{% url 'mantenedores' %}">Administración</a></li>{% endif %}
+                    <li class="nav-item dropdown">
+                        <button class="nav-link dropdown-toggle nav-usuario btn btn-link" type="button" data-bs-toggle="dropdown" aria-expanded="false">{{ user.get_username }}{% if perfil_usuario %} · {{ perfil_usuario }}{% endif %}</button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{% url 'ficha_personal' %}">Mi ficha</a></li>
+                            <li><a class="dropdown-item" href="{% url 'institucional' %}">Territorio</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><form method="post" action="{% url 'logout' %}" class="m-0">{% csrf_token %}<button class="dropdown-item" type="submit">Salir</button></form></li>
+                        </ul>
+                    </li>
+                    {% else %}
                     <li class="nav-item"><a class="nav-link" href="{% url 'inicio' %}">Inicio</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'institucional' %}">Territorio</a></li>
-                    {% if user.is_authenticated %}
-                    <li class="nav-item"><a class="nav-link" href="{% url 'solicitudes' %}">Agenda</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'actividad_nueva' %}">Registrar actividad</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'dashboard' %}">Medición</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'ficha_personal' %}">Mi ficha</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'actividades' %}">Actividades</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'informe' %}">Informes</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'alertas' %}">Alertas</a></li>
-                    {% if puede_administrar %}<li class="nav-item"><a class="nav-link" href="{% url 'mantenedores' %}">Administración</a></li>{% endif %}
-                    <li class="nav-item"><form method="post" action="{% url 'logout' %}" class="m-0"><button class="nav-link btn btn-link border-0" type="submit">Salir</button>{% csrf_token %}</form></li>
-                    {% else %}<li class="nav-item"><a class="nav-link" href="{% url 'login' %}">Ingresar</a></li>{% endif %}
+                    <li class="nav-item"><a class="btn btn-sgr btn-sm ms-lg-2" href="{% url 'login' %}">Ingresar</a></li>
+                    {% endif %}
                 </ul>
             </div>
         </div>

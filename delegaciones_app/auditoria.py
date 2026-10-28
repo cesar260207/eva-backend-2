@@ -7,7 +7,7 @@ from django.utils import timezone
 from django.views.generic import ListView
 
 from .models import Auditoria
-from .permisos import ADMINISTRADOR, RolRequeridoMixin
+from .permisos import PermisoRequeridoMixin
 
 
 def plano(valor):
@@ -49,11 +49,11 @@ def _fecha(texto):
         return None
 
 
-class AuditoriaConsulta(RolRequeridoMixin, ListView):
+class AuditoriaConsulta(PermisoRequeridoMixin, ListView):
     """Consulta con filtros del historial de operaciones críticas. Es de solo lectura: no ofrece
     ninguna acción para modificar o eliminar registros (HU-30, escenario 2)."""
 
-    roles_permitidos = (ADMINISTRADOR,)
+    permiso_requerido = 'delegaciones_app.view_auditoria'
     template_name = 'delegaciones_app/crud/auditoria.html'
     context_object_name = 'eventos'
     paginate_by = 50
