@@ -8,18 +8,36 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.http import FileResponse, Http404
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from .forms import ActividadForm, CompromisoForm, EvidenciaForm
 from .informes import PLAZOS, filtrar_actividades, filtrar_compromisos, resumen_por_responsable, situacion_de_plazo
 from .medicion import periodo_vigente, promedio_general, resultados_por_delegacion
-from .models import Actividad, Auditoria, Compromiso, Delegacion, Evidencia, Periodo, Validacion
-from .permisos import ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICADOR, funcionario_de, puede_ver_todo, registrar_acceso_denegado, tiene_rol
+from .models import Actividad, Auditoria, Compromiso, Delegacion, Evidencia, Funcionario, Periodo, Validacion
+from .permisos import (
+    ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICADOR, delegacion_propia, funcionario_de, puede_ver_todo, registrar_acceso_denegado,
+    rol_requerido, tiene_rol,
+)
 
-# Decisión de la revisión -> método de Validacion que la aplica a cada evidencia pendiente.
-DECISIONES = {'aprobar': 'aprobar_evidencia', 'rechazar': 'rechazar_evidencia', 'corregir': 'solicitar_correccion'}
+# Decisión de la revisión -> método de Validacion que la aplica a cada evidencia pendiente. La revisión
+# se simplificó a aprobar o rechazar con motivo: quien registró corrige y sube una evidencia nueva.
+DECISIONES = {'aprobar': 'aprobar_evidencia', 'rechazar': 'rechazar_evidencia'}
+
+# Quién revisa evidencias: el delegado revisa las de su delegación (su ámbito lo limita
+# _actividades_autorizadas); verificador, coordinación y administración, las de su alcance.
+ROLES_REVISORES = (ADMINISTRADOR, COORDINADOR, DELEGADO, VERIFICADOR)
+MENSAJE_REVISION_PROPIA = 'No puedes revisar una actividad que registraste tú: la revisa otro delegado, un verificador o la coordinación.'
+
+# Estados de actividad que se ofrecen en los filtros («Requiere corrección» queda solo para datos antiguos).
+ESTADOS_ACTIVIDAD_FILTRO = [(valor, etiqueta) for valor, etiqueta in Actividad.ESTADOS if valor != 'correccion']
+
+
+def _delegaciones_visibles(user):
+    """Delegaciones que el usuario puede elegir en los filtros: solo la suya si su ámbito es una delegación."""
+    propia = delegacion_propia(user)
+    return Delegacion.objects.filter(pk=propia.pk) if propia else Delegacion.objects.filter(estado=True)
 
 
 def _funcionario_requerido(request):
@@ -101,6 +119,20 @@ def _bloqueo_actividad(funcionario, actividad, ve_todo):
     return None
 
 
+MENSAJE_SOLO_AUTOR_EVIDENCIA = 'Solo quien registró la actividad o la coordinación puede subir evidencias.'
+
+
+def _bloqueo_evidencia(funcionario, actividad, ve_todo):
+    """Motivo por el que el usuario no puede subir evidencia a la actividad, o None."""
+    if actividad.estado == 'aprobada':
+        return 'Actividad aprobada: ya no admite nuevas evidencias.'
+    if actividad.item_id and actividad.item.periodo.estado == 'cerrado':
+        return 'El período de la actividad está cerrado: no admite nuevas evidencias.'
+    if not (ve_todo or (funcionario and actividad.funcionario_autor_id == funcionario.pk)):
+        return MENSAJE_SOLO_AUTOR_EVIDENCIA
+    return None
+
+
 def _calcular_estado_compromiso(compromiso):
     """Traduce el estado persistido de un Compromiso a una etiqueta y clase
     Bootstrap para la interfaz, calculando la alerta de vencimiento en vivo."""
@@ -160,6 +192,11 @@ def solicitudes(request):
 
 @login_required
 def delegacion_detalle(request, nombre):
+    propia = delegacion_propia(request.user)
+    if propia and propia.nombre != nombre:
+        registrar_acceso_denegado(request, 'Delegacion', nombre, 'fuera del ámbito')
+        messages.error(request, f'Solo puedes ver la información de la delegación {propia.nombre}.')
+        return redirect('delegacion_detalle', nombre=propia.nombre)
     compromisos = list(_compromisos_autorizados(request.user).filter(delegacion__nombre=nombre))
     for compromiso in compromisos:
         _decorar_compromiso(compromiso)
@@ -183,8 +220,8 @@ def actividad_nueva(request):
                 request.user, 'crear', 'Actividad', actividad.codigo_verificador, None,
                 {'delegacion': actividad.delegacion.nombre, 'item': str(actividad.item)},
             )
-        messages.success(request, f'Actividad creada con código {actividad.codigo_verificador}.')
-        return redirect('actividad_detalle', actividad.codigo_verificador)
+        messages.success(request, f'Actividad creada con código {actividad.codigo_verificador}. Ahora sube su evidencia.')
+        return redirect('evidencia_subir', actividad.codigo_verificador)
     return render(request, 'delegaciones_app/actividad_form.html', {'form': form, 'titulo': 'Registrar actividad'})
 
 
@@ -192,28 +229,56 @@ def actividad_nueva(request):
 def actividades(request):
     _recordar_filtros(request, 'actividades')
     query = request.GET.get('q', '').strip()
-    registros = filtrar_actividades(_actividades_autorizadas(request.user), request.GET)
+    registros = filtrar_actividades(_actividades_autorizadas(request.user), request.GET).annotate(
+        total_evidencias=Count('evidencias', distinct=True),
+        evidencias_pendientes=Count('evidencias', filter=Q(evidencias__estado_revision='pendiente'), distinct=True),
+    )
     ve_todo, funcionario = puede_ver_todo(request.user), funcionario_de(request.user)
     registros = list(registros)
     for actividad in registros:
         actividad.bloqueo = _bloqueo_actividad(funcionario, actividad, ve_todo)
+        actividad.puede_subir_evidencia = _bloqueo_evidencia(funcionario, actividad, ve_todo) is None
     return render(request, 'delegaciones_app/actividades.html', {
         'actividades': registros, 'query': query, 'puede_crear': request.user.is_authenticated,
         'filtros': request.GET, 'filtrado': any(request.GET.get(clave) for clave in ('q', 'delegacion', 'estado', 'periodo', 'desde', 'hasta')),
-        'delegaciones_filtro': Delegacion.objects.filter(estado=True), 'periodos_filtro': Periodo.objects.order_by('-fecha_inicio'),
-        'estados_filtro': Actividad.ESTADOS,
+        'delegaciones_filtro': _delegaciones_visibles(request.user), 'periodos_filtro': Periodo.objects.order_by('-fecha_inicio'),
+        'estados_filtro': ESTADOS_ACTIVIDAD_FILTRO,
     })
 
 
 @login_required
 def actividad_detalle(request, codigo):
+    """Detalle de la actividad, sus evidencias y, para quien revisa, la decisión. La carga de evidencias
+    está en su propia pantalla (evidencia_subir)."""
     actividades = _actividades_autorizadas(request.user).prefetch_related('evidencias__validaciones__funcionario_verificador')
     actividad = _obtener_autorizado(request, actividades, 'Actividad', codigo_verificador=codigo)
+    propio = funcionario_de(request.user)
+    bloqueo_evidencia = _bloqueo_evidencia(propio, actividad, puede_ver_todo(request.user))
+    es_autor = bool(propio and actividad.funcionario_autor_id == propio.pk)
+    return render(request, 'delegaciones_app/actividad_detalle.html', {
+        'actividad': actividad,
+        'url_lista': _url_de_lista(request, 'actividades'),
+        'puede_subir_evidencia': bloqueo_evidencia is None,
+        # A quien solo revisa no se le muestra el aviso de carga: no es su tarea.
+        'aviso_evidencia': bloqueo_evidencia if bloqueo_evidencia != MENSAJE_SOLO_AUTOR_EVIDENCIA else None,
+        'puede_validar': tiene_rol(request.user, *ROLES_REVISORES) and not es_autor,
+        'puede_anular': tiene_rol(request.user, *ROLES_REVISORES) and not es_autor and actividad.estado == 'aprobada' and actividad.item.periodo.estado != 'cerrado',
+        'hay_pendientes': any(evidencia.estado_revision == 'pendiente' for evidencia in actividad.evidencias.all()),
+    })
+
+
+@login_required
+def evidencia_subir(request, codigo):
+    """Sube una evidencia (JPG, PNG o PDF) a la actividad y la envía a revisión (CU-09)."""
+    actividad = _obtener_autorizado(request, _actividades_autorizadas(request.user), 'Actividad', codigo_verificador=codigo)
+    bloqueo = _bloqueo_evidencia(funcionario_de(request.user), actividad, puede_ver_todo(request.user))
+    if bloqueo:
+        if bloqueo == MENSAJE_SOLO_AUTOR_EVIDENCIA:
+            registrar_acceso_denegado(request, 'Actividad', codigo, 'no es el autor')
+        messages.error(request, bloqueo)
+        return redirect('actividad_detalle', codigo=codigo)
     evidencia_form = EvidenciaForm(request.POST or None, request.FILES or None)
     if request.method == 'POST':
-        if actividad.estado == 'aprobada':
-            messages.error(request, 'Actividad aprobada: ya no admite nuevas evidencias.')
-            return redirect('actividad_detalle', codigo=codigo)
         funcionario = _funcionario_requerido(request)
         if funcionario is None:
             return redirect('actividad_detalle', codigo=codigo)
@@ -221,15 +286,13 @@ def actividad_detalle(request, codigo):
             with transaction.atomic():
                 evidencia = funcionario.subir_evidencia(actividad, evidencia_form.cleaned_data['archivo_vinculo'], evidencia_form.cleaned_data['comentario'])
                 Auditoria.registrar_evento(request.user, 'cargar_evidencia', 'Actividad', actividad.codigo_verificador, None, {'evidencia': evidencia.codigo_evidencia})
-            messages.success(request, 'Evidencia cargada y enviada a revisión.')
+            messages.success(request, f'Evidencia {evidencia.codigo_evidencia} cargada y enviada a revisión.')
             return redirect('actividad_detalle', codigo=codigo)
-    return render(request, 'delegaciones_app/actividad_detalle.html', {
+    return render(request, 'delegaciones_app/evidencia_subir.html', {
         'actividad': actividad,
         'evidencia_form': evidencia_form,
-        'url_lista': _url_de_lista(request, 'actividades'),
-        'puede_validar': tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, VERIFICADOR),
-        'puede_anular': tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, VERIFICADOR) and actividad.estado == 'aprobada' and actividad.item.periodo.estado != 'cerrado',
-        'hay_pendientes': any(evidencia.estado_revision == 'pendiente' for evidencia in actividad.evidencias.all()),
+        'evidencias': actividad.evidencias.all(),
+        'tamano_maximo': settings.EVIDENCIA_TAMANO_MAXIMO_MB,
     })
 
 
@@ -250,16 +313,19 @@ def evidencia_archivo(request, codigo):
 
 @login_required
 def revisar_actividad(request, codigo, decision):
-    """Aprueba, rechaza o pide corrección: una Validacion por cada evidencia pendiente (RN-009)."""
+    """Aprueba o rechaza (con motivo): una Validacion por cada evidencia pendiente (RN-009)."""
     if request.method != 'POST' or decision not in DECISIONES:
         return redirect('actividad_detalle', codigo=codigo)
-    if not tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, VERIFICADOR):
+    if not tiene_rol(request.user, *ROLES_REVISORES):
         registrar_acceso_denegado(request, 'Actividad', codigo)
         return redirect('actividad_detalle', codigo=codigo)
     verificador = _funcionario_requerido(request)
     if verificador is None:
         return redirect('actividad_detalle', codigo=codigo)
     actividad = _obtener_autorizado(request, _actividades_autorizadas(request.user), 'Actividad', codigo_verificador=codigo)
+    if actividad.funcionario_autor_id == verificador.pk:
+        messages.error(request, MENSAJE_REVISION_PROPIA)
+        return redirect('actividad_detalle', codigo=codigo)
     pendientes = list(actividad.evidencias.filter(estado_revision='pendiente'))
     if not pendientes:
         messages.error(request, 'La actividad no tiene evidencias pendientes de revisión.')
@@ -287,13 +353,16 @@ def anular_actividad(request, codigo):
     """Anula la aprobación de una actividad con un motivo; recalcula los indicadores (CU-07.2)."""
     if request.method != 'POST':
         return redirect('actividad_detalle', codigo=codigo)
-    if not tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, VERIFICADOR):
+    if not tiene_rol(request.user, *ROLES_REVISORES):
         registrar_acceso_denegado(request, 'Actividad', codigo)
         return redirect('actividad_detalle', codigo=codigo)
     verificador = _funcionario_requerido(request)
     if verificador is None:
         return redirect('actividad_detalle', codigo=codigo)
     actividad = _obtener_autorizado(request, _actividades_autorizadas(request.user), 'Actividad', codigo_verificador=codigo)
+    if actividad.funcionario_autor_id == verificador.pk:
+        messages.error(request, MENSAJE_REVISION_PROPIA)
+        return redirect('actividad_detalle', codigo=codigo)
     motivo = request.POST.get('motivo', '').strip()
     try:
         with transaction.atomic():
@@ -381,7 +450,7 @@ def compromiso_nuevo(request):
     funcionario = _funcionario_requerido(request)
     if funcionario is None:
         return redirect('inicio')
-    form = CompromisoForm(request.POST or None, user=request.user)
+    form = CompromisoForm(request.POST or None, user=request.user, initial={'delegacion': request.GET.get('delegacion')})
     if request.method == 'POST' and form.is_valid():
         compromiso = form.save(commit=False)
         if not puede_ver_todo(request.user):
@@ -393,7 +462,7 @@ def compromiso_nuevo(request):
             Auditoria.registrar_evento(request.user, 'crear', 'Compromiso', compromiso.folio, None, {'delegacion': compromiso.delegacion.nombre})
         messages.success(request, f'Compromiso creado con folio {compromiso.folio}.')
         return redirect('agenda')
-    return render(request, 'delegaciones_app/compromiso_form.html', {'form': form, 'titulo': 'Nuevo compromiso'})
+    return render(request, 'delegaciones_app/compromiso_form.html', {'form': form, 'titulo': 'Nuevo compromiso', 'asigna': puede_ver_todo(request.user)})
 
 
 @login_required
@@ -446,6 +515,7 @@ def compromiso_editar(request, pk):
         'form': form,
         'titulo': f'Modificar compromiso {compromiso.folio}',
         'compromiso': compromiso,
+        'asigna': puede_ver_todo(request.user),
     })
 
 
@@ -486,8 +556,11 @@ def agenda(request):
     resumen_responsables, resumen_total = resumen_por_responsable(compromisos)
     return render(request, 'delegaciones_app/agenda.html', {
         'compromisos': compromisos,
-        'delegaciones_filtro': Delegacion.objects.filter(estado=True),
+        'delegaciones_filtro': _delegaciones_visibles(request.user),
         'estado_filtro': estado or '',
+        'asigna': puede_ver_todo(request.user),
+        'puede_crear_compromiso': tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO),
+        'puede_eliminar_compromiso': puede_ver_todo(request.user),
         'delegacion_filtro': delegacion_id or '',
         'filtros': request.GET,
         'resumen_responsables': resumen_responsables,
@@ -499,6 +572,48 @@ def agenda(request):
         'dias_alerta': settings.COMPROMISO_DIAS_ALERTA,
         'vencidos': sum(1 for item in compromisos if item.vencido),
         'realizados': sum(1 for item in compromisos if item.estado == 'realizado'),
+    })
+
+
+@rol_requerido(ADMINISTRADOR, COORDINADOR)
+def delegados(request):
+    """Coordinación: delegados de cada delegación, su carga de trabajo y su asignación.
+
+    Es la función propia del coordinador frente al delegado: el delegado trabaja su delegación;
+    el coordinador ve todas, asigna cada delegado a su delegación y le asigna compromisos.
+    """
+    candidatos = Funcionario.objects.filter(estado=True, roles__nombre_rol=DELEGADO).select_related('delegacion').distinct()
+    if request.method == 'POST':
+        funcionario = get_object_or_404(candidatos, pk=request.POST.get('funcionario'))
+        delegacion = get_object_or_404(Delegacion, pk=request.POST.get('delegacion'), estado=True)
+        anterior = funcionario.delegacion.nombre if funcionario.delegacion_id else None
+        with transaction.atomic():
+            funcionario.delegacion = delegacion
+            funcionario.save(update_fields=['delegacion'])
+            Auditoria.registrar_evento(request.user, 'asignar_delegado', 'Funcionario', funcionario.identificador_institucional, {'delegacion': anterior}, {'delegacion': delegacion.nombre})
+        messages.success(request, f'{funcionario.nombre} quedó asignado a la delegación {delegacion.nombre}.')
+        return redirect('delegados')
+
+    periodo = periodo_vigente()
+    cumplimiento = {fila['nombre']: fila for fila in resultados_por_delegacion(periodo)} if periodo else {}
+    abiertos = list(Compromiso.objects.exclude(estado='realizado').only('delegacion_id', 'fecha_comprometida', 'estado'))
+    pendientes = dict(Actividad.objects.filter(estado='pendiente').values_list('delegacion').annotate(total=Count('pk')).order_by())
+    filas = []
+    for delegacion in Delegacion.objects.filter(estado=True):
+        propios = [c for c in abiertos if c.delegacion_id == delegacion.pk]
+        filas.append({
+            'delegacion': delegacion,
+            'delegados': [f for f in candidatos if f.delegacion_id == delegacion.pk],
+            'compromisos_abiertos': len(propios),
+            'compromisos_vencidos': sum(1 for c in propios if c.vencido),
+            'actividades_pendientes': pendientes.get(delegacion.pk, 0),
+            'cumplimiento': cumplimiento.get(delegacion.nombre),
+        })
+    return render(request, 'delegaciones_app/delegados.html', {
+        'filas': filas,
+        'candidatos': candidatos,
+        'sin_delegacion': [f for f in candidatos if not f.delegacion_id],
+        'periodo': periodo,
     })
 
 

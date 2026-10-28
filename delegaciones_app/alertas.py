@@ -45,7 +45,7 @@ def alertas_de_vencimiento(user, hoy):
 
 def alertas_de_evidencias_pendientes(user, hoy):
     """Actividades con evidencias esperando revisión; solo las ve quien puede revisarlas."""
-    if not tiene_rol(user, ADMINISTRADOR, COORDINADOR, VERIFICADOR):
+    if not tiene_rol(user, ADMINISTRADOR, COORDINADOR, DELEGADO, VERIFICADOR):
         return []
     pendientes = (
         _actividades_autorizadas(user).filter(evidencias__estado_revision='pendiente')

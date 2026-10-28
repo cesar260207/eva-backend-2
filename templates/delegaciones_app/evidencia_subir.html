@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}Subir evidencia · {{ actividad.codigo_verificador }} | SGR{% endblock %}
+{% block content %}
+<a class="btn btn-sm btn-link px-0 mb-2" href="{% url 'actividad_detalle' actividad.codigo_verificador %}">&larr; Volver a la actividad</a>
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="page-kicker">Actividad {{ actividad.codigo_verificador }}</div>
+        <h1 class="page-title mb-2">Subir evidencia</h1>
+        <p class="page-intro mb-4">{{ actividad.solicitud_problema|truncatechars:140 }} · {{ actividad.delegacion }} · {{ actividad.fecha|date:'d-m-Y' }}</p>
+        <div class="panel">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                {% for error in evidencia_form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
+                <div class="mb-3">
+                    <label class="form-label" for="{{ evidencia_form.archivo_vinculo.id_for_label }}">Archivo de respaldo</label>
+                    <input class="form-control{% if evidencia_form.archivo_vinculo.errors %} is-invalid{% endif %}" type="file" name="{{ evidencia_form.archivo_vinculo.html_name }}" id="{{ evidencia_form.archivo_vinculo.id_for_label }}" accept=".jpg,.jpeg,.png,.pdf" required>
+                    {% for error in evidencia_form.archivo_vinculo.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                    <div class="form-text">Foto (JPG o PNG) o documento PDF, de hasta {{ tamano_maximo }} MB.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="{{ evidencia_form.comentario.id_for_label }}">Comentario (opcional)</label>
+                    <textarea class="form-control" name="{{ evidencia_form.comentario.html_name }}" id="{{ evidencia_form.comentario.id_for_label }}" rows="2" placeholder="Ej.: acta firmada por la junta de vecinos">{{ evidencia_form.comentario.value|default:'' }}</textarea>
+                </div>
+                <div class="d-flex justify-content-end gap-2">
+                    <a class="btn btn-light" href="{% url 'actividad_detalle' actividad.codigo_verificador %}">Ahora no</a>
+                    <button class="btn btn-sgr" type="submit">Subir evidencia</button>
+                </div>
+            </form>
+        </div>
+        {% if evidencias %}
+        <div class="panel mt-3">
+            <div class="section-label mb-2">Ya cargadas</div>
+            <ul class="list-unstyled small mb-0">
+            {% for evidencia in evidencias %}<li>{{ evidencia.codigo_evidencia }} · {{ evidencia.get_estado_revision_display }}</li>{% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

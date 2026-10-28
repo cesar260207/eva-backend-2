@@ -5,7 +5,6 @@ from io import StringIO
 from datetime import date
 
 from django.apps import apps
-from django.contrib import admin
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
@@ -24,7 +23,7 @@ from .crud import MANTENEDORES
 from .informes import filtrar_actividades, filtrar_compromisos
 from .models import validar_tamano_evidencia
 from .pruebas_base import crear_funcionario
-from .permisos import RolRequeridoMixin, roles_de, rol_requerido, tiene_rol
+from .permisos import RolRequeridoMixin, asignar_perfil, roles_de, rol_requerido, tiene_rol
 from .models import (
 	Actividad, Auditoria, Cargo, Catalogo, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
 	HistorialCompromiso, Indicador, ItemMedible, MedicionDelegacion, Meta, ParametroVersionado, Periodo,
@@ -470,6 +469,7 @@ class PermisosTests(TestCase):
 		funcionario = Funcionario.objects.create(usuario=usuario, identificador_institucional=username, nombre=username, cargo=self.cargo, estado=estado)
 		for rol in roles:
 			FuncionarioRol.objects.create(funcionario=funcionario, rol=Rol.objects.get(nombre_rol=rol))
+		asignar_perfil(usuario)
 		return usuario
 
 	def _llamar(self, vista, usuario, ruta='/prueba/'):
@@ -550,6 +550,7 @@ class MantenedoresTests(TestCase):
 		funcionario = Funcionario.objects.create(usuario=usuario, identificador_institucional=username, nombre=username, cargo=self.cargo)
 		for rol in roles:
 			FuncionarioRol.objects.create(funcionario=funcionario, rol=Rol.objects.get(nombre_rol=rol))
+		asignar_perfil(usuario)
 		return usuario
 
 	def _url(self, nombre, slug, *args):
@@ -565,11 +566,11 @@ class MantenedoresTests(TestCase):
 	def test_indice_deshabilita_los_mantenedores_exclusivos_del_administrador(self):
 		respuesta = self.client.get(reverse('mantenedores'))
 		self.assertContains(respuesta, 'Ver registros', count=8)
-		self.assertNotContains(respuesta, 'Disponible para administradores')
+		self.assertNotContains(respuesta, 'No disponible para tu perfil')
 		self.client.force_login(self.coordinador)
 		respuesta = self.client.get(reverse('mantenedores'))
 		self.assertContains(respuesta, 'Ver registros', count=6)
-		self.assertContains(respuesta, 'Disponible para administradores', count=2)
+		self.assertContains(respuesta, 'No disponible para tu perfil', count=2)
 
 	def test_las_ocho_listas_tienen_agregar_y_buscar(self):
 		self.assertEqual(len(MANTENEDORES), 8)
@@ -830,7 +831,8 @@ class ActividadVistasTests(BaseOperacion):
 		self.client.force_login(self.funcionario)
 		respuesta = self.client.post(reverse('actividad_nueva'), self._datos_actividad(solicitud_problema='Consulta vecinal', contacto_nombre='Organizacion demo'))
 		actividad = Actividad.objects.get(solicitud_problema='Consulta vecinal')
-		self.assertRedirects(respuesta, reverse('actividad_detalle', args=[actividad.codigo_verificador]))
+		# Tras registrar, se pasa directo a subir la evidencia.
+		self.assertRedirects(respuesta, reverse('evidencia_subir', args=[actividad.codigo_verificador]))
 		self.assertTrue(actividad.codigo_verificador.startswith('EVD-'))
 		self.assertEqual((actividad.funcionario_autor, actividad.estado, actividad.version), (self.funcionario.funcionario, 'pendiente', 1))
 		self.assertTrue(Auditoria.objects.filter(entidad='Actividad', identificador_registro=actividad.codigo_verificador, evento='crear').exists())
@@ -977,7 +979,7 @@ class ActividadVistasTests(BaseOperacion):
 	def test_subir_evidencia_la_envia_a_revision_y_audita(self):
 		actividad = self._actividad(estado='correccion')
 		self.client.force_login(self.funcionario)
-		respuesta = self.client.post(reverse('actividad_detalle', args=[actividad.codigo_verificador]), {'archivo_vinculo': self._archivo(), 'comentario': 'Acta firmada'})
+		respuesta = self.client.post(reverse('evidencia_subir', args=[actividad.codigo_verificador]), {'archivo_vinculo': self._archivo(), 'comentario': 'Acta firmada'})
 		self.assertRedirects(respuesta, reverse('actividad_detalle', args=[actividad.codigo_verificador]))
 		evidencia = Evidencia.objects.get()
 		self.assertEqual((evidencia.codigo_evidencia, evidencia.metadatos, evidencia.estado_revision), (f'{actividad.codigo_verificador}-01', {'comentario': 'Acta firmada'}, 'pendiente'))
@@ -988,14 +990,14 @@ class ActividadVistasTests(BaseOperacion):
 		actividad = self._actividad()
 		self.client.force_login(self.funcionario)
 		archivo = SimpleUploadedFile('script.exe', b'MZ', content_type='application/octet-stream')
-		respuesta = self.client.post(reverse('actividad_detalle', args=[actividad.codigo_verificador]), {'archivo_vinculo': archivo, 'comentario': ''})
+		respuesta = self.client.post(reverse('evidencia_subir', args=[actividad.codigo_verificador]), {'archivo_vinculo': archivo, 'comentario': ''})
 		self.assertIn('archivo_vinculo', respuesta.context['evidencia_form'].errors)
 		self.assertFalse(Evidencia.objects.exists())
 
 	def test_actividad_aprobada_no_admite_nuevas_evidencias(self):
 		actividad = self._actividad(estado='aprobada')
 		self.client.force_login(self.funcionario)
-		self.client.post(reverse('actividad_detalle', args=[actividad.codigo_verificador]), {'archivo_vinculo': self._archivo(), 'comentario': ''})
+		self.client.post(reverse('evidencia_subir', args=[actividad.codigo_verificador]), {'archivo_vinculo': self._archivo(), 'comentario': ''})
 		self.assertFalse(Evidencia.objects.exists())
 		self.assertContains(self.client.get(reverse('actividad_detalle', args=[actividad.codigo_verificador])), 'ya no admite nuevas evidencias')
 
@@ -1024,21 +1026,23 @@ class RevisionTests(BaseOperacion):
 		self.assertEqual((indicador.avance, indicador.cumplimiento), (1, Decimal('10.00')))
 		self.assertTrue(Auditoria.objects.filter(evento='aprobar', identificador_registro=self.codigo).exists())
 
-	def test_rechazar_y_pedir_correccion_exigen_observacion(self):
-		for decision in ('rechazar', 'corregir'):
-			self._revisar(decision, observacion='')
-			self.assertEqual(Actividad.objects.get(pk=self.actividad.pk).estado, 'pendiente', decision)
-			self.assertFalse(Validacion.objects.exists(), decision)
+	def test_rechazar_exige_motivo_y_ya_no_se_pide_correccion(self):
+		self._revisar('rechazar', observacion='')
+		self.assertEqual(Actividad.objects.get(pk=self.actividad.pk).estado, 'pendiente')
+		self.assertFalse(Validacion.objects.exists())
+		# «Solicitar corrección» se eliminó del flujo: la decisión ya no se acepta.
 		self._revisar('corregir', observacion='Falta la firma')
-		self.assertEqual(Actividad.objects.get(pk=self.actividad.pk).estado, 'correccion')
-		self.assertEqual(set(Evidencia.objects.values_list('estado_revision', flat=True)), {'correccion'})
+		self.assertFalse(Validacion.objects.exists())
+		self._revisar('rechazar', observacion='Falta la firma')
+		self.assertEqual(Actividad.objects.get(pk=self.actividad.pk).estado, 'rechazada')
+		self.assertEqual(set(Evidencia.objects.values_list('estado_revision', flat=True)), {'rechazada'})
 
 	def test_rechazo_sin_observacion_explica_el_motivo(self):
 		respuesta = self._revisar('rechazar', observacion='')
 		self.assertContains(self.client.get(respuesta.url), 'exige un motivo')
 
-	def test_actividad_corregida_vuelve_a_revision_y_se_puede_aprobar(self):
-		self._revisar('corregir', observacion='Falta la firma')
+	def test_actividad_rechazada_se_corrige_vuelve_a_revision_y_se_puede_aprobar(self):
+		self._revisar('rechazar', observacion='Falta la firma')
 		self.client.force_login(self.funcionario)
 		actividad = Actividad.objects.get(pk=self.actividad.pk)
 		self.client.post(reverse('actividad_editar', args=[self.codigo]), self._datos_actividad(version=actividad.version))
@@ -1068,9 +1072,11 @@ class RevisionTests(BaseOperacion):
 	def test_el_detalle_ofrece_la_revision_solo_a_quien_puede_hacerla(self):
 		url = reverse('actividad_detalle', args=[self.codigo])
 		self.client.force_login(self.verificador)
-		self.assertContains(self.client.get(url), 'Solicitar corrección')
+		detalle = self.client.get(url)
+		self.assertContains(detalle, reverse('revisar_actividad', args=[self.codigo, 'rechazar']))
+		self.assertNotContains(detalle, 'Solicitar corrección')
 		self.client.force_login(self.funcionario)
-		self.assertNotContains(self.client.get(url), 'Solicitar corrección')
+		self.assertNotContains(self.client.get(url), reverse('revisar_actividad', args=[self.codigo, 'rechazar']))
 
 
 class CompromisoVistasTests(BaseOperacion):
@@ -1175,7 +1181,9 @@ class AccesoAutenticadoTests(BaseOperacion):
 			respuesta = self.client.get(url)
 			self.assertContains(respuesta, 'FOL-CENTRO-1')
 			self.assertNotContains(respuesta, 'FOL-RURAL-1')
-		self.assertNotContains(self.client.get(reverse('delegacion_detalle', args=['Rural'])), 'FOL-RURAL-1')
+		ajena = self.client.get(reverse('delegacion_detalle', args=['Rural']), follow=True)
+		self.assertRedirects(ajena, reverse('delegacion_detalle', args=['Centro']))
+		self.assertNotContains(ajena, 'FOL-RURAL-1')
 
 	def test_coordinador_ve_compromisos_de_todas_las_delegaciones(self):
 		self.client.force_login(self.coordinador)
@@ -1330,7 +1338,7 @@ class SeedDemoTests(TestCase):
 		cargar_demo()
 		filas = contar_filas()
 		esperadas = {
-			'Delegacion': 6, 'Funcionario': 9, 'FuncionarioRol': 9, 'UsuarioMaestro': 1, 'Periodo': 1, 'ParametroVersionado': 1,
+			'Delegacion': 6, 'Funcionario': 9, 'FuncionarioRol': 10, 'UsuarioMaestro': 1, 'Periodo': 1, 'ParametroVersionado': 1,
 			'ItemMedible': 1, 'Meta': 6, 'Catalogo': 5, 'Indicador': 6, 'Compromiso': 8, 'HistorialCompromiso': 8,
 			'Actividad': 1, 'Evidencia': 1, 'Validacion': 1, 'MedicionDelegacion': 6,
 		}
@@ -1385,62 +1393,12 @@ class SeedDemoTests(TestCase):
 		self.assertEqual((Funcionario.objects.count(), Meta.objects.count(), Periodo.objects.count()), (9, 6, 1))
 
 
-class AdminTests(TestCase):
-	"""CU-26, CU-30 (RF-001, RF-002, RF-036). El Django Admin administra los 19 modelos (las 17 clases, FuncionarioRol y MedicionDelegacion)."""
-
-	@classmethod
-	def setUpTestData(cls):
-		cargar_demo()
-
-	def setUp(self):
-		self.assertTrue(self.client.login(username='admin.demo', password=CLAVE_DEMO))
-
-	def _modelos(self):
-		return [modelo for modelo in admin.site._registry if modelo._meta.app_label == 'delegaciones_app']
-
-	def _url(self, modelo, accion, *args):
-		return reverse(f'admin:delegaciones_app_{modelo._meta.model_name}_{accion}', args=args)
-
-	def test_estan_registrados_los_19_modelos(self):
-		self.assertEqual(len(self._modelos()), 19)
-		todos = {modelo.__name__ for modelo in apps.get_app_config('delegaciones_app').get_models()}
-		self.assertEqual(todos - {modelo.__name__ for modelo in self._modelos()}, set())
-
-	def test_cada_modelo_se_lista_busca_y_se_abre_para_agregar_y_modificar(self):
-		for modelo in self._modelos():
-			nombre = modelo.__name__
-			self.assertEqual(self.client.get(self._url(modelo, 'changelist')).status_code, 200, nombre)
-			self.assertEqual(self.client.get(self._url(modelo, 'changelist'), {'q': 'demo'}).status_code, 200, nombre)
-			# La auditoría es de solo lectura: ni el superusuario puede agregar (CU-30.1).
-			self.assertEqual(self.client.get(self._url(modelo, 'add')).status_code, 403 if modelo is Auditoria else 200, nombre)
-			objeto = modelo.objects.first()
-			if objeto is not None:
-				self.assertEqual(self.client.get(self._url(modelo, 'change', objeto.pk)).status_code, 200, nombre)
-
-	def test_un_periodo_cerrado_y_lo_que_depende_de_el_no_se_eliminan(self):
-		periodo = Periodo.objects.get()
-		Periodo.objects.filter(pk=periodo.pk).update(estado='cerrado')
-		for modelo, objeto in ((Periodo, periodo), (ItemMedible, ItemMedible.objects.first()), (Meta, Meta.objects.first()), (Indicador, Indicador.objects.first())):
-			self.assertEqual(self.client.get(self._url(modelo, 'delete', objeto.pk)).status_code, 403, modelo.__name__)
-		Periodo.objects.filter(pk=periodo.pk).update(estado='abierto')
-		self.assertEqual(self.client.get(self._url(Periodo, 'delete', periodo.pk)).status_code, 200)
-
-	def test_un_usuario_staff_sin_permisos_no_agrega_auditoria(self):
-		empleado = User.objects.create_user('staff-sin-permisos', password=CLAVE_DEMO, is_staff=True)
-		self.client.force_login(empleado)
-		self.assertEqual(self.client.get(self._url(Auditoria, 'add')).status_code, 403)
-
-
 class AuditoriaTests(BaseOperacion):
-	"""CU-26.1, CU-30, CU-30.1 (RF-036, RNF-008). Auditoría inmutable, accesos denegados y cambios del admin auditados."""
+	"""CU-26.1, CU-30, CU-30.1 (RF-036, RNF-008). Auditoría inmutable y accesos denegados auditados."""
 
 	def _evento(self, evento, entidad=None):
 		eventos = Auditoria.objects.filter(evento=evento)
 		return eventos.filter(entidad=entidad) if entidad else eventos
-
-	def _superusuario(self):
-		cargar_demo()
-		self.assertTrue(self.client.login(username='admin.demo', password=CLAVE_DEMO))
 
 	def test_un_evento_registrado_no_se_modifica_ni_se_elimina(self):
 		evento = Auditoria.registrar_evento(self.coordinador, 'crear', 'Cargo', 1)
@@ -1455,47 +1413,12 @@ class AuditoriaTests(BaseOperacion):
 			Auditoria.objects.all().delete()
 		self.assertEqual(Auditoria.objects.get(pk=evento.pk).evento, 'crear')
 
-	def test_el_superusuario_no_puede_agregar_modificar_ni_eliminar_auditoria_y_el_intento_se_registra(self):
-		self._superusuario()
-		evento = Auditoria.registrar_evento(self.coordinador, 'crear', 'Cargo', 1)
-		self.assertEqual(self.client.get(reverse('admin:delegaciones_app_auditoria_add')).status_code, 403)
-		self.assertEqual(self.client.post(reverse('admin:delegaciones_app_auditoria_change', args=[evento.pk]), {'evento': 'otro'}).status_code, 403)
-		self.assertEqual(self.client.post(reverse('admin:delegaciones_app_auditoria_delete', args=[evento.pk]), {'post': 'yes'}).status_code, 403)
-		self.assertEqual(Auditoria.objects.get(pk=evento.pk).evento, 'crear')
-		acciones = [json.loads(e.valor_nuevo)['accion'] for e in self._evento('intento_alteracion', 'Auditoria').order_by('pk')]
-		self.assertEqual(acciones, ['agregar', 'modificar', 'eliminar'])
-		# Ver sigue permitido y no ofrece acciones de borrado masivo.
-		self.assertEqual(self.client.get(reverse('admin:delegaciones_app_auditoria_changelist')).status_code, 200)
-		self.assertEqual(self.client.get(reverse('admin:delegaciones_app_auditoria_change', args=[evento.pk])).status_code, 200)
-
-	def test_los_cambios_hechos_en_el_admin_quedan_auditados(self):
-		self._superusuario()
-		self.client.post(reverse('admin:delegaciones_app_cargo_add'), {'nombre': 'Cargo del admin', 'vigencia': 'on'})
-		cargo = Cargo.objects.get(nombre='Cargo del admin')
-		self.assertEqual(self._evento('admin_crear', 'Cargo').get().identificador_registro, str(cargo.pk))
-
-		self.client.post(reverse('admin:delegaciones_app_cargo_change', args=[cargo.pk]), {'nombre': 'Cargo renombrado', 'vigencia': 'on'})
-		edicion = self._evento('admin_editar', 'Cargo').get()
-		self.assertEqual((edicion.valor_anterior, edicion.valor_nuevo), ('{"nombre": "Cargo del admin"}', '{"nombre": "Cargo renombrado"}'))
-
-		self.client.post(reverse('admin:delegaciones_app_cargo_delete', args=[cargo.pk]), {'post': 'yes'})
-		self.assertFalse(Cargo.objects.filter(pk=cargo.pk).exists())
-		self.assertEqual(json.loads(self._evento('admin_eliminar', 'Cargo').get().valor_anterior), {'descripcion': 'Cargo renombrado'})
-
-	def test_el_cambio_de_un_parametro_desde_el_admin_queda_auditado(self):
-		self._superusuario()
-		parametro = ParametroVersionado.objects.get(clave='maximo_cumplimiento')
-		self.client.post(reverse('admin:delegaciones_app_parametroversionado_change', args=[parametro.pk]), {'periodo': parametro.periodo.pk, 'clave': 'maximo_cumplimiento', 'valor': '120', 'descripcion': parametro.descripcion})
-		self.assertEqual(ParametroVersionado.objects.get(pk=parametro.pk).valor, '120')
-		cambio = self._evento('admin_editar', 'ParametroVersionado').get()
-		self.assertEqual((cambio.valor_anterior, cambio.valor_nuevo), ('{"valor": "150"}', '{"valor": "120"}'))
-
 	def test_un_acceso_denegado_por_rol_queda_registrado(self):
 		self.client.force_login(self.funcionario)
 		self.client.get(reverse('mantenedor_lista', args=['catalogo']))
 		evento = self._evento('acceso_denegado', 'Acceso').get()
 		self.assertEqual(evento.funcionario, self.funcionario.funcionario)
-		self.assertEqual(json.loads(evento.valor_nuevo)['motivo'], 'rol insuficiente')
+		self.assertEqual(json.loads(evento.valor_nuevo)['motivo'], 'permiso insuficiente')
 
 	def test_sin_sesion_no_se_registra_acceso_denegado(self):
 		self.client.get(reverse('mantenedor_lista', args=['catalogo']))
@@ -1587,7 +1510,7 @@ class EvidenciaTamanoTests(BaseOperacion):
 	def test_el_formulario_de_evidencia_informa_el_motivo_del_rechazo(self):
 		actividad = self._actividad()
 		self.client.force_login(self.funcionario)
-		respuesta = self.client.post(reverse('actividad_detalle', args=[actividad.codigo_verificador]), {'archivo_vinculo': self._pdf(1.5), 'comentario': ''})
+		respuesta = self.client.post(reverse('evidencia_subir', args=[actividad.codigo_verificador]), {'archivo_vinculo': self._pdf(1.5), 'comentario': ''})
 		self.assertIn('archivo_vinculo', respuesta.context['evidencia_form'].errors)
 		self.assertContains(respuesta, 'máximo permitido es 1 MB')
 		self.assertFalse(Evidencia.objects.exists())
@@ -1708,16 +1631,6 @@ class CompromisoReglasTests(BaseOperacion):
 		respuesta = self.client.post(reverse('compromiso_estado', args=[compromiso.pk, 'pendiente']), follow=True)
 		self.assertContains(respuesta, 'Transición no permitida')
 		self.assertEqual(Compromiso.objects.get(pk=compromiso.pk).estado, 'realizado')
-
-	def test_el_admin_no_ofrece_eliminar_un_incumplimiento(self):
-		cargar_demo()
-		self.assertTrue(self.client.login(username='admin.demo', password=CLAVE_DEMO))
-		vencido = Compromiso.objects.filter(estado='pendiente').first()
-		realizado = Compromiso.objects.filter(estado='realizado').first()
-		self.assertTrue(vencido.vencido)
-		self.assertEqual(self.client.get(reverse('admin:delegaciones_app_compromiso_delete', args=[vencido.pk])).status_code, 403)
-		self.assertEqual(self.client.get(reverse('admin:delegaciones_app_compromiso_delete', args=[realizado.pk])).status_code, 200)
-
 
 class FichaPersonalTests(BaseOperacion):
 	"""CU-06, CU-06.2, CU-07.3, CU-17, CU-17.2 (RF-008, RF-028). Ficha personal, diferencia con lo esperado, meta cumplida y detalle de la fórmula."""

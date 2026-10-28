@@ -1,8 +1,15 @@
-"""Permisos por rol. Reemplazan a PerfilUsuario.rol: los roles salen del Funcionario del usuario."""
+"""Permisos por rol y por perfil.
+
+Los roles salen del Funcionario del usuario y definen su función en el flujo de trabajo (quién
+registra, quién verifica, qué delegación ve). Los perfiles son los grupos de Django
+(Administrador, Supervisor y Administrativo): cada grupo tiene permisos de Django asignados en la
+migración 0015 y esos permisos deciden el acceso a los mantenedores, la auditoría y los perfiles.
+"""
 from functools import wraps
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.models import Group
 from django.contrib.auth.views import redirect_to_login
 from django.shortcuts import redirect
 
@@ -20,19 +27,63 @@ ROLES_DEL_SISTEMA = (ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICA
 
 MENSAJE_SIN_PERMISO = 'No tienes permiso para acceder a esta sección.'
 
+# Perfiles de acceso: grupos de Django creados por la migración 0015 con sus permisos.
+PERFIL_ADMINISTRADOR = 'Administrador'
+PERFIL_SUPERVISOR = 'Supervisor'
+PERFIL_ADMINISTRATIVO = 'Administrativo'
+PERFILES = (PERFIL_ADMINISTRADOR, PERFIL_SUPERVISOR, PERFIL_ADMINISTRATIVO)
+
+# Rol que aporta cada perfil: así el alcance (ver todas las delegaciones) sigue al grupo asignado.
+ROL_DEL_PERFIL = {PERFIL_ADMINISTRADOR: ADMINISTRADOR, PERFIL_SUPERVISOR: COORDINADOR}
+
 
 def roles_de(user):
     """Nombres de los roles activos del usuario.
 
-    Un superusuario o un UsuarioMaestro activo cuenta siempre como administrador.
-    Un Funcionario con estado inactivo no aporta roles.
+    Un superusuario o un UsuarioMaestro activo cuenta siempre como administrador, y los perfiles
+    Administrador y Supervisor aportan los roles administrador y coordinador.
+    Un Funcionario con estado inactivo no aporta roles, ni los de su perfil.
     """
     if not user.is_authenticated or not user.is_active:
         return frozenset()
     roles = set(Rol.objects.filter(funcionarios__usuario=user, funcionarios__estado=True).values_list('nombre_rol', flat=True))
     if user.is_superuser or UsuarioMaestro.objects.filter(usuario=user, estado=True).exists():
         roles.add(ADMINISTRADOR)
+    if not Funcionario.objects.filter(usuario=user, estado=False).exists():
+        for perfil in user.groups.filter(name__in=ROL_DEL_PERFIL).values_list('name', flat=True):
+            roles.add(ROL_DEL_PERFIL[perfil])
     return frozenset(roles)
+
+
+def perfil_sugerido(roles):
+    """Perfil que corresponde a un conjunto de nombres de rol: el de mayor alcance."""
+    if ADMINISTRADOR in roles:
+        return PERFIL_ADMINISTRADOR
+    if COORDINADOR in roles:
+        return PERFIL_SUPERVISOR
+    return PERFIL_ADMINISTRATIVO
+
+
+def asignar_perfil(usuario, perfil=None):
+    """Deja al usuario en un solo perfil. Sin perfil indicado, se deduce de sus roles."""
+    if perfil is None:
+        perfil = perfil_sugerido(set(Rol.objects.filter(funcionarios__usuario=usuario).values_list('nombre_rol', flat=True)))
+    nombre = perfil.name if isinstance(perfil, Group) else perfil
+    usuario.groups.remove(*Group.objects.filter(name__in=PERFILES).exclude(name=nombre))
+    usuario.groups.add(Group.objects.get(name=nombre))
+
+
+def perfil_de(user):
+    """Perfil con que se presenta el panel del usuario: el de mayor alcance que tenga."""
+    if not user.is_authenticated:
+        return None
+    if user.is_superuser:
+        return PERFIL_ADMINISTRADOR
+    grupos = set(user.groups.filter(name__in=PERFILES).values_list('name', flat=True))
+    for perfil in PERFILES[:2]:
+        if perfil in grupos:
+            return perfil
+    return perfil_sugerido(roles_de(user))
 
 
 def tiene_rol(user, *roles):
@@ -43,6 +94,15 @@ def tiene_rol(user, *roles):
 def puede_ver_todo(user):
     """Administración y coordinación ven los registros de todas las delegaciones."""
     return tiene_rol(user, ADMINISTRADOR, COORDINADOR)
+
+
+def delegacion_propia(user):
+    """Delegación a la que se limita lo que ve el usuario: la suya si no tiene alcance global
+    (un delegado de Centro ve solo Centro). None si ve todas o si no tiene delegación asignada."""
+    if puede_ver_todo(user):
+        return None
+    funcionario = funcionario_de(user)
+    return funcionario.delegacion if funcionario and funcionario.delegacion_id else None
 
 
 def funcionario_de(user):
@@ -75,6 +135,42 @@ def rol_requerido(*roles):
             return vista(request, *args, **kwargs)
         return envoltura
     return decorador
+
+
+def _denegar(request, motivo):
+    registrar_acceso_denegado(request, motivo=motivo)
+    messages.error(request, MENSAJE_SIN_PERMISO, fail_silently=True)
+    return redirect('inicio')
+
+
+def permiso_requerido(*permisos):
+    """Decorador para vistas de función: exige sesión iniciada y al menos uno de los permisos de Django."""
+    def decorador(vista):
+        @wraps(vista)
+        def envoltura(request, *args, **kwargs):
+            if not request.user.is_authenticated:
+                return redirect_to_login(request.get_full_path())
+            if not any(request.user.has_perm(permiso) for permiso in permisos):
+                return _denegar(request, 'permiso insuficiente')
+            return vista(request, *args, **kwargs)
+        return envoltura
+    return decorador
+
+
+class PermisoRequeridoMixin(LoginRequiredMixin):
+    """Mixin para vistas de clase: exige el permiso de Django de `permiso_requerido` (por ejemplo
+    'delegaciones_app.change_periodo'). Los permisos llegan al usuario por su grupo (perfil)."""
+
+    permiso_requerido = ''
+
+    def get_permiso_requerido(self):
+        return self.permiso_requerido
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and not request.user.has_perm(self.get_permiso_requerido()):
+            return _denegar(request, 'permiso insuficiente')
+        # Sin sesión, LoginRequiredMixin redirige al login.
+        return super().dispatch(request, *args, **kwargs)
 
 
 class RolRequeridoMixin(LoginRequiredMixin):

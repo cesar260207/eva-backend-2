@@ -2,7 +2,7 @@
 > proyecto (Evaluación Sumativa #1), que leía datos desde `data/*.json`. Esa
 > versión evolucionó: toda la persistencia ahora vive en una base de datos
 > relacional (MySQL) a través de los modelos Django definidos en
-> `delegaciones_app/models.py`, administrable desde Django Admin. Los archivos
+> `delegaciones_app/models.py`, administrable desde pantallas propias (sin Django Admin desde la Evaluación Sumativa 3). Los archivos
 > JSON se conservan solo como fuente de carga inicial para `seed_demo`. Ver
 > `README.md` para el detalle actualizado de arquitectura e instalación.
 
@@ -218,7 +218,7 @@ Usuario accede a http://127.0.0.1:8000/
 | Dashboard | gestion_app | `/gestion/` | Metas y cumplimiento |
 | Semáforo | gestion_app | `/gestion/semaforo/` | Vista visual |
 | Resumen | gestion_app | `/gestion/resumen/` | Estadísticas generales |
-| Admin | Django | `/admin/` | Panel administrativo |
+| Mi panel | gestion_app | `/gestion/panel/` | Panel según el perfil (Administrador, Supervisor o Administrativo) |
 
 ---
 

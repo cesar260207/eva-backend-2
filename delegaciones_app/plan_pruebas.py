@@ -56,7 +56,7 @@ CATALOGO_RF = {
 
 CODIGO_DE_MODULO = {
     'test_integracion': 'INT', 'test_unit_autenticacion': 'LOGIN', 'test_unit_organizacion': 'ORG', 'test_unit_actividades': 'ACT',
-    'test_unit_medicion': 'MED', 'test_unit_compromisos': 'COM', 'test_unit_transversal': 'TRA', 'test_unit_plan_pruebas': 'PLAN', 'test_unit_alertas': 'ALE',
+    'test_unit_medicion': 'MED', 'test_unit_compromisos': 'COM', 'test_unit_transversal': 'TRA', 'test_unit_plan_pruebas': 'PLAN', 'test_unit_alertas': 'ALE', 'test_unit_seguridad': 'SEG', 'test_unit_delegaciones': 'DEL',
 }
 
 # Estado de los requisitos que no están completos en el sistema (se declara aquí para que el plan lo diga con claridad).

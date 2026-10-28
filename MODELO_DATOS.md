@@ -2,8 +2,12 @@
 
 La estructura se define en `delegaciones_app/models.py`. Django crea y modifica
 las tablas al ejecutar las migraciones (`python manage.py migrate`); no se crean
-manualmente desde phpMyAdmin. El ORM usa estas mismas tablas en las vistas y en
-Django Admin.
+manualmente desde phpMyAdmin. El ORM usa estas mismas tablas en las vistas propias del
+sistema; desde la Evaluación Sumativa 3 no se usa Django Admin.
+
+Los perfiles de acceso (Administrador, Supervisor y Administrativo) son las tablas de grupos y
+permisos de `django.contrib.auth` (`auth_group`, `auth_group_permissions`, `auth_user_groups`);
+la migración `0015_perfiles_de_acceso` los crea y asigna un perfil a cada usuario existente.
 
 El modelo implementa las 17 clases del diseño (diagrama de clases del informe),
 más dos tablas adicionales: `FuncionarioRol`, que resuelve la relación
@@ -123,8 +127,8 @@ listado con búsqueda, nuevo, modificar y eliminar o desactivar.
 
 Las actividades (`/actividades/`) y los compromisos (`/agenda/`) tienen sus
 propias pantallas, con filtros por rol y delegación, y no son mantenedores
-adicionales. `MedicionDelegacion` se administra solo en Django Admin, que
-registra las 19 tablas.
+adicionales. `MedicionDelegacion` conserva los indicadores importados y se consulta en el
+Resumen; no tiene mantenedor.
 
 ### Reglas de las actividades
 

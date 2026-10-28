@@ -4,11 +4,14 @@
 <a class="btn btn-sm btn-link px-0 mb-2" href="{{ url_lista }}">&larr; Volver a las actividades</a>
 <div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
     <div>
-        <div class="page-kicker">Detalle y trazabilidad</div>
+        <div class="page-kicker">Actividad</div>
         <h1 class="page-title">{{ actividad.codigo_verificador }}</h1>
         <p class="page-intro mb-0">{{ actividad.solicitud_problema }}</p>
     </div>
-    <span class="badge badge-soft">{{ actividad.get_estado_display }}</span>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge badge-soft fs-6">{{ actividad.get_estado_display }}</span>
+        {% if puede_subir_evidencia %}<a class="btn btn-sgr" href="{% url 'evidencia_subir' actividad.codigo_verificador %}">Subir evidencia</a>{% endif %}
+    </div>
 </div>
 <div class="row g-4">
     <div class="col-lg-7">
@@ -26,13 +29,14 @@
         </div>
         {% if puede_validar and hay_pendientes %}
         <div class="panel mt-4">
-            <div class="section-label mb-2">Revisión de verificador</div>
+            <div class="section-label mb-2">Revisión</div>
+            <p class="small text-muted">Aprueba si la evidencia respalda la actividad. Si no, recházala indicando el motivo: quien la registró podrá corregir y subir una evidencia nueva.</p>
             <form method="post">
                 {% csrf_token %}
-                <textarea class="form-control mb-3" name="observacion" rows="2" placeholder="Observación (obligatoria para rechazar o solicitar corrección)"></textarea>
+                <label class="form-label" for="observacion">Motivo u observación</label>
+                <textarea class="form-control mb-3" id="observacion" name="observacion" rows="2" placeholder="Obligatorio para rechazar"></textarea>
                 <div class="d-flex flex-wrap gap-2">
                     <button class="btn btn-sgr" type="submit" formaction="{% url 'revisar_actividad' actividad.codigo_verificador 'aprobar' %}">Aprobar</button>
-                    <button class="btn btn-outline-secondary" type="submit" formaction="{% url 'revisar_actividad' actividad.codigo_verificador 'corregir' %}">Solicitar corrección</button>
                     <button class="btn btn-outline-danger" type="submit" formaction="{% url 'revisar_actividad' actividad.codigo_verificador 'rechazar' %}">Rechazar</button>
                 </div>
             </form>
@@ -52,28 +56,21 @@
     </div>
     <div class="col-lg-5">
         <div class="panel">
-            <div class="section-label mb-2">Evidencias</div>
+            <div class="section-label mb-3">Evidencias ({{ actividad.evidencias.all|length }})</div>
             {% for evidencia in actividad.evidencias.all %}
-            <div class="mb-3">
-                <p class="mb-1"><strong>{{ evidencia.codigo_evidencia }}</strong> · {{ evidencia.archivo_vinculo.name }}</p>
-                {% if evidencia.archivo_vinculo %}<p class="mb-1 small"><a href="{% url 'evidencia_archivo' evidencia.codigo_evidencia %}" target="_blank" rel="noopener">Ver archivo</a> · <a href="{% url 'evidencia_archivo' evidencia.codigo_evidencia %}?descargar=1">Descargar</a></p>{% endif %}
-                <small class="text-muted">{{ evidencia.get_estado_revision_display }}</small>
+            <div class="evidencia-item">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <strong>{{ evidencia.codigo_evidencia }}</strong>
+                    <span class="badge {% if evidencia.estado_revision == 'aprobada' %}badge-success-soft{% elif evidencia.estado_revision == 'pendiente' %}badge-warning-soft{% else %}badge-danger-soft{% endif %}">{{ evidencia.get_estado_revision_display }}</span>
+                </div>
+                {% if evidencia.archivo_vinculo %}<div class="small"><a href="{% url 'evidencia_archivo' evidencia.codigo_evidencia %}" target="_blank" rel="noopener">Ver archivo</a> · <a href="{% url 'evidencia_archivo' evidencia.codigo_evidencia %}?descargar=1">Descargar</a></div>{% endif %}
                 {% if evidencia.metadatos.comentario %}<div class="small">{{ evidencia.metadatos.comentario }}</div>{% endif %}
-                {% with ultima=evidencia.validaciones.all.0 %}{% if ultima.observacion %}<div class="small text-muted">Observación del verificador: {{ ultima.observacion }}</div>{% endif %}{% endwith %}
+                {% with ultima=evidencia.validaciones.all.0 %}{% if ultima.observacion %}<div class="small text-muted">Revisión: {{ ultima.observacion }}</div>{% endif %}{% endwith %}
             </div>
             {% empty %}
-            <p class="text-muted">Todavía no hay archivos asociados.</p>
+            <p class="text-muted mb-0">Sin evidencia cargada.</p>
             {% endfor %}
-            <hr>
-            {% if actividad.estado == 'aprobada' %}
-            <p class="text-muted mb-0">Actividad aprobada: ya no admite nuevas evidencias.</p>
-            {% else %}
-            <form method="post" enctype="multipart/form-data">
-                {% csrf_token %}
-                {{ evidencia_form.as_p }}
-                <button class="btn btn-sgr" type="submit">Cargar evidencia</button>
-            </form>
-            {% endif %}
+            {% if aviso_evidencia %}<p class="small text-muted mt-3 mb-0">{{ aviso_evidencia }}</p>{% endif %}
         </div>
     </div>
 </div>

@@ -7,7 +7,7 @@
         <h1 class="page-title">{{ config.titulo }}</h1>
         <p class="page-intro mb-0">{{ config.descripcion }}</p>
     </div>
-    <a class="btn btn-sgr" href="{% url 'mantenedor_nuevo' config.slug %}">Agregar</a>
+    {% if puede.add %}<a class="btn btn-sgr" href="{% url 'mantenedor_nuevo' config.slug %}">Agregar</a>{% else %}<span class="badge badge-soft">Solo lectura para tu perfil</span>{% endif %}
 </div>
 <div class="panel">
     <form method="get" class="row g-2 mb-3">
@@ -30,15 +30,15 @@
                     {% if config.baja %}<td>{% if fila.activo %}<span class="badge bg-success">Activo</span>{% else %}<span class="badge bg-secondary">Inactivo</span>{% endif %}</td>{% endif %}
                     <td>
                         <div class="d-flex flex-wrap gap-2">
-                            <a class="btn btn-sm btn-outline-sgr" href="{% url 'mantenedor_editar' config.slug fila.pk %}">Modificar</a>
+                            {% if puede.change %}<a class="btn btn-sm btn-outline-sgr" href="{% url 'mantenedor_editar' config.slug fila.pk %}">Modificar</a>
                             {% for accion in fila.acciones %}
                             <form method="post" action="{{ accion.url }}" class="d-flex gap-1 m-0">
                                 {% csrf_token %}
                                 {% if accion.motivo %}<input class="form-control form-control-sm" name="motivo" placeholder="Motivo" required>{% endif %}
                                 <button class="btn btn-sm btn-outline-sgr" type="submit">{{ accion.etiqueta }}</button>
                             </form>
-                            {% endfor %}
-                            {% if config.baja %}
+                            {% endfor %}{% endif %}
+                            {% if not puede.delete %}{% elif config.baja %}
                             <a class="btn btn-sm btn-outline-danger" href="{% url 'mantenedor_eliminar' config.slug fila.pk %}">{% if fila.activo %}Desactivar{% else %}Activar{% endif %}</a>
                             {% else %}
                             <a class="btn btn-sm btn-outline-danger" href="{% url 'mantenedor_eliminar' config.slug fila.pk %}">Eliminar</a>

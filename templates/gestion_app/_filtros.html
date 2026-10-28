@@ -1,3 +1,6 @@
+{% if delegacion_propia %}
+<div class="alert alert-secondary py-2">Ves solo los resultados de tu delegación: <strong>{{ delegacion_propia.nombre }}</strong>.</div>
+{% endif %}
 <div class="panel mb-4">
     <form class="row g-2" method="get">
         <div class="col-md-6"><input class="form-control" type="search" name="q" value="{{ query }}" placeholder="Buscar delegación"></div>

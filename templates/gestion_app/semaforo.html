@@ -8,7 +8,7 @@
         <h2 class="mb-2">Semáforo de desempeño territorial</h2>
         <p class="text-muted mb-0">{% if periodo %}Período {{ periodo.nombre }}: verde si alcanza lo esperado al día ({{ esperado }} %), ámbar desde el 60 % de lo esperado y rojo bajo eso.{% else %}Indicadores visuales de cumplimiento por delegación.{% endif %}</p>
     </div>
-    {% if puede_administrar %}<a href="{% url 'mantenedor_nuevo' 'metas' %}" class="btn btn-sgr">+ Agregar meta</a>{% endif %}
+    {% if perms.delegaciones_app.add_meta %}<a href="{% url 'mantenedor_nuevo' 'metas' %}" class="btn btn-sgr">+ Agregar meta</a>{% endif %}
 </div>
 {% include 'gestion_app/_filtros.html' %}
 
@@ -27,7 +27,7 @@
                     Último cálculo: {{ delegacion.ultimos_datos|date:'d-m-Y'|default:'Sin cálculo' }}
                 </div>
                 {% if delegacion.dias_desde_registro != None %}<p class="small text-muted mb-3">Días transcurridos desde el último cálculo: {{ delegacion.dias_desde_registro }}</p>{% endif %}
-                {% if puede_administrar %}<a class="btn btn-sm btn-outline-sgr" href="{% url 'mantenedor_lista' 'metas' %}?q={{ delegacion.nombre|urlencode }}">Gestionar metas</a>{% endif %}
+                {% if perms.delegaciones_app.view_meta %}<a class="btn btn-sm btn-outline-sgr" href="{% url 'mantenedor_lista' 'metas' %}?q={{ delegacion.nombre|urlencode }}">Gestionar metas</a>{% endif %}
             </div>
         </div>
     </div>
