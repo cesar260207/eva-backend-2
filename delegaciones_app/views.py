@@ -137,13 +137,13 @@ def _calcular_estado_compromiso(compromiso):
     """Traduce el estado persistido de un Compromiso a una etiqueta y clase
     Bootstrap para la interfaz, calculando la alerta de vencimiento en vivo."""
     if compromiso.estado == 'realizado':
-        return 'Realizado', 'success'
+        return 'Realizada', 'success'
     if compromiso.estado == 'proceso':
         return 'En proceso', 'primary'
     if compromiso.vencido:
         return 'Alerta Roja por Vencimiento', 'danger'
     if compromiso.proximo_a_vencer:
-        return 'Próximo a vencer', 'warning'
+        return 'Próxima a vencer', 'warning'
     return 'Pendiente', 'warning'
 
 
@@ -183,7 +183,7 @@ def solicitudes(request):
         'solicitudes': compromisos,
         'query': query,
         'total': len(compromisos),
-        'pendientes': sum(1 for item in compromisos if item.estado_display in ('Pendiente', 'Próximo a vencer')),
+        'pendientes': sum(1 for item in compromisos if item.estado_display in ('Pendiente', 'Próxima a vencer')),
         'en_proceso': sum(1 for item in compromisos if item.estado_display == 'En proceso'),
         'alertas': sum(1 for item in compromisos if item.estado_display == 'Alerta Roja por Vencimiento'),
     }
@@ -458,11 +458,11 @@ def compromiso_nuevo(request):
         compromiso.folio = f'AGR-{datetime.now():%Y%m%d}-{uuid.uuid4().hex[:5].upper()}'
         with transaction.atomic():
             compromiso.save()
-            compromiso.registrar_historial(funcionario, '', 'Creación del compromiso')
+            compromiso.registrar_historial(funcionario, '', 'Creación de la tarea')
             Auditoria.registrar_evento(request.user, 'crear', 'Compromiso', compromiso.folio, None, {'delegacion': compromiso.delegacion.nombre})
-        messages.success(request, f'Compromiso creado con folio {compromiso.folio}.')
+        messages.success(request, f'Tarea creada con folio {compromiso.folio}.')
         return redirect('agenda')
-    return render(request, 'delegaciones_app/compromiso_form.html', {'form': form, 'titulo': 'Nuevo compromiso', 'asigna': puede_ver_todo(request.user)})
+    return render(request, 'delegaciones_app/compromiso_form.html', {'form': form, 'titulo': 'Agregar al tubo de trabajo', 'asigna': puede_ver_todo(request.user)})
 
 
 @login_required
@@ -483,7 +483,7 @@ def compromiso_estado(request, pk, estado):
     except ValidationError as error:
         messages.error(request, ' '.join(error.messages))
     else:
-        messages.success(request, f'El compromiso {compromiso.folio} cambió a {compromiso.get_estado_display()}.')
+        messages.success(request, f'La tarea {compromiso.folio} cambió a {compromiso.get_estado_display()}.')
     return redirect(_url_de_lista(request, 'agenda'))
 
 
@@ -498,7 +498,7 @@ def compromiso_editar(request, pk):
     compromiso = get_object_or_404(Compromiso, pk=pk)
     if not _puede_editar_compromiso(request.user, funcionario_de(request.user), compromiso):
         registrar_acceso_denegado(request, 'Compromiso', compromiso.folio, 'no es el responsable')
-        messages.error(request, 'No tienes permiso para modificar este compromiso.')
+        messages.error(request, 'No tienes permiso para modificar esta tarea.')
         return redirect(_url_de_lista(request, 'agenda'))
     form = CompromisoForm(request.POST or None, instance=compromiso, user=request.user)
     if request.method == 'POST' and form.is_valid():
@@ -509,11 +509,11 @@ def compromiso_editar(request, pk):
         except ValidationError as error:
             form.add_error(None, error)
         else:
-            messages.success(request, f'Compromiso {compromiso.folio} actualizado.')
+            messages.success(request, f'Tarea {compromiso.folio} actualizada.')
             return redirect(_url_de_lista(request, 'agenda'))
     return render(request, 'delegaciones_app/compromiso_form.html', {
         'form': form,
-        'titulo': f'Modificar compromiso {compromiso.folio}',
+        'titulo': f'Modificar tarea {compromiso.folio}',
         'compromiso': compromiso,
         'asigna': puede_ver_todo(request.user),
     })
@@ -523,7 +523,7 @@ def compromiso_editar(request, pk):
 def compromiso_eliminar(request, pk):
     if not puede_ver_todo(request.user):
         registrar_acceso_denegado(request, 'Compromiso', str(pk), 'rol insuficiente')
-        messages.error(request, 'Solo administración o coordinación puede eliminar compromisos.')
+        messages.error(request, 'Solo administración o coordinación puede eliminar tareas.')
         return redirect('agenda')
     compromiso = get_object_or_404(Compromiso, pk=pk)
     motivo = compromiso.motivo_no_eliminable()
@@ -536,7 +536,7 @@ def compromiso_eliminar(request, pk):
         except ValidationError as error:
             messages.error(request, ' '.join(error.messages))
         else:
-            messages.success(request, f'Compromiso {folio} eliminado.')
+            messages.success(request, f'Tarea {folio} eliminada.')
         return redirect(_url_de_lista(request, 'agenda'))
     return render(request, 'delegaciones_app/compromiso_confirmar_eliminar.html', {
         'compromiso': compromiso,
@@ -558,6 +558,7 @@ def agenda(request):
         'compromisos': compromisos,
         'delegaciones_filtro': _delegaciones_visibles(request.user),
         'estado_filtro': estado or '',
+        'estados_filtro': Compromiso.ESTADOS,
         'asigna': puede_ver_todo(request.user),
         'puede_crear_compromiso': tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO),
         'puede_eliminar_compromiso': puede_ver_todo(request.user),

@@ -7,8 +7,8 @@
 <div class="row g-3 mb-4">
     <div class="col-6 col-lg-3"><div class="metric amber h-100"><small>Cumplimiento promedio</small><strong>{{ promedio }} %</strong><small>{{ periodo|default:'Sin período vigente' }}</small></div></div>
     <div class="col-6 col-lg-3"><div class="metric h-100"><small>Actividades por revisar</small><strong>{{ actividades_pendientes }}</strong><small>{{ evidencias_pendientes }} evidencias pendientes</small></div></div>
-    <div class="col-6 col-lg-3"><div class="metric coral h-100"><small>Compromisos vencidos</small><strong>{{ compromisos_vencidos }}</strong><small>{{ compromisos_por_vencer }} por vencer</small></div></div>
-    <div class="col-6 col-lg-3"><div class="metric navy h-100"><small>Compromisos abiertos</small><strong>{{ compromisos_abiertos }}</strong><small>{{ actividades_aprobadas }} actividades aprobadas</small></div></div>
+    <div class="col-6 col-lg-3"><div class="metric coral h-100"><small>Tareas vencidas</small><strong>{{ compromisos_vencidos }}</strong><small>{{ compromisos_por_vencer }} por vencer</small></div></div>
+    <div class="col-6 col-lg-3"><div class="metric navy h-100"><small>Tareas abiertas</small><strong>{{ compromisos_abiertos }}</strong><small>{{ actividades_aprobadas }} actividades aprobadas</small></div></div>
 </div>
 
 <div class="row g-3 mb-4">
@@ -28,13 +28,13 @@
         <div class="section-label">Coordinación de delegados</div>
         <div class="d-grid gap-2 mb-3">
             <a class="btn btn-sgr" href="{% url 'delegados' %}">Delegados y asignaciones</a>
-            <a class="btn btn-outline-sgr" href="{% url 'compromiso_nuevo' %}">Asignar compromiso a un delegado</a>
+            <a class="btn btn-outline-sgr" href="{% url 'compromiso_nuevo' %}">Asignar tarea a un delegado</a>
         </div>
         <div class="section-label">Transacciones autorizadas</div>
         <div class="d-grid gap-2">
             <a class="btn btn-outline-sgr" href="{% url 'actividad_nueva' %}">Registrar actividad con evidencia</a>
             <a class="btn btn-outline-sgr" href="{% url 'actividades' %}?estado=pendiente">Actividades por revisar</a>
-            <a class="btn btn-outline-sgr" href="{% url 'agenda' %}">Seguimiento de compromisos</a>
+            <a class="btn btn-outline-sgr" href="{% url 'agenda' %}">Tubo de trabajo</a>
             <a class="btn btn-outline-sgr" href="{% url 'informe' %}">Informes</a>
         </div>
     </div></div>

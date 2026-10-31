@@ -278,7 +278,7 @@ class ActividadForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm):
         labels = {
             'item': 'Ítem de medición', 'catalogo': 'Tipo de atención', 'fecha': 'Fecha y hora',
             'solicitud_problema': 'Solicitud o problema', 'accion': 'Acción ejecutada',
-            'contacto_nombre': 'Nombre de contacto', 'contacto_telefono': 'Teléfono de contacto', 'compromiso': 'Compromiso vinculado (opcional)',
+            'contacto_nombre': 'Nombre de contacto', 'contacto_telefono': 'Teléfono de contacto', 'compromiso': 'Tarea del tubo de trabajo vinculada (opcional)',
         }
         help_texts = {'item': 'Solo ítems de períodos abiertos. La fecha debe caer dentro del período del ítem.'}
         widgets = {
@@ -316,7 +316,7 @@ class CompromisoForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm)
         self.fields['funcionario_responsable'].label_from_instance = lambda f: f'{f.nombre} · {f.delegacion or "sin delegación"}'
         if ve_todo:
             self.fields['funcionario_responsable'].label = 'Delegado responsable'
-            self.fields['funcionario_responsable'].help_text = 'La coordinación asigna el compromiso a un delegado de la delegación elegida.'
+            self.fields['funcionario_responsable'].help_text = 'La coordinación asigna la tarea a un delegado de la delegación elegida.'
         self.fields['item'].queryset = ItemMedible.objects.exclude(periodo__estado='cerrado').select_related('cargo', 'periodo')
         for campo in ('funcionario_responsable', 'origen'):
             self.fields[campo].required = True

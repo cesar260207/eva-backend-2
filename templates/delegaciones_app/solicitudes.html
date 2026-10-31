@@ -1,10 +1,10 @@
 {% extends 'base.html' %}
 
-{% block title %}Tubo de Solicitudes | Municipalidad de La Serena{% endblock %}
+{% block title %}Tubo de trabajo | Municipalidad de La Serena{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-3">
-    <h2 class="mb-0">Tubo de trabajo de solicitudes</h2>
+    <h2 class="mb-0">Tubo de trabajo</h2>
     <a class="btn btn-sgr" href="{% url 'compromiso_nuevo' %}">+ Agregar</a>
 </div>
 <div class="panel mb-4">
@@ -59,7 +59,7 @@
                 <p class="mb-3">{{ solicitud.descripcion }}</p>
                 <div class="row small text-muted mb-3">
                     <div class="col-md-6"><strong>Ingreso:</strong> {{ solicitud.fecha_ingreso|date:'d-m-Y' }}</div>
-                    <div class="col-md-6"><strong>Compromiso:</strong> {{ solicitud.fecha_comprometida|date:'d-m-Y' }}</div>
+                    <div class="col-md-6"><strong>Plazo:</strong> {{ solicitud.fecha_comprometida|date:'d-m-Y' }}</div>
                 </div>
                 <div class="d-flex gap-2">
                     <a class="btn btn-sm btn-outline-sgr" href="#">Modificar</a>

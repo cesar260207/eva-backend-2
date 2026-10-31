@@ -152,10 +152,10 @@ class CoordinacionDeDelegadosTests(EscenarioBase, TestCase):
     def test_la_agenda_explica_quien_crea_compromisos(self):
         """CU-12 Agenda compartida (RF-016). La agenda dice quién crea y quién elimina."""
         self.client.force_login(self.coordinador)
-        self.assertContains(self.client.get(reverse('agenda')), 'Asignar compromiso a un delegado')
+        self.assertContains(self.client.get(reverse('agenda')), 'Asignar tarea a un delegado')
         self.nuevo_compromiso()
         self.client.force_login(self.usuario_autor)
         agenda = self.client.get(reverse('agenda'))
-        self.assertContains(agenda, '¿Quién crea los compromisos?')
-        self.assertContains(agenda, 'Registrar compromiso de mi delegación')
+        self.assertContains(agenda, '¿Quién agrega tareas al tubo de trabajo?')
+        self.assertContains(agenda, 'Registrar tarea de mi delegación')
         self.assertNotContains(agenda, 'Eliminar</a>')

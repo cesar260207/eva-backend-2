@@ -9,6 +9,11 @@ Los perfiles de acceso (Administrador, Supervisor y Administrativo) son las tabl
 permisos de `django.contrib.auth` (`auth_group`, `auth_group_permissions`, `auth_user_groups`);
 la migración `0015_perfiles_de_acceso` los crea y asigna un perfil a cada usuario existente.
 
+**Equivalencia de nombres.** «Tubo de trabajo» en la interfaz = modelo `Compromiso` (tabla
+`compromiso`) = «Agenda colectiva» del diseño (CU-12). Cada registro del tubo se muestra como una
+«tarea». La migración `0016_textos_tubo_de_trabajo` solo cambia los nombres visibles y las etiquetas de
+los estados; no ejecuta SQL ni modifica datos.
+
 El modelo implementa las 17 clases del diseño (diagrama de clases del informe),
 más dos tablas adicionales: `FuncionarioRol`, que resuelve la relación
 muchos a muchos entre funcionarios y roles, y `MedicionDelegacion`, que conserva

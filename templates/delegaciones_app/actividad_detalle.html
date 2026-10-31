@@ -23,7 +23,7 @@
                 <div class="col-md-6"><div class="section-label">Tipo de atención</div><strong>{{ actividad.catalogo.nombre|default:'-' }}</strong></div>
                 <div class="col-md-6"><div class="section-label">Ítem de medición</div><strong>{{ actividad.item.nombre|default:'-' }}</strong>{% if actividad.item %}<div class="small text-muted">{{ actividad.item.periodo }}</div>{% endif %}</div>
                 <div class="col-md-6"><div class="section-label">Contacto</div><strong>{{ actividad.contacto_nombre|default:'-' }}</strong>{% if actividad.contacto_telefono %}<div class="small text-muted">{{ actividad.contacto_telefono }}</div>{% endif %}</div>
-                {% if actividad.compromiso %}<div class="col-12"><div class="section-label">Compromiso vinculado</div><strong>{{ actividad.compromiso.folio }}</strong> {{ actividad.compromiso.descripcion|truncatechars:80 }}</div>{% endif %}
+                {% if actividad.compromiso %}<div class="col-12"><div class="section-label">Tarea del tubo de trabajo vinculada</div><strong>{{ actividad.compromiso.folio }}</strong> {{ actividad.compromiso.descripcion|truncatechars:80 }}</div>{% endif %}
                 <div class="col-12"><div class="section-label">Acción ejecutada</div><p class="mb-0">{{ actividad.accion }}</p></div>
             </div>
         </div>

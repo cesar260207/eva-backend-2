@@ -22,7 +22,7 @@ desplegable en una instancia AWS EC2.
   Delegaciones, Cargos, Roles, Funcionarios, Catálogo, Períodos, Ítems medibles y Metas.
 - Registro de actividades con código verificador único e inmutable, carga de evidencias
   (JPG, PNG o PDF, hasta 5 MB), revisión por verificadores y anulación de aprobaciones con motivo.
-- Agenda de compromisos con responsable, plazos, alerta de vencimiento, estados controlados, historial
+- Tubo de trabajo (tareas con la comunidad) con responsable, plazos, alerta de vencimiento, estados controlados, historial
   y un resumen por responsable y estado.
 - Alertas por vencimientos, evidencias pendientes de revisión, ausencia de registros y avance bajo lo esperado.
 - Actividad reciente por funcionario: registros, último ingreso, días sin ingreso y promedio diario.
@@ -34,6 +34,19 @@ desplegable en una instancia AWS EC2.
 - Gestión de usuarios propia: crear cuentas, asignar perfil (grupo) y roles, activar o desactivar,
   desde el mantenedor «Funcionarios y usuarios». Django Admin no está instalado ni publicado.
 - Variables de entorno para toda configuración sensible (nunca escritas en el código).
+
+### Nombres en la interfaz
+
+El sistema usa en pantalla el término de la Municipalidad (Matriz SGR):
+
+| En la interfaz | En el código y la base de datos | En el diseño |
+|---|---|---|
+| «Tubo de trabajo» (la lista completa) | modelo `Compromiso`, tabla `compromiso`, ruta `/agenda/` | «Agenda colectiva» (CU-12) |
+| «Tarea» (cada registro del tubo) | una fila de `Compromiso` | un compromiso |
+
+El modelo, la tabla y las URL conservan su nombre original; solo cambian los textos visibles.
+Las etiquetas de los estados van en femenino (Ingresada, Pendiente, En proceso, Realizada), pero en la
+base se guardan los mismos valores de siempre (`ingresado`, `pendiente`, `proceso`, `realizado`).
 
 ## Arquitectura de datos
 
@@ -168,7 +181,7 @@ Los datos son sinteticos y solo sirven para demostracion academica.
 - `/actividad/nueva/`: registro de actividades; `/actividad/<código>/` muestra su detalle,
   evidencias, revisión y anulación de la aprobación.
 - `/evidencia/<código>/archivo/`: abre o descarga el archivo de una evidencia, con los mismos permisos de su actividad.
-- `/agenda/`: compromisos y agenda colectiva, con filtros y alerta de vencimiento.
+- `/agenda/`: tubo de trabajo (sus tareas), con filtros y alerta de vencimiento.
 - `/actividad/<código>/evidencia/`: subir evidencia a una actividad.
 - `/coordinacion/delegados/`: delegados por delegación, su carga y su asignación (coordinación).
 - `/administracion/`: índice de los ocho mantenedores.

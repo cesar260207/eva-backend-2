@@ -1604,12 +1604,12 @@ class CompromisoReglasTests(BaseOperacion):
 		self._con_plazo(40, 'realizado', folio='YA-REALIZADO')
 		self.client.force_login(self.coordinador)
 		respuesta = self.client.get(reverse('agenda'))
-		self.assertContains(respuesta, '1 compromiso próximo a vencer')
-		self.assertContains(respuesta, 'Próximo a vencer')
+		self.assertContains(respuesta, '1 tarea próxima a vencer')
+		self.assertContains(respuesta, 'Próxima a vencer')
 		contexto = respuesta.context
 		self.assertEqual((contexto['por_vencer'], contexto['vencidos'], contexto['realizados'], contexto['proximos']), (1, 1, 1, 1))
 		estados = {c.folio: c.estado_display for c in contexto['compromisos']}
-		self.assertEqual(estados, {'POR-VENCER': 'Próximo a vencer', 'YA-VENCIDO': 'Vencido', 'YA-REALIZADO': 'Realizado'})
+		self.assertEqual(estados, {'POR-VENCER': 'Próxima a vencer', 'YA-VENCIDO': 'Vencida', 'YA-REALIZADO': 'Realizada'})
 
 	def test_la_agenda_ofrece_solo_las_transiciones_permitidas(self):
 		compromiso = self._con_plazo(30, 'proceso')
@@ -1921,7 +1921,7 @@ class FiltrosYInformesTests(BaseOperacion):
 		respuesta = self.client.get(reverse('informe'), {'tipo': 'compromisos', 'plazo': 'vencidos'})
 		self.assertEqual(len(respuesta.context['filas']), 1)
 		self.assertEqual(respuesta.context['filas'][0][0], 'INF-VENCIDO')
-		self.assertEqual(respuesta.context['filas'][0][7], 'Vencido')
+		self.assertEqual(respuesta.context['filas'][0][7], 'Vencida')
 
 	def test_el_informe_de_cumplimiento_usa_los_indicadores(self):
 		meta = Meta.objects.create(item=self.item, funcionario=self.funcionario.funcionario, valor_objetivo=2)
@@ -1982,7 +1982,7 @@ class ResumenYActividadRecienteVistasTests(BaseOperacion):
         """CU-12 Agenda compartida (RF-021). El panel totaliza lo que se ve en la agenda."""
         self.client.force_login(self.coordinador)
         respuesta = self.client.get(reverse('agenda'))
-        self.assertContains(respuesta, 'Compromisos por responsable y estado')
+        self.assertContains(respuesta, 'Tareas por responsable y estado')
         filas = {f['nombre']: f for f in respuesta.context['resumen_responsables']}
         self.assertEqual((filas['funcionario-op']['total'], filas['funcionario-op']['realizado'], filas['rural-res']['total']), (2, 1, 1))
         self.assertEqual(respuesta.context['resumen_total']['total'], 3)
@@ -2004,10 +2004,10 @@ class ResumenYActividadRecienteVistasTests(BaseOperacion):
         """CU-20.1 Consolidar datos filtrados (RF-021, RF-033). El informe repite el resumen de la agenda."""
         self.client.force_login(self.coordinador)
         respuesta = self.client.get(reverse('informe'), {'tipo': 'resumen'})
-        self.assertContains(respuesta, 'Informe de resumen de compromisos por responsable')
+        self.assertContains(respuesta, 'Informe de resumen del tubo de trabajo por responsable')
         self.assertEqual(respuesta.context['filas'][-1][0], 'Total')
         csv_respuesta = self.client.get(reverse('informe'), {'tipo': 'resumen', 'formato': 'csv'})
-        self.assertTrue(csv_respuesta.content.decode('utf-8').startswith('﻿Responsable;Ingresado'))
+        self.assertTrue(csv_respuesta.content.decode('utf-8').startswith('﻿Responsable;Ingresadas'))
 
     def test_la_ficha_muestra_la_actividad_reciente_propia(self):
         """CU-06 Seguimiento de avance (RF-030). Último ingreso, días sin ingreso, registros y promedio diario."""

@@ -9,7 +9,7 @@
     <div class="col-6 col-lg-2"><div class="metric navy h-100"><small>Delegaciones activas</small><strong>{{ delegaciones_activas }}</strong><small>{{ funcionarios_activos }} funcionarios</small></div></div>
     <div class="col-6 col-lg-2"><div class="metric amber h-100"><small>Cumplimiento promedio</small><strong>{{ promedio }} %</strong><small>{{ periodo|default:'Sin período vigente' }}</small></div></div>
     <div class="col-6 col-lg-2"><div class="metric h-100"><small>Actividades</small><strong>{{ actividades_total }}</strong><small>{{ actividades_pendientes }} por revisar</small></div></div>
-    <div class="col-6 col-lg-2"><div class="metric coral h-100"><small>Compromisos abiertos</small><strong>{{ compromisos_abiertos }}</strong><small>{{ compromisos_vencidos }} vencidos</small></div></div>
+    <div class="col-6 col-lg-2"><div class="metric coral h-100"><small>Tareas abiertas</small><strong>{{ compromisos_abiertos }}</strong><small>{{ compromisos_vencidos }} vencidas</small></div></div>
     <div class="col-6 col-lg-2"><div class="metric navy h-100"><small>Períodos abiertos</small><strong>{{ periodos_abiertos }}</strong><small>{{ evidencias_pendientes }} evidencias pendientes</small></div></div>
 </div>
 
@@ -31,9 +31,9 @@
         <div class="d-grid gap-2">
             <a class="btn btn-outline-sgr" href="{% url 'actividad_nueva' %}">Registrar actividad con evidencia</a>
             <a class="btn btn-outline-sgr" href="{% url 'actividades' %}?estado=pendiente">Revisar evidencias pendientes</a>
-            <a class="btn btn-outline-sgr" href="{% url 'compromiso_nuevo' %}">Asignar compromiso a un delegado</a>
+            <a class="btn btn-outline-sgr" href="{% url 'compromiso_nuevo' %}">Asignar tarea a un delegado</a>
             <a class="btn btn-outline-sgr" href="{% url 'delegados' %}">Delegados y asignaciones</a>
-            <a class="btn btn-outline-sgr" href="{% url 'agenda' %}">Seguimiento de compromisos</a>
+            <a class="btn btn-outline-sgr" href="{% url 'agenda' %}">Tubo de trabajo</a>
             <a class="btn btn-outline-sgr" href="{% url 'mantenedor_lista' 'periodos' %}">Abrir, cerrar o reabrir períodos</a>
         </div>
     </div></div>

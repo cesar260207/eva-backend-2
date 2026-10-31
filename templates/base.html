@@ -23,7 +23,7 @@
                     {% if user.is_authenticated %}
                     <li class="nav-item"><a class="nav-link" href="{% url 'panel' %}">Mi panel</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'actividades' %}">Actividades</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'agenda' %}">Compromisos</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'agenda' %}">Tubo de trabajo</a></li>
                     {% if es_coordinacion %}<li class="nav-item"><a class="nav-link" href="{% url 'delegados' %}">Delegados</a></li>
                     {% elif mi_delegacion %}<li class="nav-item"><a class="nav-link" href="{% url 'delegacion_detalle' mi_delegacion.nombre %}">Mi delegación</a></li>{% endif %}
                     <li class="nav-item dropdown">

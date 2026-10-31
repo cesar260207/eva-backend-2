@@ -11,10 +11,10 @@ from django.utils import timezone
 from .models import Actividad, Compromiso
 
 TIPOS_INFORME = [
-    ('actividades', 'Actividades'), ('compromisos', 'Compromisos'), ('resumen', 'Resumen de compromisos por responsable'),
+    ('actividades', 'Actividades'), ('compromisos', 'Tareas del tubo de trabajo'), ('resumen', 'Resumen del tubo de trabajo por responsable'),
     ('reciente', 'Actividad reciente por funcionario'), ('cumplimiento', 'Cumplimiento por delegación'),
 ]
-PLAZOS = [('vencidos', 'Vencidos'), ('por_vencer', 'Próximos a vencer')]
+PLAZOS = [('vencidos', 'Vencidas'), ('por_vencer', 'Próximas a vencer')]
 
 
 def _fecha(valor):
@@ -84,9 +84,9 @@ def filtrar_compromisos(compromisos, datos):
 def situacion_de_plazo(compromiso):
     """Etiqueta y clase Bootstrap de un compromiso según su estado y su plazo (RF-018, RF-019)."""
     if compromiso.vencido:
-        return 'Vencido', 'danger'
+        return 'Vencida', 'danger'
     if compromiso.proximo_a_vencer:
-        return 'Próximo a vencer', 'warning'
+        return 'Próxima a vencer', 'warning'
     return compromiso.get_estado_display(), 'success' if compromiso.estado == 'realizado' else 'warning'
 
 
@@ -145,7 +145,7 @@ def resumen_por_responsable(compromisos):
 
 def filas_de_resumen(compromisos):
     """Columnas y filas planas del resumen de compromisos por responsable (la última fila es el total)."""
-    columnas = ['Responsable', 'Ingresado', 'Pendiente', 'En proceso', 'Realizado', 'Vencidos', 'Total', 'Realizado (%)', 'Pendiente (%)']
+    columnas = ['Responsable', 'Ingresadas', 'Pendientes', 'En proceso', 'Realizadas', 'Vencidas', 'Total', 'Realizado (%)', 'Pendiente (%)']
     filas, total = resumen_por_responsable(compromisos)
     return columnas, [
         [f['nombre'], f['ingresado'], f['pendiente'], f['proceso'], f['realizado'], f['vencidos'], f['total'], f['pct_realizado'], f['pct_pendiente']]
