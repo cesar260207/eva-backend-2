@@ -34,6 +34,23 @@ class EvidenciaEnListadoYDetalleTests(EscenarioBase, TestCase):
         self.assertContains(self.client.get(reverse('actividad_detalle', args=[actividad.codigo_verificador])), url)
         self.assertTemplateUsed(self.client.get(url), 'delegaciones_app/evidencia_subir.html')
 
+    def test_subir_evidencia_y_modificar_son_botones_distintos(self):
+        """CU-09 Subir evidencia (RF-012). En el detalle, «Subir evidencia» y «Modificar actividad» llevan a pantallas distintas."""
+        actividad = self.nueva_actividad()
+        self.client.force_login(self.usuario_autor)
+        detalle = self.client.get(reverse('actividad_detalle', args=[actividad.codigo_verificador]))
+        self.assertContains(detalle, f'href="{reverse("evidencia_subir", args=[actividad.codigo_verificador])}">Subir evidencia</a>', html=False)
+        self.assertContains(detalle, f'href="{reverse("actividad_editar", args=[actividad.codigo_verificador])}">Modificar actividad</a>', html=False)
+
+    def test_una_actividad_aprobada_no_ofrece_subir_evidencia(self):
+        """CU-09 Subir evidencia (RF-012, RF-013). Aprobada no admite evidencias: el botón no aparece en la lista ni en el detalle."""
+        actividad = self.nueva_actividad(estado='aprobada')
+        url = reverse('evidencia_subir', args=[actividad.codigo_verificador])
+        self.client.force_login(self.usuario_autor)
+        self.assertNotContains(self.client.get(reverse('actividades')), url)
+        self.assertNotContains(self.client.get(reverse('actividad_detalle', args=[actividad.codigo_verificador])), url)
+        self.assertRedirects(self.client.get(url), reverse('actividad_detalle', args=[actividad.codigo_verificador]))
+
     def test_quien_solo_revisa_no_ve_carga_de_archivos(self):
         """CU-11 Revisión sin elementos de carga (RF-013). El revisor ve la decisión, no el formulario de carga."""
         actividad = self.nueva_actividad()
