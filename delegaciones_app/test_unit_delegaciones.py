@@ -1,6 +1,8 @@
 """Pruebas de los ajustes de la revisión del equipo: carga de evidencia en su propia pantalla, indicador de
 evidencia, revisión aprobar/rechazar, ámbito del delegado, coordinación de delegados y creación de compromisos."""
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from .models import Auditoria, Indicador, Meta, Validacion
@@ -23,7 +25,22 @@ class EvidenciaEnListadoYDetalleTests(EscenarioBase, TestCase):
         self.assertEqual((filas[sin.pk].total_evidencias, filas[con.pk].total_evidencias), (0, 1))
         respuesta = self.client.get(reverse('actividades'))
         self.assertContains(respuesta, 'Sin evidencia')
-        self.assertContains(respuesta, 'Cargada (1)')
+        self.assertContains(respuesta, 'Con evidencia (1)')
+
+    def test_el_indicador_no_hace_una_consulta_por_fila(self):
+        """CU-09 Indicar evidencia cargada (RF-012). El total sale de un annotate: más filas no suman consultas."""
+        self.client.force_login(self.usuario_autor)
+
+        def consultas_del_listado():
+            with CaptureQueriesContext(connection) as consultas:
+                self.client.get(reverse('actividades'))
+            return len(consultas)
+
+        self.nueva_evidencia(self.nueva_actividad())
+        con_una = consultas_del_listado()
+        for _ in range(4):
+            self.nueva_evidencia(self.nueva_actividad())
+        self.assertEqual(consultas_del_listado(), con_una)
 
     def test_el_autor_ve_el_boton_subir_evidencia(self):
         """CU-09 Subir evidencia (RF-012). Botón propio en la lista y en el detalle."""

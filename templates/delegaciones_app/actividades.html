@@ -34,10 +34,10 @@
                     <td><span class="badge badge-soft">{{ actividad.get_estado_display }}</span></td>
                     <td>
                         {% if actividad.total_evidencias %}
-                        <span class="badge badge-success-soft">&#10003; Cargada ({{ actividad.total_evidencias }})</span>
+                        <span class="badge badge-success-soft">Con evidencia ({{ actividad.total_evidencias }})</span>
                         {% if actividad.evidencias_pendientes %}<div class="small text-muted">{{ actividad.evidencias_pendientes }} por revisar</div>{% endif %}
                         {% else %}
-                        <span class="badge badge-danger-soft">&#10007; Sin evidencia</span>
+                        <span class="badge badge-danger-soft">Sin evidencia</span>
                         {% endif %}
                     </td>
                     <td>
