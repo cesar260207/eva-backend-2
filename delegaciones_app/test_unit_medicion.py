@@ -39,13 +39,11 @@ class AvanceUnitTests(MedicionBase):
         indicador = Indicador(meta=self.meta, periodo=self.periodo)
         self.assertEqual(indicador.calcular_avance(), 2)
 
-    def test_no_cuentan_las_pendientes_rechazadas_ni_en_correccion(self):
+    def test_no_cuentan_las_pendientes_ni_las_rechazadas(self):
         """CU-11.2 Bloquear aporte al avance (RF-022). RN-009: solo lo aprobado aporta."""
         self.nueva_actividad(solicitud_problema='Pendiente')
         rechazada = self.nueva_actividad(solicitud_problema='Rechazada')
         Validacion(evidencia=self.nueva_evidencia(rechazada), funcionario_verificador=self.verificador).rechazar_evidencia('No sirve')
-        correccion = self.nueva_actividad(solicitud_problema='Corrección')
-        Validacion(evidencia=self.nueva_evidencia(correccion), funcionario_verificador=self.verificador).solicitar_correccion('Falta foto')
         self.assertEqual(Indicador(meta=self.meta, periodo=self.periodo).calcular_avance(), 0)
 
     def test_no_cuenta_una_actividad_aprobada_sin_validacion_aprobada(self):
@@ -326,7 +324,7 @@ class FichaPersonalUnitTests(MedicionBase):
         self.aprobar(self.nueva_actividad(solicitud_problema='Aprobada'))
         self.nueva_evidencia(self.nueva_actividad(solicitud_problema='Pendiente'))
         conteo = {fila['estado']: fila['total'] for fila in medicion.resumen_de_evidencias(self.autor, self.periodo)}
-        self.assertEqual(conteo, {'pendiente': 1, 'aprobada': 1, 'rechazada': 0, 'correccion': 0})
+        self.assertEqual(conteo, {'pendiente': 1, 'aprobada': 1, 'rechazada': 0})
 
     def test_resumen_de_compromisos_por_situacion(self):
         """CU-14.1 Clasificar compromisos por vencimiento (RF-019). Vigentes, por vencer, vencidos y realizados."""

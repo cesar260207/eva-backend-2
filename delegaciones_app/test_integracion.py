@@ -271,7 +271,7 @@ class OperacionTests(TestCase):
 
 	def test_subir_evidencia_genera_codigos_y_envia_a_revision(self):
 		actividad = self._actividad()
-		actividad.cambiar_estado('correccion')
+		actividad.cambiar_estado('rechazada')
 		primera = self.autor.subir_evidencia(actividad, self._archivo(), 'Acta firmada')
 		segunda = self.autor.subir_evidencia(actividad, self._archivo('foto.png'))
 		self.assertEqual(primera.codigo_evidencia, f'{actividad.codigo_verificador}-01')
@@ -301,13 +301,13 @@ class OperacionTests(TestCase):
 		self.assertEqual(Actividad.objects.get(pk=validada.pk).estado, 'aprobada')
 		self.assertEqual(Indicador(meta=meta, periodo=self.periodo).calcular_avance(), 1)
 
-	def test_rechazo_y_correccion_exigen_texto_y_numeran_revisiones(self):
+	def test_el_rechazo_exige_texto_y_numera_revisiones(self):
 		actividad = self._actividad()
 		evidencia = self.autor.subir_evidencia(actividad, self._archivo())
 		with self.assertRaises(ValidationError):
 			self._validacion(evidencia).rechazar_evidencia('')
-		correccion = self._validacion(evidencia).solicitar_correccion('Falta la firma')
-		self.assertEqual((correccion.version, actividad.estado, evidencia.estado_revision), (1, 'correccion', 'correccion'))
+		primero = self._validacion(evidencia).rechazar_evidencia('Falta la firma')
+		self.assertEqual((primero.version, actividad.estado, evidencia.estado_revision), (1, 'rechazada', 'rechazada'))
 
 		evidencia.reemplazar_archivo(self._archivo('firmado.pdf'))
 		self.assertEqual((evidencia.estado_revision, actividad.estado), ('pendiente', 'pendiente'))
@@ -455,6 +455,49 @@ class MigracionDatosTests(TransactionTestCase):
 		self.assertFalse(viejo.get_model('auth', 'User').objects.filter(username__startswith='delegado.').exists())
 		self.assertEqual(modelo('Evidencia').objects.count(), 2)
 		self.assertEqual(modelo('MetaMedicion').objects.count(), 2)
+
+
+class MigracionSinCorreccionTests(TransactionTestCase):
+	"""Sin CU (migración de datos). La migración 0017 convierte «correccion» en «rechazada» y conserva la observación."""
+
+	antes = [('delegaciones_app', '0016_textos_tubo_de_trabajo')]
+	despues = [('delegaciones_app', '0017_sin_solicitar_correccion')]
+
+	def _migrar(self, destino):
+		executor = MigrationExecutor(connection)
+		executor.migrate(destino)
+		return executor.loader.project_state(destino).apps
+
+	def tearDown(self):
+		self._migrar(MigrationExecutor(connection).loader.graph.leaf_nodes())
+
+	def test_correccion_pasa_a_rechazada_conservando_la_observacion(self):
+		viejo = self._migrar(self.antes)
+		modelo = lambda nombre: viejo.get_model('delegaciones_app', nombre)
+		usuario = viejo.get_model('auth', 'User').objects.create(username='autor-0017')
+		cargo = modelo('Cargo').objects.create(nombre='Profesional')
+		centro = modelo('Delegacion').objects.create(nombre='Centro')
+		autor = modelo('Funcionario').objects.create(usuario=usuario, identificador_institucional='autor-0017', nombre='Autor', cargo=cargo, delegacion=centro)
+		periodo = modelo('Periodo').objects.create(nombre='Septiembre', fecha_inicio=date(2026, 9, 1), fecha_termino=date(2026, 9, 30), estado='abierto')
+		item = modelo('ItemMedible').objects.create(cargo=cargo, periodo=periodo, nombre='Atención', ponderacion=100)
+		actividad = modelo('Actividad').objects.create(
+			codigo_verificador='EVD-0017', funcionario_autor=autor, delegacion=centro, item=item, fecha='2026-09-10T10:00:00Z',
+			solicitud_problema='Luminaria', accion='Visita', estado='correccion',
+		)
+		evidencia = modelo('Evidencia').objects.create(codigo_evidencia='EVD-0017-01', actividad=actividad, funcionario_autor=autor, archivo_vinculo='evidencias/a.pdf', estado_revision='correccion')
+		modelo('Validacion').objects.create(evidencia=evidencia, funcionario_verificador=autor, decision='correccion', observacion='Falta la firma')
+		modelo('Actividad').objects.create(
+			codigo_verificador='EVD-0017-OK', funcionario_autor=autor, delegacion=centro, item=item, fecha='2026-09-11T10:00:00Z',
+			solicitud_problema='Poda', accion='Visita', estado='aprobada',
+		)
+
+		nuevo = self._migrar(self.despues)
+		modelo = lambda nombre: nuevo.get_model('delegaciones_app', nombre)
+		self.assertEqual(modelo('Actividad').objects.get(codigo_verificador='EVD-0017').estado, 'rechazada')
+		self.assertEqual(modelo('Actividad').objects.get(codigo_verificador='EVD-0017-OK').estado, 'aprobada')
+		self.assertEqual(modelo('Evidencia').objects.get().estado_revision, 'rechazada')
+		validacion = modelo('Validacion').objects.get()
+		self.assertEqual((validacion.decision, validacion.observacion), ('rechazada', 'Falta la firma'))
 
 
 class PermisosTests(TestCase):
@@ -977,7 +1020,7 @@ class ActividadVistasTests(BaseOperacion):
 		self.assertEqual((actividad.solicitud_problema, actividad.funcionario_autor), ('Ajustada por coordinacion', self.funcionario.funcionario))
 
 	def test_subir_evidencia_la_envia_a_revision_y_audita(self):
-		actividad = self._actividad(estado='correccion')
+		actividad = self._actividad(estado='rechazada')
 		self.client.force_login(self.funcionario)
 		respuesta = self.client.post(reverse('evidencia_subir', args=[actividad.codigo_verificador]), {'archivo_vinculo': self._archivo(), 'comentario': 'Acta firmada'})
 		self.assertRedirects(respuesta, reverse('actividad_detalle', args=[actividad.codigo_verificador]))
@@ -1862,7 +1905,7 @@ class FiltrosYInformesTests(BaseOperacion):
 		respuesta = self.client.get(reverse('actividades'), {'estado': 'aprobada'})
 		self.assertEqual([a.solicitud_problema for a in respuesta.context['actividades']], ['Operativo aprobado'])
 		self.assertTrue(respuesta.context['filtrado'])
-		self.assertContains(self.client.get(reverse('actividades'), {'estado': 'correccion'}), 'Ninguna actividad coincide con los filtros')
+		self.assertContains(self.client.get(reverse('actividades'), {'estado': 'borrador'}), 'Ninguna actividad coincide con los filtros')
 
 	def test_la_agenda_filtra_por_plazo(self):
 		vencido = self._compromiso(folio='AG-VENCIDO')

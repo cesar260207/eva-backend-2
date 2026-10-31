@@ -190,7 +190,7 @@ class VersionOptimistaMixin:
 
 
 class Actividad(VersionOptimistaMixin, models.Model):
-	ESTADOS = [('borrador', 'Borrador'), ('pendiente', 'Pendiente de revisión'), ('aprobada', 'Aprobada'), ('rechazada', 'Rechazada'), ('correccion', 'Requiere corrección')]
+	ESTADOS = [('borrador', 'Borrador'), ('pendiente', 'Pendiente de revisión'), ('aprobada', 'Aprobada'), ('rechazada', 'Rechazada')]
 	codigo_verificador = models.CharField(max_length=50, unique=True, editable=False)
 	funcionario_autor = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='actividades')
 	# Ajuste 9: se conserva para filtrar y medir por delegación (también la de coordinadores sin delegación).
@@ -293,7 +293,7 @@ EXTENSIONES_EVIDENCIA = ['jpg', 'jpeg', 'png', 'pdf']
 
 
 class Evidencia(models.Model):
-	ESTADOS_REVISION = [('pendiente', 'Pendiente de revisión'), ('aprobada', 'Aprobada'), ('rechazada', 'Rechazada'), ('correccion', 'Requiere corrección')]
+	ESTADOS_REVISION = [('pendiente', 'Pendiente de revisión'), ('aprobada', 'Aprobada'), ('rechazada', 'Rechazada')]
 	codigo_evidencia = models.CharField(max_length=60, unique=True, editable=False)
 	actividad = models.ForeignKey(Actividad, on_delete=models.CASCADE, related_name='evidencias')
 	funcionario_autor = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='evidencias')
@@ -341,7 +341,8 @@ class Evidencia(models.Model):
 
 
 class Validacion(models.Model):
-	DECISIONES = [('aprobada', 'Aprobada'), ('rechazada', 'Rechazada'), ('correccion', 'Requiere corrección')]
+	# La revisión solo aprueba o rechaza con motivo; quien registró corrige y vuelve a enviar (migración 0017).
+	DECISIONES = [('aprobada', 'Aprobada'), ('rechazada', 'Rechazada')]
 	evidencia = models.ForeignKey(Evidencia, on_delete=models.CASCADE, related_name='validaciones')
 	funcionario_verificador = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='validaciones')
 	decision = models.CharField(max_length=20, choices=DECISIONES)
@@ -385,11 +386,6 @@ class Validacion(models.Model):
 		if not (motivo or '').strip():
 			raise ValidationError('El rechazo de una evidencia exige un motivo.')
 		return self._decidir('rechazada', motivo)
-
-	def solicitar_correccion(self, observacion):
-		if not (observacion or '').strip():
-			raise ValidationError('La solicitud de corrección exige una observación.')
-		return self._decidir('correccion', observacion)
 
 
 class Compromiso(VersionOptimistaMixin, models.Model):

@@ -50,7 +50,7 @@ el histórico importado de la Matriz SGR. En total son 19 tablas propias.
 |---|---|---|
 | `Actividad` | Atención o acción territorial registrada por un funcionario, con código verificador único. | FK a `Funcionario`, `Delegacion`, `ItemMedible`, `Catalogo` y, opcional, `Compromiso`. |
 | `Evidencia` | Archivo que respalda una actividad (JPG, PNG o PDF, hasta el tamaño configurado). | FK a `Actividad` (se borra con ella) y a su autor. |
-| `Validacion` | Decisión de un verificador sobre una evidencia: aprobada, rechazada o con corrección pedida. | FK a `Evidencia` y al verificador. Queda como historial. |
+| `Validacion` | Decisión de un verificador sobre una evidencia: aprobada o rechazada (con motivo). | FK a `Evidencia` y al verificador. Queda como historial. |
 | `Compromiso` | Solicitud o acuerdo territorial con responsable, plazo, estado y folio único. | FK a `Delegacion`, `Funcionario` e `ItemMedible` opcional. |
 | `HistorialCompromiso` | Cada cambio de estado, derivación o cierre de un compromiso, con su autor. | FK a `Compromiso` y `Funcionario`. |
 | `Auditoria` | Registro inmutable de las operaciones críticas y de los accesos denegados. | FK opcional a `Funcionario` o `UsuarioMaestro`. |
@@ -160,7 +160,7 @@ Resumen; no tiene mantenedor.
   cambia con `EVIDENCIA_TAMANO_MAXIMO_MB`. El rechazo informa el motivo exacto.
 - El código de cada evidencia deriva del de su actividad (`EVD-...-01`) y no
   cambia.
-- Rechazar o pedir corrección exige una observación. Solo una validación
+- La revisión solo aprueba o rechaza. Rechazar exige un motivo. Solo una validación
   aprobada hace que la actividad aporte al avance.
 - El archivo se abre o descarga desde el detalle de la actividad, por la vista protegida
   `evidencia_archivo`: exige sesión y los mismos permisos de la actividad, y un intento fuera del ámbito queda
@@ -262,9 +262,10 @@ estos ajustes mínimos, porque el diseño no cubre algo que el sistema ya usa:
   necesita saber quién la hace o sobre qué registro: `reabrir_periodo(motivo, usuario)`,
   `subir_evidencia(actividad, archivo)` y `set_estado`, `derivar_compromiso` y
   `cerrar_compromiso` con `autor`.
-- Actividad y Evidencia tienen el estado adicional «correccion», que deja
-  `Validacion.solicitar_correccion()`. `Validacion.version` es el número de
-  revisión de la evidencia.
+- La opción «Solicitar corrección» se eliminó: la migración `0017_sin_solicitar_correccion`
+  convierte cada fila con estado «correccion» en «rechazada» (en `actividad`, `evidencia` y
+  `validacion`) y conserva la observación como motivo del rechazo. `Validacion.version` es el número
+  de revisión de la evidencia.
 - `Indicador.ajuste` y `Validacion.resultado` se guardan, pero no entran en el
   cálculo, porque el informe no define cómo se aplican.
 - Las transiciones de estado de un compromiso (avanzar, y reabrir un realizado

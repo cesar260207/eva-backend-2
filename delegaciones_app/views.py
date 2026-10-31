@@ -30,10 +30,6 @@ DECISIONES = {'aprobar': 'aprobar_evidencia', 'rechazar': 'rechazar_evidencia'}
 ROLES_REVISORES = (ADMINISTRADOR, COORDINADOR, DELEGADO, VERIFICADOR)
 MENSAJE_REVISION_PROPIA = 'No puedes revisar una actividad que registraste tú: la revisa otro delegado, un verificador o la coordinación.'
 
-# Estados de actividad que se ofrecen en los filtros («Requiere corrección» queda solo para datos antiguos).
-ESTADOS_ACTIVIDAD_FILTRO = [(valor, etiqueta) for valor, etiqueta in Actividad.ESTADOS if valor != 'correccion']
-
-
 def _delegaciones_visibles(user):
     """Delegaciones que el usuario puede elegir en los filtros: solo la suya si su ámbito es una delegación."""
     propia = delegacion_propia(user)
@@ -242,7 +238,7 @@ def actividades(request):
         'actividades': registros, 'query': query, 'puede_crear': request.user.is_authenticated,
         'filtros': request.GET, 'filtrado': any(request.GET.get(clave) for clave in ('q', 'delegacion', 'estado', 'periodo', 'desde', 'hasta')),
         'delegaciones_filtro': _delegaciones_visibles(request.user), 'periodos_filtro': Periodo.objects.order_by('-fecha_inicio'),
-        'estados_filtro': ESTADOS_ACTIVIDAD_FILTRO,
+        'estados_filtro': Actividad.ESTADOS,
     })
 
 
@@ -392,8 +388,8 @@ def actividad_editar(request, codigo):
     form = ActividadForm(request.POST or None, instance=actividad, user=request.user, compromisos=_compromisos_autorizados(request.user))
     if request.method == 'POST' and form.is_valid():
         actividad = form.save(commit=False)
-        # Corregir una actividad rechazada o con corrección solicitada la devuelve a la cola de revisión.
-        devuelta_a_revision = estado_anterior in {'rechazada', 'correccion'}
+        # Corregir una actividad rechazada la devuelve a la cola de revisión.
+        devuelta_a_revision = estado_anterior == 'rechazada'
         if devuelta_a_revision:
             actividad.estado = 'pendiente'
         try:
