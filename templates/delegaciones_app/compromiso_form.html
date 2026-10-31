@@ -2,9 +2,9 @@
 {% block title %}{{ titulo }} | SGR{% endblock %}
 {% block content %}
 <div class="row justify-content-center"><div class="col-lg-8">
-    <div class="page-kicker">Agenda colectiva</div>
+    <div class="page-kicker">Tubo de trabajo</div>
     <h1 class="page-title mb-2">{{ titulo }}</h1>
-    <p class="page-intro mb-4">{% if asigna %}Como coordinación, eliges la delegación y el delegado responsable del compromiso.{% else %}El compromiso queda en tu delegación y a tu cargo.{% endif %}</p>
-    <div class="panel"><form method="post">{% csrf_token %}{{ form.as_p }}<div class="d-flex justify-content-end gap-2"><a href="{% url 'agenda' %}" class="btn btn-light">Cancelar</a><button class="btn btn-sgr">{% if compromiso %}Guardar cambios{% else %}Crear compromiso{% endif %}</button></div></form></div>
+    <p class="page-intro mb-4">{% if asigna %}Como coordinación, eliges la delegación y el delegado responsable de la tarea.{% else %}La tarea queda en tu delegación y a tu cargo.{% endif %}</p>
+    <div class="panel"><form method="post">{% csrf_token %}{{ form.as_p }}<div class="d-flex justify-content-end gap-2"><a href="{% url 'agenda' %}" class="btn btn-light">Cancelar</a><button class="btn btn-sgr">{% if compromiso %}Guardar cambios{% else %}Agregar al tubo de trabajo{% endif %}</button></div></form></div>
 </div></div>
 {% endblock %}

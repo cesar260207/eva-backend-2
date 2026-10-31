@@ -34,7 +34,7 @@ class AlertasDeVencimientoTests(AlertasBase):
         compromiso = self.nuevo_compromiso(dias=-4, folio='AL-VENC')
         alerta, = alertas_de_vencimiento(self.coordinador, self.hoy)
         self.assertEqual((alerta['tipo'], alerta['nivel'], alerta['responsable'], alerta['fecha']), ('vencimiento', 'danger', 'autor-base', compromiso.fecha_comprometida))
-        self.assertIn('AL-VENC vencido hace 4 días', alerta['motivo'])
+        self.assertIn('AL-VENC vencida hace 4 días', alerta['motivo'])
         self.assertIn('AL-VENC', alerta['url'])
 
     def test_un_compromiso_proximo_a_vencer_genera_una_advertencia(self):
@@ -42,14 +42,14 @@ class AlertasDeVencimientoTests(AlertasBase):
         self.nuevo_compromiso(dias=0, folio='AL-HOY')
         self.nuevo_compromiso(dias=2, folio='AL-DOS')
         motivos = {a['motivo'] for a in alertas_de_vencimiento(self.coordinador, self.hoy)}
-        self.assertEqual(motivos, {'Compromiso AL-HOY: vence hoy', 'Compromiso AL-DOS: vence en 2 días'})
+        self.assertEqual(motivos, {'Tarea AL-HOY: vence hoy', 'Tarea AL-DOS: vence en 2 días'})
 
     def test_el_singular_se_escribe_bien(self):
         """CU-14.2 Generar alerta por vencimiento próximo (RF-037). Un día, no 1 días."""
         self.nuevo_compromiso(dias=1, folio='AL-UNO')
         self.nuevo_compromiso(dias=-1, folio='AL-AYER')
         motivos = {a['motivo'] for a in alertas_de_vencimiento(self.coordinador, self.hoy)}
-        self.assertEqual(motivos, {'Compromiso AL-UNO: vence en 1 día', 'Compromiso AL-AYER vencido hace 1 día'})
+        self.assertEqual(motivos, {'Tarea AL-UNO: vence en 1 día', 'Tarea AL-AYER vencida hace 1 día'})
 
     def test_no_alertan_los_realizados_ni_los_lejanos(self):
         """CU-14.2 Generar alerta por vencimiento próximo (RF-037). Solo lo que requiere atención."""

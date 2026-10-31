@@ -143,3 +143,24 @@ Herramienta usada: **Claude Code** (asistente de IA dentro de VS Code), trabajan
 - Nadie puede revisar una actividad que registró él mismo.
 
 **Qué detectó la IA al probar:** Recorrió las pantallas con cada cuenta demo y encontró que el panel del delegado se caía porque una variable de la vista pisaba la del menú. Lo arregló y agregó una prueba para ese caso.
+
+## Prompt 13 - Ajustes del equipo y revisión contra la Evaluación Sumativa 3
+
+**Prompt literal:** "Lee el archivo PROMPT_CLAUDE_CODE_AJUSTES_Y_EVALUACION.md adjunto y sigue sus instrucciones desde "Eres mi compañero de desarrollo" hasta el final (lo que está antes de la línea de guiones son notas para mí, ignóralas). La evaluación es el PDF adjunto Eva Sumativa 3.pdf: úsalo como fuente en vez de docs/evaluacion/. Empieza por leer el proyecto y ejecutar las pruebas, y cuéntame qué encontraste antes de tocar el código." El archivo adjunto pedía 13 ajustes de interfaz y permisos (Parte 1), una revisión contra la pauta (Parte 2) y la preparación de la entrega (Parte 3), con reglas de trabajo: una rama propia, un commit por tarea, pruebas antes y después de cada cambio y migraciones que no pierden datos.
+
+**Cómo ayudó la IA:**
+
+- **Diagnóstico inicial.** Leyó el proyecto, ejecutó las 530 pruebas y listó los conflictos entre lo pedido y el código antes de cambiar nada. Preguntó una sola vez por cada decisión abierta, con su recomendación.
+- **Parte 1 (13 ajustes).** «Tubo de trabajo» y «tarea» en toda la interfaz sin renombrar tablas; un único botón para crear tareas; «Modificar» y «Subir evidencia» en la página de cada registro; revisión reducida a aprobar o rechazar con motivo (migración 0017, que pasa a «rechazada» las filas antiguas en corrección); cuatro perfiles por jerarquía (migración 0018, reversible); ámbito del delegado limitado a su delegación; paneles separados para coordinador y delegado; pruebas nuevas de la recuperación de contraseña; textos internos fuera de las pantallas; diseño con bordes rectos y filtros en grilla.
+- **Errores que encontró al revisar.** Cualquier usuario podía cambiar el estado de una tarea ajena; había botones Modificar y Eliminar que no hacían nada (`href="#"`); el buscador de la página de una delegación no filtraba; la portada mostraba cifras de todas las delegaciones a un delegado; Django mostraba plurales como «actividads». Corrigió cada uno con su prueba.
+- **Parte 2 (pauta).** Comparó cada criterio de la pauta con el código y entregó una tabla de lo que existía, lo que faltaba y lo que haría, y esperó el visto bueno. Luego: eliminar actividades solo con el permiso `delete_actividad` (migración 0019); mantenedores que eliminan cuando el registro no tiene datos relacionados y, si los tiene, desactivan explicando cuáles (migración 0020, solo textos); `RevisionForm` para la revisión de evidencias; las cuatro transacciones documentadas en el README.
+
+**Dónde la corrigió el equipo:**
+
+- La IA había mantenido el nombre «Supervisor» para el perfil intermedio. El equipo aclaró que ese nombre era genérico de la pauta del ramo y fijó la jerarquía real: Administrador, Coordinador, Delegado y Funcionario. La IA rehízo los perfiles con esos cuatro niveles.
+- La IA propuso agregar correos a las cuentas demo para probar la recuperación. El equipo prefirió no crear cuentas de Gmail todavía: las cuentas demo conservan sus credenciales y el correo real se escribe desde la interfaz el día de la revisión.
+- Ante la pregunta de si el autor podía seguir eliminando sus actividades, el equipo eligió que eliminar sea solo de coordinación y administración, por tratarse de una operación crítica.
+
+**Verificación:** Al cerrar cada tarea la IA ejecutó la suite completa (581 pruebas en verde al terminar la Parte 2) y `plan_pruebas`, revisó `makemigrations --check` y aplicó las migraciones en la base local solo después de explicar qué filas cambiaban. El equipo revisó las pantallas en el navegador.
+
+**Lo que la IA no hizo:** No pidió ni leyó contraseñas, el archivo `.env` ni la llave `.pem`; no tocó la instancia EC2; no redactó el documento técnico (entregó la lista de su contenido).

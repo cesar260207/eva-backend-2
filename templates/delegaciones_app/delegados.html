@@ -1,19 +1,19 @@
 {% extends 'base.html' %}
 {% block title %}Delegados | SGR{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+<div class="page-header">
     <div>
         <div class="page-kicker">Coordinación</div>
         <h1 class="page-title mb-2">Delegados y asignaciones</h1>
-        <p class="page-intro mb-0">Cada delegado trabaja solo su delegación. Desde aquí la coordinación ve todas las delegaciones, asigna a cada delegado su delegación y le asigna compromisos.</p>
+        <p class="page-intro mb-0">Cada delegado trabaja solo su delegación. Desde aquí la coordinación ve todas las delegaciones, asigna a cada delegado su delegación y sigue su tubo de trabajo. Las tareas se agregan desde la página del tubo de trabajo.</p>
     </div>
-    <a class="btn btn-sgr" href="{% url 'compromiso_nuevo' %}">+ Asignar compromiso</a>
+    <a class="btn btn-outline-sgr" href="{% url 'agenda' %}">Ver tubo de trabajo</a>
 </div>
 
 <div class="panel mb-4">
     <div class="table-responsive">
         <table class="table align-middle mb-0">
-            <thead><tr><th>Delegación</th><th>Delegado(s)</th><th class="text-end">Compromisos abiertos</th><th class="text-end">Vencidos</th><th class="text-end">Actividades por revisar</th><th class="text-end">Cumplimiento</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>Delegación</th><th>Delegado(s)</th><th class="text-end">Tareas abiertas</th><th class="text-end">Vencidas</th><th class="text-end">Actividades por revisar</th><th class="text-end">Cumplimiento</th><th>Acciones</th></tr></thead>
             <tbody>
             {% for fila in filas %}
                 <tr>
@@ -24,8 +24,7 @@
                     <td class="text-end">{{ fila.actividades_pendientes }}</td>
                     <td class="text-end">{% if fila.cumplimiento %}<span class="badge bg-{{ fila.cumplimiento.estado_class }}">{{ fila.cumplimiento.cumplimiento }} %</span>{% else %}-{% endif %}</td>
                     <td><div class="d-flex flex-wrap gap-2">
-                        <a class="btn btn-sm btn-outline-sgr" href="{% url 'compromiso_nuevo' %}?delegacion={{ fila.delegacion.pk }}">Asignar compromiso</a>
-                        <a class="btn btn-sm btn-outline-sgr" href="{% url 'agenda' %}?delegacion={{ fila.delegacion.pk }}">Ver agenda</a>
+                        <a class="btn btn-sm btn-outline-sgr" href="{% url 'agenda' %}?delegacion={{ fila.delegacion.pk }}">Ver tubo de trabajo</a>
                     </div></td>
                 </tr>
             {% endfor %}
@@ -38,20 +37,16 @@
     <div class="col-lg-6"><div class="panel h-100">
         <div class="section-label mb-2">Asignar delegado a una delegación</div>
         {% if candidatos %}
-        <form method="post" class="row g-2">
+        <form method="post" class="row g-2" novalidate>
             {% csrf_token %}
+            {% for error in form.non_field_errors %}<div class="col-12"><div class="alert alert-danger mb-0">{{ error }}</div></div>{% endfor %}
+            {% for campo in form %}
             <div class="col-md-6">
-                <label class="form-label" for="funcionario">Delegado</label>
-                <select class="form-select" id="funcionario" name="funcionario" required>
-                    {% for f in candidatos %}<option value="{{ f.pk }}">{{ f.nombre }} · {{ f.delegacion|default:'sin delegación' }}</option>{% endfor %}
-                </select>
+                <label class="form-label" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+                {{ campo }}
+                {% for error in campo.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
             </div>
-            <div class="col-md-6">
-                <label class="form-label" for="delegacion">Delegación</label>
-                <select class="form-select" id="delegacion" name="delegacion" required>
-                    {% for fila in filas %}<option value="{{ fila.delegacion.pk }}">{{ fila.delegacion.nombre }}</option>{% endfor %}
-                </select>
-            </div>
+            {% endfor %}
             <div class="col-12 d-flex justify-content-end"><button class="btn btn-sgr" type="submit">Asignar</button></div>
         </form>
         {% else %}

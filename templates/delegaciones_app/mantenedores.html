@@ -4,7 +4,7 @@
 <div class="mb-4">
     <div class="page-kicker">Administración</div>
     <h1 class="page-title">Mantenedores del sistema</h1>
-    <p class="page-intro mb-0">Cada mantenedor tiene su CRUD propio: agregar, modificar, buscar y desactivar o eliminar con confirmación. Lo que puedes hacer en cada uno depende de los permisos de tu perfil. Las actividades y los compromisos se gestionan desde sus pantallas de trabajo.</p>
+    <p class="page-intro mb-0">Cada mantenedor tiene su CRUD propio: agregar, modificar, buscar y eliminar con confirmación. Si un registro tiene datos relacionados no se elimina: se desactiva y la confirmación explica la razón. Lo que puedes hacer en cada uno depende de los permisos de tu perfil. Las actividades y el tubo de trabajo se gestionan desde sus propias pantallas.</p>
 </div>
 <div class="row g-3">
     {% for tarjeta in tarjetas %}
@@ -25,7 +25,7 @@
     <div>
         <div class="section-label">Seguridad</div>
         <h2 class="h5 mb-1">Perfiles y permisos</h2>
-        <p class="text-muted small mb-0">Grupos Administrador, Supervisor y Administrativo con sus permisos y usuarios.</p>
+        <p class="text-muted small mb-0">Grupos Administrador, Coordinador, Delegado y Funcionario con sus permisos y usuarios.</p>
     </div>
     <a class="btn btn-outline-sgr" href="{% url 'perfiles' %}">Ver perfiles</a>
 </div>

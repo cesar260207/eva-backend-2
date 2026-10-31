@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block title %}Panel Delegado | SGR{% endblock %}
+{% block content %}
+{% include 'gestion_app/_panel_encabezado.html' with descripcion='Permisos intermedios: trabajas tu delegación, revisas sus evidencias y sigues su tubo de trabajo y sus métricas.' %}
+
+<div class="row g-3 mb-4">
+    {% for fila in resultado_delegacion %}
+    <div class="col-6 col-lg-3"><div class="metric amber h-100"><small>Cumplimiento de {{ fila.nombre }}</small><strong>{{ fila.cumplimiento }} %</strong><small><span class="badge bg-{{ fila.estado_class }}">{{ fila.estado }}</span> {{ periodo }}</small></div></div>
+    {% empty %}
+    <div class="col-6 col-lg-3"><div class="metric amber h-100"><small>Cumplimiento</small><strong>-</strong><small>Sin período vigente o sin metas</small></div></div>
+    {% endfor %}
+    <div class="col-6 col-lg-3"><div class="metric h-100"><small>Actividades por revisar</small><strong>{{ actividades_pendientes }}</strong><small>{{ actividades_total }} en tu delegación</small></div></div>
+    <div class="col-6 col-lg-3"><div class="metric coral h-100"><small>Tareas vencidas</small><strong>{{ compromisos_vencidos }}</strong><small>{{ compromisos_por_vencer }} por vencer</small></div></div>
+    <div class="col-6 col-lg-3"><div class="metric navy h-100"><small>Tareas abiertas</small><strong>{{ compromisos_abiertos }}</strong><small>en el tubo de trabajo</small></div></div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-4"><div class="panel h-100">
+        <div class="section-label">Tu delegación{% if delegacion_propia %}: {{ delegacion_propia.nombre }}{% endif %}</div>
+        <div class="d-grid gap-2">
+            <a class="btn btn-sgr" href="{% url 'actividades' %}?estado=pendiente">Revisar evidencias pendientes</a>
+            <a class="btn btn-outline-sgr" href="{% url 'agenda' %}">Ver tubo de trabajo</a>
+            {% if delegacion_propia %}<a class="btn btn-outline-sgr" href="{% url 'delegacion_detalle' delegacion_propia.nombre %}">Ver mi delegación</a>{% endif %}
+            <a class="btn btn-outline-sgr" href="{% url 'actividades' %}">Actividades de la delegación</a>
+            <a class="btn btn-outline-sgr" href="{% url 'actividad_nueva' %}">Registrar actividad</a>
+            <a class="btn btn-outline-sgr" href="{% url 'dashboard' %}">Medición y semáforo</a>
+            <a class="btn btn-outline-sgr" href="{% url 'informe' %}">Informes</a>
+        </div>
+    </div></div>
+    <div class="col-lg-4"><div class="panel h-100">
+        <div class="section-label">Restringido para tu perfil</div>
+        <ul class="small mb-0">
+            <li>Mantenedores, usuarios, perfiles y auditoría.</li>
+            <li>Ver, revisar o modificar registros de otras delegaciones.</li>
+            <li>Revisar las actividades que registraste tú.</li>
+            <li>Eliminar actividades o tareas del tubo de trabajo, y abrir o cerrar períodos.</li>
+            <li>Asignar delegados (lo hace la coordinación).</li>
+        </ul>
+    </div></div>
+    <div class="col-lg-4">{% include 'gestion_app/_panel_alertas.html' %}</div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6"><div class="panel h-100">
+        <div class="section-label">Esperan tu revisión</div>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead><tr><th>Código</th><th>Registró</th><th>Fecha</th></tr></thead>
+                <tbody>
+                {% for actividad in por_revisar %}<tr><td><a href="{% url 'actividad_detalle' actividad.codigo_verificador %}">{{ actividad.codigo_verificador }}</a></td><td>{{ actividad.funcionario_autor.nombre }}</td><td>{{ actividad.fecha|date:'d-m-Y' }}</td></tr>
+                {% empty %}<tr><td colspan="3" class="text-muted">No hay evidencias pendientes de revisión.</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div></div>
+    <div class="col-lg-6"><div class="panel h-100">
+        <div class="section-label">Tubo de trabajo de la delegación</div>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead><tr><th>Folio</th><th>Responsable</th><th>Plazo</th><th>Estado</th></tr></thead>
+                <tbody>
+                {% for compromiso in tareas_abiertas %}<tr><td>{{ compromiso.folio }}</td><td>{{ compromiso.funcionario_responsable.nombre }}</td><td>{{ compromiso.fecha_comprometida|date:'d-m-Y' }}</td><td>{{ compromiso.get_estado_display }}{% if compromiso.vencido %} <span class="badge bg-danger">Vencida</span>{% endif %}</td></tr>
+                {% empty %}<tr><td colspan="4" class="text-muted">No hay tareas abiertas.</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div></div>
+</div>
+{% endblock %}

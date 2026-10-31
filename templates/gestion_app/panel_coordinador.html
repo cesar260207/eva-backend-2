@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
-{% block title %}Panel Supervisor | SGR{% endblock %}
+{% block title %}Panel Coordinador | SGR{% endblock %}
 {% block content %}
-{% include 'gestion_app/_panel_encabezado.html' with descripcion='Permisos intermedios: los mantenedores y transacciones que tu perfil autoriza y la información operacional de las delegaciones.' %}
+{% include 'gestion_app/_panel_encabezado.html' with descripcion='Permisos intermedios: gestionas y asignas a los delegados, revisas y sigues todas las delegaciones, y usas los mantenedores que tu perfil autoriza.' %}
 
 <div class="section-label mb-2">Información operacional</div>
 <div class="row g-3 mb-4">
     <div class="col-6 col-lg-3"><div class="metric amber h-100"><small>Cumplimiento promedio</small><strong>{{ promedio }} %</strong><small>{{ periodo|default:'Sin período vigente' }}</small></div></div>
     <div class="col-6 col-lg-3"><div class="metric h-100"><small>Actividades por revisar</small><strong>{{ actividades_pendientes }}</strong><small>{{ evidencias_pendientes }} evidencias pendientes</small></div></div>
-    <div class="col-6 col-lg-3"><div class="metric coral h-100"><small>Compromisos vencidos</small><strong>{{ compromisos_vencidos }}</strong><small>{{ compromisos_por_vencer }} por vencer</small></div></div>
-    <div class="col-6 col-lg-3"><div class="metric navy h-100"><small>Compromisos abiertos</small><strong>{{ compromisos_abiertos }}</strong><small>{{ actividades_aprobadas }} actividades aprobadas</small></div></div>
+    <div class="col-6 col-lg-3"><div class="metric coral h-100"><small>Tareas vencidas</small><strong>{{ compromisos_vencidos }}</strong><small>{{ compromisos_por_vencer }} por vencer</small></div></div>
+    <div class="col-6 col-lg-3"><div class="metric navy h-100"><small>Tareas abiertas</small><strong>{{ compromisos_abiertos }}</strong><small>{{ actividades_aprobadas }} actividades aprobadas</small></div></div>
 </div>
 
 <div class="row g-3 mb-4">
@@ -28,13 +28,11 @@
         <div class="section-label">Coordinación de delegados</div>
         <div class="d-grid gap-2 mb-3">
             <a class="btn btn-sgr" href="{% url 'delegados' %}">Delegados y asignaciones</a>
-            <a class="btn btn-outline-sgr" href="{% url 'compromiso_nuevo' %}">Asignar compromiso a un delegado</a>
         </div>
         <div class="section-label">Transacciones autorizadas</div>
         <div class="d-grid gap-2">
-            <a class="btn btn-outline-sgr" href="{% url 'actividad_nueva' %}">Registrar actividad con evidencia</a>
             <a class="btn btn-outline-sgr" href="{% url 'actividades' %}?estado=pendiente">Actividades por revisar</a>
-            <a class="btn btn-outline-sgr" href="{% url 'agenda' %}">Seguimiento de compromisos</a>
+            <a class="btn btn-outline-sgr" href="{% url 'agenda' %}">Ver tubo de trabajo</a>
             <a class="btn btn-outline-sgr" href="{% url 'informe' %}">Informes</a>
         </div>
     </div></div>
@@ -47,10 +45,10 @@
         <a class="btn btn-sm btn-outline-sgr" href="{% url 'dashboard' %}">Ver medición</a>
     </div>
     <table class="table table-sm align-middle">
-        <thead><tr><th>Delegación</th><th class="text-end">Cumplimiento</th><th class="text-end">Diferencia con lo esperado</th><th>Estado</th></tr></thead>
+        <thead><tr><th>Delegación</th><th>Delegado</th><th class="text-end">Cumplimiento</th><th class="text-end">Diferencia con lo esperado</th><th>Estado</th></tr></thead>
         <tbody>
-        {% for fila in delegaciones %}<tr><td>{{ fila.nombre }}</td><td class="text-end">{{ fila.cumplimiento }} %</td><td class="text-end">{{ fila.diferencia|default:'-' }}</td><td><span class="badge bg-{{ fila.estado_class }}">{{ fila.estado }}</span></td></tr>
-        {% empty %}<tr><td colspan="4" class="text-muted">Sin indicadores para el período vigente.</td></tr>{% endfor %}
+        {% for fila in delegaciones %}<tr><td>{{ fila.nombre }}</td><td>{{ fila.delegados|default:'Sin delegado activo' }}</td><td class="text-end">{{ fila.cumplimiento }} %</td><td class="text-end">{{ fila.diferencia|default:'-' }}</td><td><span class="badge bg-{{ fila.estado_class }}">{{ fila.estado }}</span></td></tr>
+        {% empty %}<tr><td colspan="5" class="text-muted">Sin indicadores para el período vigente.</td></tr>{% endfor %}
         </tbody>
     </table>
 </div>

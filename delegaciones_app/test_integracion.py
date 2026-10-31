@@ -271,7 +271,7 @@ class OperacionTests(TestCase):
 
 	def test_subir_evidencia_genera_codigos_y_envia_a_revision(self):
 		actividad = self._actividad()
-		actividad.cambiar_estado('correccion')
+		actividad.cambiar_estado('rechazada')
 		primera = self.autor.subir_evidencia(actividad, self._archivo(), 'Acta firmada')
 		segunda = self.autor.subir_evidencia(actividad, self._archivo('foto.png'))
 		self.assertEqual(primera.codigo_evidencia, f'{actividad.codigo_verificador}-01')
@@ -301,13 +301,13 @@ class OperacionTests(TestCase):
 		self.assertEqual(Actividad.objects.get(pk=validada.pk).estado, 'aprobada')
 		self.assertEqual(Indicador(meta=meta, periodo=self.periodo).calcular_avance(), 1)
 
-	def test_rechazo_y_correccion_exigen_texto_y_numeran_revisiones(self):
+	def test_el_rechazo_exige_texto_y_numera_revisiones(self):
 		actividad = self._actividad()
 		evidencia = self.autor.subir_evidencia(actividad, self._archivo())
 		with self.assertRaises(ValidationError):
 			self._validacion(evidencia).rechazar_evidencia('')
-		correccion = self._validacion(evidencia).solicitar_correccion('Falta la firma')
-		self.assertEqual((correccion.version, actividad.estado, evidencia.estado_revision), (1, 'correccion', 'correccion'))
+		primero = self._validacion(evidencia).rechazar_evidencia('Falta la firma')
+		self.assertEqual((primero.version, actividad.estado, evidencia.estado_revision), (1, 'rechazada', 'rechazada'))
 
 		evidencia.reemplazar_archivo(self._archivo('firmado.pdf'))
 		self.assertEqual((evidencia.estado_revision, actividad.estado), ('pendiente', 'pendiente'))
@@ -455,6 +455,98 @@ class MigracionDatosTests(TransactionTestCase):
 		self.assertFalse(viejo.get_model('auth', 'User').objects.filter(username__startswith='delegado.').exists())
 		self.assertEqual(modelo('Evidencia').objects.count(), 2)
 		self.assertEqual(modelo('MetaMedicion').objects.count(), 2)
+
+
+class MigracionSinCorreccionTests(TransactionTestCase):
+	"""Sin CU (migración de datos). La migración 0017 convierte «correccion» en «rechazada» y conserva la observación."""
+
+	antes = [('delegaciones_app', '0016_textos_tubo_de_trabajo')]
+	despues = [('delegaciones_app', '0017_sin_solicitar_correccion')]
+
+	def _migrar(self, destino):
+		executor = MigrationExecutor(connection)
+		executor.migrate(destino)
+		return executor.loader.project_state(destino).apps
+
+	def tearDown(self):
+		self._migrar(MigrationExecutor(connection).loader.graph.leaf_nodes())
+
+	def test_correccion_pasa_a_rechazada_conservando_la_observacion(self):
+		viejo = self._migrar(self.antes)
+		modelo = lambda nombre: viejo.get_model('delegaciones_app', nombre)
+		usuario = viejo.get_model('auth', 'User').objects.create(username='autor-0017')
+		cargo = modelo('Cargo').objects.create(nombre='Profesional')
+		centro = modelo('Delegacion').objects.create(nombre='Centro')
+		autor = modelo('Funcionario').objects.create(usuario=usuario, identificador_institucional='autor-0017', nombre='Autor', cargo=cargo, delegacion=centro)
+		periodo = modelo('Periodo').objects.create(nombre='Septiembre', fecha_inicio=date(2026, 9, 1), fecha_termino=date(2026, 9, 30), estado='abierto')
+		item = modelo('ItemMedible').objects.create(cargo=cargo, periodo=periodo, nombre='Atención', ponderacion=100)
+		actividad = modelo('Actividad').objects.create(
+			codigo_verificador='EVD-0017', funcionario_autor=autor, delegacion=centro, item=item, fecha='2026-09-10T10:00:00Z',
+			solicitud_problema='Luminaria', accion='Visita', estado='correccion',
+		)
+		evidencia = modelo('Evidencia').objects.create(codigo_evidencia='EVD-0017-01', actividad=actividad, funcionario_autor=autor, archivo_vinculo='evidencias/a.pdf', estado_revision='correccion')
+		modelo('Validacion').objects.create(evidencia=evidencia, funcionario_verificador=autor, decision='correccion', observacion='Falta la firma')
+		modelo('Actividad').objects.create(
+			codigo_verificador='EVD-0017-OK', funcionario_autor=autor, delegacion=centro, item=item, fecha='2026-09-11T10:00:00Z',
+			solicitud_problema='Poda', accion='Visita', estado='aprobada',
+		)
+
+		nuevo = self._migrar(self.despues)
+		modelo = lambda nombre: nuevo.get_model('delegaciones_app', nombre)
+		self.assertEqual(modelo('Actividad').objects.get(codigo_verificador='EVD-0017').estado, 'rechazada')
+		self.assertEqual(modelo('Actividad').objects.get(codigo_verificador='EVD-0017-OK').estado, 'aprobada')
+		self.assertEqual(modelo('Evidencia').objects.get().estado_revision, 'rechazada')
+		validacion = modelo('Validacion').objects.get()
+		self.assertEqual((validacion.decision, validacion.observacion), ('rechazada', 'Falta la firma'))
+
+
+class MigracionPerfilesPorJerarquiaTests(TransactionTestCase):
+	"""Sin CU (migración de datos). La migración 0018 deja los perfiles Administrador, Coordinador, Delegado y Funcionario."""
+
+	antes = [('delegaciones_app', '0017_sin_solicitar_correccion')]
+	despues = [('delegaciones_app', '0018_perfiles_por_jerarquia')]
+
+	def _migrar(self, destino):
+		executor = MigrationExecutor(connection)
+		executor.migrate(destino)
+		return executor.loader.project_state(destino).apps
+
+	def tearDown(self):
+		self._migrar(MigrationExecutor(connection).loader.graph.leaf_nodes())
+
+	def _usuario(self, apps, username, rol, grupo):
+		usuario = apps.get_model('auth', 'User').objects.create(username=username)
+		cargo = apps.get_model('delegaciones_app', 'Cargo').objects.get_or_create(nombre='Profesional')[0]
+		funcionario = apps.get_model('delegaciones_app', 'Funcionario').objects.create(usuario=usuario, identificador_institucional=username, nombre=username, cargo=cargo)
+		# get_or_create: otra prueba transaccional pudo vaciar los roles y grupos que crean las migraciones.
+		funcionario.roles.add(apps.get_model('delegaciones_app', 'Rol').objects.get_or_create(nombre_rol=rol)[0])
+		usuario.groups.add(apps.get_model('auth', 'Group').objects.get_or_create(name=grupo)[0])
+		return usuario.pk
+
+	def test_renombra_crea_el_delegado_y_mueve_a_los_revisores(self):
+		viejo = self._migrar(self.antes)
+		delegado = self._usuario(viejo, 'del-0018', 'delegado', 'Administrativo')
+		verificador = self._usuario(viejo, 'ver-0018', 'verificador', 'Administrativo')
+		funcionario = self._usuario(viejo, 'fun-0018', 'funcionario', 'Administrativo')
+		coordinador = self._usuario(viejo, 'coo-0018', 'coordinador', 'Supervisor')
+		permisos_supervisor = set(viejo.get_model('auth', 'Group').objects.get(name='Supervisor').permissions.values_list('pk', flat=True))
+
+		nuevo = self._migrar(self.despues)
+		Grupo, Usuario = nuevo.get_model('auth', 'Group'), nuevo.get_model('auth', 'User')
+		nombres = set(Grupo.objects.values_list('name', flat=True))
+		self.assertTrue({'Coordinador', 'Delegado', 'Funcionario'} <= nombres)
+		self.assertFalse({'Supervisor', 'Administrativo'} & nombres)
+		grupo_de = lambda pk: set(Usuario.objects.get(pk=pk).groups.values_list('name', flat=True))
+		self.assertEqual((grupo_de(delegado), grupo_de(verificador)), ({'Delegado'}, {'Delegado'}))
+		self.assertEqual((grupo_de(funcionario), grupo_de(coordinador)), ({'Funcionario'}, {'Coordinador'}))
+		self.assertEqual(set(Grupo.objects.get(name='Coordinador').permissions.values_list('pk', flat=True)), permisos_supervisor)
+		self.assertTrue(Grupo.objects.get(name='Delegado').permissions.filter(codename='add_validacion').exists())
+
+		revertido = self._migrar(self.antes)
+		nombres = set(revertido.get_model('auth', 'Group').objects.values_list('name', flat=True))
+		self.assertTrue({'Supervisor', 'Administrativo'} <= nombres)
+		self.assertFalse({'Coordinador', 'Delegado', 'Funcionario'} & nombres)
+		self.assertEqual(set(revertido.get_model('auth', 'User').objects.get(pk=delegado).groups.values_list('name', flat=True)), {'Administrativo'})
 
 
 class PermisosTests(TestCase):
@@ -618,19 +710,22 @@ class MantenedoresTests(TestCase):
 		self.assertIn('codigo', respuesta.context['form'].errors)
 		self.assertEqual(Catalogo.objects.filter(codigo='DUP').count(), 1)
 
-	def test_catalogo_se_desactiva_y_activa_sin_borrar_la_fila(self):
+	def test_catalogo_sin_uso_se_elimina_y_uno_inactivo_se_activa(self):
 		elemento = Catalogo.objects.create(codigo='SRV-BAJA', nombre='Servicio', tipo='servicio')
 		url = self._url('mantenedor_eliminar', 'catalogo', elemento.pk)
-		self.assertContains(self.client.get(url), 'Confirmar desactivación')
-		self.assertTrue(Catalogo.objects.get(pk=elemento.pk).activo)
+		self.assertContains(self.client.get(url), 'Confirmar eliminación')
+		self.assertTrue(Catalogo.objects.filter(pk=elemento.pk).exists())
 
 		self.assertRedirects(self.client.post(url), reverse('mantenedor_lista', args=['catalogo']))
-		self.assertFalse(Catalogo.objects.get(pk=elemento.pk).activo)
-		self.assertTrue(self._auditoria('desactivar', 'Catalogo').exists())
+		self.assertFalse(Catalogo.objects.filter(pk=elemento.pk).exists())
+		self.assertTrue(self._auditoria('eliminar', 'Catalogo').exists())
 
+		inactivo = Catalogo.objects.create(codigo='SRV-OFF', nombre='Inactivo', tipo='servicio', activo=False)
+		url = self._url('mantenedor_eliminar', 'catalogo', inactivo.pk)
 		self.assertContains(self.client.get(url), 'Confirmar activación')
 		self.client.post(url)
-		self.assertTrue(Catalogo.objects.get(pk=elemento.pk).activo)
+		self.assertTrue(Catalogo.objects.get(pk=inactivo.pk).activo)
+		self.assertTrue(self._auditoria('activar', 'Catalogo').exists())
 
 	def test_roles_del_sistema_no_se_renombran_ni_se_eliminan(self):
 		consulta = Rol.objects.get(nombre_rol='consulta')
@@ -674,6 +769,8 @@ class MantenedoresTests(TestCase):
 
 	def test_desactivar_funcionario_tambien_desactiva_su_cuenta(self):
 		funcionario = self.funcionario.funcionario
+		# Con un registro de auditoría a su nombre tiene datos relacionados: se desactiva en vez de eliminarse.
+		Auditoria.registrar_evento(self.funcionario, 'editar', 'Delegacion', self.centro.pk)
 		self.client.post(self._url('mantenedor_eliminar', 'funcionarios', funcionario.pk))
 		funcionario.refresh_from_db()
 		self.assertFalse(funcionario.estado)
@@ -876,8 +973,10 @@ class ActividadVistasTests(BaseOperacion):
 		self.client.force_login(self.funcionario)
 		respuesta = self.client.get(reverse('actividades'))
 		self.assertContains(respuesta, reverse('actividad_editar', args=[actividad.codigo_verificador]))
-		self.assertContains(respuesta, reverse('actividad_eliminar', args=[actividad.codigo_verificador]))
+		self.assertNotContains(respuesta, reverse('actividad_eliminar', args=[actividad.codigo_verificador]))
 		self.assertNotContains(respuesta, 'href="#"')
+		self.client.force_login(self.coordinador)
+		self.assertContains(self.client.get(reverse('actividades')), reverse('actividad_eliminar', args=[actividad.codigo_verificador]))
 
 	def test_autor_edita_su_actividad_y_audita(self):
 		actividad = self._actividad()
@@ -939,7 +1038,7 @@ class ActividadVistasTests(BaseOperacion):
 		actividad = self._actividad()
 		self._evidencia(actividad)
 		url = reverse('actividad_eliminar', args=[actividad.codigo_verificador])
-		self.client.force_login(self.funcionario)
+		self.client.force_login(self.coordinador)
 
 		respuesta = self.client.get(url)
 		self.assertEqual(respuesta.context['total_evidencias'], 1)
@@ -977,7 +1076,7 @@ class ActividadVistasTests(BaseOperacion):
 		self.assertEqual((actividad.solicitud_problema, actividad.funcionario_autor), ('Ajustada por coordinacion', self.funcionario.funcionario))
 
 	def test_subir_evidencia_la_envia_a_revision_y_audita(self):
-		actividad = self._actividad(estado='correccion')
+		actividad = self._actividad(estado='rechazada')
 		self.client.force_login(self.funcionario)
 		respuesta = self.client.post(reverse('evidencia_subir', args=[actividad.codigo_verificador]), {'archivo_vinculo': self._archivo(), 'comentario': 'Acta firmada'})
 		self.assertRedirects(respuesta, reverse('actividad_detalle', args=[actividad.codigo_verificador]))
@@ -1181,9 +1280,9 @@ class AccesoAutenticadoTests(BaseOperacion):
 			respuesta = self.client.get(url)
 			self.assertContains(respuesta, 'FOL-CENTRO-1')
 			self.assertNotContains(respuesta, 'FOL-RURAL-1')
-		ajena = self.client.get(reverse('delegacion_detalle', args=['Rural']), follow=True)
-		self.assertRedirects(ajena, reverse('delegacion_detalle', args=['Centro']))
-		self.assertNotContains(ajena, 'FOL-RURAL-1')
+		ajena = self.client.get(reverse('delegacion_detalle', args=['Rural']))
+		self.assertEqual(ajena.status_code, 404)
+		self.assertNotContains(ajena, 'FOL-RURAL-1', status_code=404)
 
 	def test_coordinador_ve_compromisos_de_todas_las_delegaciones(self):
 		self.client.force_login(self.coordinador)
@@ -1604,12 +1703,12 @@ class CompromisoReglasTests(BaseOperacion):
 		self._con_plazo(40, 'realizado', folio='YA-REALIZADO')
 		self.client.force_login(self.coordinador)
 		respuesta = self.client.get(reverse('agenda'))
-		self.assertContains(respuesta, '1 compromiso próximo a vencer')
-		self.assertContains(respuesta, 'Próximo a vencer')
+		self.assertContains(respuesta, '1 tarea próxima a vencer')
+		self.assertContains(respuesta, 'Próxima a vencer')
 		contexto = respuesta.context
 		self.assertEqual((contexto['por_vencer'], contexto['vencidos'], contexto['realizados'], contexto['proximos']), (1, 1, 1, 1))
 		estados = {c.folio: c.estado_display for c in contexto['compromisos']}
-		self.assertEqual(estados, {'POR-VENCER': 'Próximo a vencer', 'YA-VENCIDO': 'Vencido', 'YA-REALIZADO': 'Realizado'})
+		self.assertEqual(estados, {'POR-VENCER': 'Próxima a vencer', 'YA-VENCIDO': 'Vencida', 'YA-REALIZADO': 'Realizada'})
 
 	def test_la_agenda_ofrece_solo_las_transiciones_permitidas(self):
 		compromiso = self._con_plazo(30, 'proceso')
@@ -1862,7 +1961,7 @@ class FiltrosYInformesTests(BaseOperacion):
 		respuesta = self.client.get(reverse('actividades'), {'estado': 'aprobada'})
 		self.assertEqual([a.solicitud_problema for a in respuesta.context['actividades']], ['Operativo aprobado'])
 		self.assertTrue(respuesta.context['filtrado'])
-		self.assertContains(self.client.get(reverse('actividades'), {'estado': 'correccion'}), 'Ninguna actividad coincide con los filtros')
+		self.assertContains(self.client.get(reverse('actividades'), {'estado': 'borrador'}), 'Ninguna actividad coincide con los filtros')
 
 	def test_la_agenda_filtra_por_plazo(self):
 		vencido = self._compromiso(folio='AG-VENCIDO')
@@ -1921,7 +2020,7 @@ class FiltrosYInformesTests(BaseOperacion):
 		respuesta = self.client.get(reverse('informe'), {'tipo': 'compromisos', 'plazo': 'vencidos'})
 		self.assertEqual(len(respuesta.context['filas']), 1)
 		self.assertEqual(respuesta.context['filas'][0][0], 'INF-VENCIDO')
-		self.assertEqual(respuesta.context['filas'][0][7], 'Vencido')
+		self.assertEqual(respuesta.context['filas'][0][7], 'Vencida')
 
 	def test_el_informe_de_cumplimiento_usa_los_indicadores(self):
 		meta = Meta.objects.create(item=self.item, funcionario=self.funcionario.funcionario, valor_objetivo=2)
@@ -1982,7 +2081,7 @@ class ResumenYActividadRecienteVistasTests(BaseOperacion):
         """CU-12 Agenda compartida (RF-021). El panel totaliza lo que se ve en la agenda."""
         self.client.force_login(self.coordinador)
         respuesta = self.client.get(reverse('agenda'))
-        self.assertContains(respuesta, 'Compromisos por responsable y estado')
+        self.assertContains(respuesta, 'Tareas por responsable y estado')
         filas = {f['nombre']: f for f in respuesta.context['resumen_responsables']}
         self.assertEqual((filas['funcionario-op']['total'], filas['funcionario-op']['realizado'], filas['rural-res']['total']), (2, 1, 1))
         self.assertEqual(respuesta.context['resumen_total']['total'], 3)
@@ -2004,10 +2103,10 @@ class ResumenYActividadRecienteVistasTests(BaseOperacion):
         """CU-20.1 Consolidar datos filtrados (RF-021, RF-033). El informe repite el resumen de la agenda."""
         self.client.force_login(self.coordinador)
         respuesta = self.client.get(reverse('informe'), {'tipo': 'resumen'})
-        self.assertContains(respuesta, 'Informe de resumen de compromisos por responsable')
+        self.assertContains(respuesta, 'Informe de resumen del tubo de trabajo por responsable')
         self.assertEqual(respuesta.context['filas'][-1][0], 'Total')
         csv_respuesta = self.client.get(reverse('informe'), {'tipo': 'resumen', 'formato': 'csv'})
-        self.assertTrue(csv_respuesta.content.decode('utf-8').startswith('﻿Responsable;Ingresado'))
+        self.assertTrue(csv_respuesta.content.decode('utf-8').startswith('﻿Responsable;Ingresadas'))
 
     def test_la_ficha_muestra_la_actividad_reciente_propia(self):
         """CU-06 Seguimiento de avance (RF-030). Último ingreso, días sin ingreso, registros y promedio diario."""

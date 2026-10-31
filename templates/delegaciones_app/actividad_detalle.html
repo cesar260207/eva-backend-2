@@ -2,14 +2,15 @@
 {% block title %}{{ actividad.codigo_verificador }} | SGR{% endblock %}
 {% block content %}
 <a class="btn btn-sm btn-link px-0 mb-2" href="{{ url_lista }}">&larr; Volver a las actividades</a>
-<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+<div class="page-header">
     <div>
         <div class="page-kicker">Actividad</div>
         <h1 class="page-title">{{ actividad.codigo_verificador }}</h1>
         <p class="page-intro mb-0">{{ actividad.solicitud_problema }}</p>
     </div>
-    <div class="d-flex align-items-center gap-2">
+    <div class="acciones">
         <span class="badge badge-soft fs-6">{{ actividad.get_estado_display }}</span>
+        {% if puede_modificar %}<a class="btn btn-outline-sgr" href="{% url 'actividad_editar' actividad.codigo_verificador %}">Modificar actividad</a>{% endif %}
         {% if puede_subir_evidencia %}<a class="btn btn-sgr" href="{% url 'evidencia_subir' actividad.codigo_verificador %}">Subir evidencia</a>{% endif %}
     </div>
 </div>
@@ -23,7 +24,7 @@
                 <div class="col-md-6"><div class="section-label">Tipo de atención</div><strong>{{ actividad.catalogo.nombre|default:'-' }}</strong></div>
                 <div class="col-md-6"><div class="section-label">Ítem de medición</div><strong>{{ actividad.item.nombre|default:'-' }}</strong>{% if actividad.item %}<div class="small text-muted">{{ actividad.item.periodo }}</div>{% endif %}</div>
                 <div class="col-md-6"><div class="section-label">Contacto</div><strong>{{ actividad.contacto_nombre|default:'-' }}</strong>{% if actividad.contacto_telefono %}<div class="small text-muted">{{ actividad.contacto_telefono }}</div>{% endif %}</div>
-                {% if actividad.compromiso %}<div class="col-12"><div class="section-label">Compromiso vinculado</div><strong>{{ actividad.compromiso.folio }}</strong> {{ actividad.compromiso.descripcion|truncatechars:80 }}</div>{% endif %}
+                {% if actividad.compromiso %}<div class="col-12"><div class="section-label">Tarea del tubo de trabajo vinculada</div><strong>{{ actividad.compromiso.folio }}</strong> {{ actividad.compromiso.descripcion|truncatechars:80 }}</div>{% endif %}
                 <div class="col-12"><div class="section-label">Acción ejecutada</div><p class="mb-0">{{ actividad.accion }}</p></div>
             </div>
         </div>
@@ -33,8 +34,8 @@
             <p class="small text-muted">Aprueba si la evidencia respalda la actividad. Si no, recházala indicando el motivo: quien la registró podrá corregir y subir una evidencia nueva.</p>
             <form method="post">
                 {% csrf_token %}
-                <label class="form-label" for="observacion">Motivo u observación</label>
-                <textarea class="form-control mb-3" id="observacion" name="observacion" rows="2" placeholder="Obligatorio para rechazar"></textarea>
+                <label class="form-label" for="{{ revision_form.observacion.id_for_label }}">{{ revision_form.observacion.label }}</label>
+                {{ revision_form.observacion }}
                 <div class="d-flex flex-wrap gap-2">
                     <button class="btn btn-sgr" type="submit" formaction="{% url 'revisar_actividad' actividad.codigo_verificador 'aprobar' %}">Aprobar</button>
                     <button class="btn btn-outline-danger" type="submit" formaction="{% url 'revisar_actividad' actividad.codigo_verificador 'rechazar' %}">Rechazar</button>

@@ -32,11 +32,11 @@ def alertas_de_vencimiento(user, hoy):
     for compromiso in _compromisos_autorizados(user).exclude(estado='realizado'):
         url = f"{reverse('agenda')}?q={compromiso.folio}"
         if compromiso.vencido:
-            motivo = f'Compromiso {compromiso.folio} vencido hace {_plural(-compromiso.dias_para_vencer, "día", "días")}'
+            motivo = f'Tarea {compromiso.folio} vencida hace {_plural(-compromiso.dias_para_vencer, "día", "días")}'
             nivel = 'danger'
         elif compromiso.proximo_a_vencer:
             cuando = 'vence hoy' if compromiso.dias_para_vencer == 0 else f'vence en {_plural(compromiso.dias_para_vencer, "día", "días")}'
-            motivo, nivel = f'Compromiso {compromiso.folio}: {cuando}', 'warning'
+            motivo, nivel = f'Tarea {compromiso.folio}: {cuando}', 'warning'
         else:
             continue
         alertas.append(_alerta('vencimiento', 'Vencimiento', nivel, motivo, compromiso.funcionario_responsable.nombre, compromiso.fecha_comprometida, url))

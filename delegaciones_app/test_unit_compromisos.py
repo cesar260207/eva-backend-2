@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
 from .forms import CompromisoForm
@@ -139,10 +140,10 @@ class PlazoUnitTests(CompromisoBase):
     def test_situacion_de_plazo_clasifica_cada_compromiso(self):
         """CU-14.1 Clasificar compromisos por vencimiento (RF-019). Vencido, próximo a vencer, realizado o estado normal."""
         casos = [
-            (self.nuevo_compromiso(dias=-3, folio='S1'), ('Vencido', 'danger')),
-            (self.nuevo_compromiso(dias=2, folio='S2'), ('Próximo a vencer', 'warning')),
+            (self.nuevo_compromiso(dias=-3, folio='S1'), ('Vencida', 'danger')),
+            (self.nuevo_compromiso(dias=2, folio='S2'), ('Próxima a vencer', 'warning')),
             (self.nuevo_compromiso(dias=40, estado='proceso', folio='S3'), ('En proceso', 'warning')),
-            (self.nuevo_compromiso(dias=-3, estado='realizado', folio='S4'), ('Realizado', 'success')),
+            (self.nuevo_compromiso(dias=-3, estado='realizado', folio='S4'), ('Realizada', 'success')),
         ]
         for compromiso, esperado in casos:
             self.assertEqual(situacion_de_plazo(compromiso), esperado, compromiso.folio)
@@ -305,7 +306,7 @@ class FiltrosAgendaUnitTests(CompromisoBase):
         self.assertEqual(columnas[0], 'Folio')
         self.assertIn('Situación del plazo', columnas)
         fila = dict(zip(columnas, filas[0]))
-        self.assertEqual((fila['Folio'], fila['Responsable'], fila['Situación del plazo'], fila['Estado']), ('AG-1', 'autor-base', 'Vencido', 'Ingresado'))
+        self.assertEqual((fila['Folio'], fila['Responsable'], fila['Situación del plazo'], fila['Estado']), ('AG-1', 'autor-base', 'Vencida', 'Ingresada'))
 
 
 class ResumenColectivoUnitTests(CompromisoBase):
@@ -371,3 +372,61 @@ class ResumenColectivoUnitTests(CompromisoBase):
         self.assertEqual(columnas[0], 'Responsable')
         self.assertEqual(filas[-1][0], 'Total')
         self.assertEqual(filas[-1][columnas.index('Total')], 4)
+
+
+class TuboDeTrabajoUnitTests(CompromisoBase):
+    """CU-12 Agenda colectiva, que en la interfaz se llama «Tubo de trabajo» (RF-016)."""
+
+    def test_la_pagina_y_el_menu_dicen_tubo_de_trabajo(self):
+        """CU-12 Agenda colectiva (RF-016). El menú, el título y la pestaña usan el término de la Municipalidad."""
+        self.client.force_login(self.coordinador)
+        respuesta = self.client.get(reverse('agenda'))
+        self.assertContains(respuesta, '<title>Tubo de trabajo | SGR</title>', html=False)
+        self.assertContains(respuesta, '<h1 class="page-title mb-2">Tubo de trabajo</h1>', html=False)
+        self.assertContains(respuesta, f'href="{reverse("agenda")}">Tubo de trabajo</a>', html=False)
+        self.assertNotContains(respuesta, 'Agenda colectiva')
+
+    def test_cada_registro_se_llama_tarea(self):
+        """CU-12 Agenda colectiva (RF-016, RF-018). Cada registro del tubo es una «tarea» y sus estados van en femenino."""
+        self.assertEqual(Compromiso._meta.verbose_name, 'tarea del tubo de trabajo')
+        self.assertEqual(dict(Compromiso.ESTADOS)['realizado'], 'Realizada')
+        self.client.force_login(self.coordinador)
+        self.assertContains(self.client.get(reverse('compromiso_nuevo')), 'Agregar al tubo de trabajo')
+
+    def test_solo_quien_puede_crear_ve_el_boton_agregar(self):
+        """CU-02 Registro de compromisos ciudadanos (RF-016). Administración, coordinación, delegados y funcionarios ven
+        «+ Agregar al tubo de trabajo»; verificador y consulta no."""
+        delegado = crear_funcionario('delegado-tubo', 'delegado', cargo=self.cargo, delegacion=self.centro)
+        consulta = crear_funcionario('consulta-tubo', 'consulta', cargo=self.cargo, delegacion=self.centro)
+        boton = f'href="{reverse("compromiso_nuevo")}">+ Agregar al tubo de trabajo</a>'
+        casos = ((self.coordinador, True), (delegado, True), (self.usuario_autor, True), (self.usuario_verificador, False), (consulta, False))
+        for usuario, ve_el_boton in casos:
+            self.client.force_login(usuario)
+            comprobar = self.assertContains if ve_el_boton else self.assertNotContains
+            comprobar(self.client.get(reverse('agenda')), boton, msg_prefix=usuario.username)
+
+    def test_consulta_no_puede_agregar_tareas(self):
+        """CU-26.1 Denegar acceso por rol (RF-016). Aunque escriba la URL, una cuenta de consulta no agrega tareas."""
+        self.client.force_login(crear_funcionario('consulta-url', 'consulta', cargo=self.cargo, delegacion=self.centro))
+        self.assertRedirects(self.client.get(reverse('compromiso_nuevo')), reverse('inicio'))
+        self.assertFalse(Compromiso.objects.exists())
+
+    def test_el_boton_esta_solo_en_la_pagina_del_tubo(self):
+        """CU-12 Agenda colectiva (RF-016). Paneles, delegados y la delegación llevan al tubo y no crean tareas."""
+        url_nueva = f'href="{reverse("compromiso_nuevo")}'
+        paginas = [
+            (self.coordinador, reverse('panel'), 'Ver tubo de trabajo'), (self.coordinador, reverse('delegados'), 'Ver tubo de trabajo'),
+            (self.coordinador, reverse('solicitudes'), 'Ver como tabla'), (self.usuario_autor, reverse('panel'), 'Ver tubo de trabajo'),
+            (self.usuario_autor, reverse('delegacion_detalle', args=['Centro']), 'Ver tubo de trabajo'),
+        ]
+        for usuario, url, enlace in paginas:
+            self.client.force_login(usuario)
+            respuesta = self.client.get(url)
+            self.assertNotContains(respuesta, url_nueva, msg_prefix=url)
+            self.assertContains(respuesta, enlace, msg_prefix=url)
+
+    def test_el_boton_conserva_la_delegacion_filtrada(self):
+        """CU-12.1 Filtrar agenda compartida (RF-016). Al filtrar por una delegación, la tarea nueva parte en ella."""
+        self.client.force_login(self.coordinador)
+        respuesta = self.client.get(reverse('agenda'), {'delegacion': self.rural.pk})
+        self.assertContains(respuesta, f'{reverse("compromiso_nuevo")}?delegacion={self.rural.pk}')

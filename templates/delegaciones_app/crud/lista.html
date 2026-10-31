@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}{{ config.titulo }} | SGR{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+<div class="page-header">
     <div>
         <div class="page-kicker">Administración · <a href="{% url 'mantenedores' %}" class="text-reset">Mantenedores</a></div>
         <h1 class="page-title">{{ config.titulo }}</h1>
@@ -39,7 +39,7 @@
                             </form>
                             {% endfor %}{% endif %}
                             {% if not puede.delete %}{% elif config.baja %}
-                            <a class="btn btn-sm btn-outline-danger" href="{% url 'mantenedor_eliminar' config.slug fila.pk %}">{% if fila.activo %}Desactivar{% else %}Activar{% endif %}</a>
+                            <a class="btn btn-sm btn-outline-danger" href="{% url 'mantenedor_eliminar' config.slug fila.pk %}">{% if fila.activo %}Eliminar{% else %}Activar{% endif %}</a>
                             {% else %}
                             <a class="btn btn-sm btn-outline-danger" href="{% url 'mantenedor_eliminar' config.slug fila.pk %}">Eliminar</a>
                             {% endif %}

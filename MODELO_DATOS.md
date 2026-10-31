@@ -5,9 +5,31 @@ las tablas al ejecutar las migraciones (`python manage.py migrate`); no se crean
 manualmente desde phpMyAdmin. El ORM usa estas mismas tablas en las vistas propias del
 sistema; desde la Evaluación Sumativa 3 no se usa Django Admin.
 
-Los perfiles de acceso (Administrador, Supervisor y Administrativo) son las tablas de grupos y
-permisos de `django.contrib.auth` (`auth_group`, `auth_group_permissions`, `auth_user_groups`);
-la migración `0015_perfiles_de_acceso` los crea y asigna un perfil a cada usuario existente.
+Los perfiles de acceso (Administrador, Coordinador, Delegado y Funcionario) son las tablas de grupos y
+permisos de `django.contrib.auth` (`auth_group`, `auth_group_permissions`, `auth_user_groups`).
+La migración `0015_perfiles_de_acceso` creó los tres perfiles de la pauta (Administrador, Supervisor y
+Administrativo) y la `0018_perfiles_por_jerarquia` los dejó según la jerarquía de la Municipalidad:
+renombra Supervisor a Coordinador y Administrativo a Funcionario (conservan su id, permisos y usuarios),
+crea Delegado y mueve allí a los usuarios con rol delegado o verificador. La
+`0019_eliminar_actividad_solo_coordinacion` agrega al Coordinador el permiso `delete_actividad`
+(una fila de `auth_group_permissions`): eliminar actividades queda para Coordinador y Administrador.
+
+**Perfil y rol.** El perfil es el nivel de permisos; el rol, la función y el alcance. Los dos roles que
+revisan evidencias quedan así:
+
+- `delegado`: trabaja su delegación (tubo de trabajo, actividades) y además verifica, con las mismas
+  funciones del verificador pero limitadas a su delegación. Usa el perfil Delegado.
+- `verificador`: se conserva para no romper datos existentes. Revisa evidencias de su delegación o, si no
+  tiene, de todas. También usa el perfil Delegado.
+
+Revisar exige el rol y el permiso `add_validacion` del perfil. La tabla `rol` solo guarda el nombre
+(`nombre_rol`), así que esta descripción vive en la documentación y en `permisos.py`; la migración 0018
+no modifica las tablas `rol`, `funcionario` ni `funcionario_rol`.
+
+**Equivalencia de nombres.** «Tubo de trabajo» en la interfaz = modelo `Compromiso` (tabla
+`compromiso`) = «Agenda colectiva» del diseño (CU-12). Cada registro del tubo se muestra como una
+«tarea». La migración `0016_textos_tubo_de_trabajo` solo cambia los nombres visibles y las etiquetas de
+los estados; no ejecuta SQL ni modifica datos.
 
 El modelo implementa las 17 clases del diseño (diagrama de clases del informe),
 más dos tablas adicionales: `FuncionarioRol`, que resuelve la relación
@@ -22,7 +44,7 @@ el histórico importado de la Matriz SGR. En total son 19 tablas propias.
 |---|---|---|
 | `Delegacion` | Unidad territorial municipal. | Tiene funcionarios, actividades y compromisos. Calcula su cumplimiento ponderado. |
 | `Cargo` | Cargo de los funcionarios y su vigencia. | Tiene funcionarios e ítems medibles. |
-| `Rol` | Rol que define permisos: administrador, coordinador, delegado, funcionario, verificador y consulta. | Se asigna a funcionarios mediante `FuncionarioRol`. |
+| `Rol` | Rol que define la función y el alcance: administrador, coordinador, delegado (también verifica en su delegación), funcionario, verificador y consulta. | Se asigna a funcionarios mediante `FuncionarioRol`. |
 | `Funcionario` | Persona con cuenta de acceso, cargo, delegación opcional y uno o más roles. | `usuario` uno a uno con el usuario de Django; autor de actividades y compromisos. |
 | `UsuarioMaestro` | Superusuario con alcance total. | `usuario` uno a uno opcional con el usuario de Django. |
 | `FuncionarioRol` (adicional) | Asigna un rol a un funcionario. | Único por funcionario y rol. |
@@ -45,7 +67,7 @@ el histórico importado de la Matriz SGR. En total son 19 tablas propias.
 |---|---|---|
 | `Actividad` | Atención o acción territorial registrada por un funcionario, con código verificador único. | FK a `Funcionario`, `Delegacion`, `ItemMedible`, `Catalogo` y, opcional, `Compromiso`. |
 | `Evidencia` | Archivo que respalda una actividad (JPG, PNG o PDF, hasta el tamaño configurado). | FK a `Actividad` (se borra con ella) y a su autor. |
-| `Validacion` | Decisión de un verificador sobre una evidencia: aprobada, rechazada o con corrección pedida. | FK a `Evidencia` y al verificador. Queda como historial. |
+| `Validacion` | Decisión de un verificador sobre una evidencia: aprobada o rechazada (con motivo). | FK a `Evidencia` y al verificador. Queda como historial. |
 | `Compromiso` | Solicitud o acuerdo territorial con responsable, plazo, estado y folio único. | FK a `Delegacion`, `Funcionario` e `ItemMedible` opcional. |
 | `HistorialCompromiso` | Cada cambio de estado, derivación o cierre de un compromiso, con su autor. | FK a `Compromiso` y `Funcionario`. |
 | `Auditoria` | Registro inmutable de las operaciones críticas y de los accesos denegados. | FK opcional a `Funcionario` o `UsuarioMaestro`. |
@@ -111,15 +133,23 @@ La interfaz presenta exactamente ocho mantenedores en `/administracion/`:
 Delegaciones, Cargos, Roles, Funcionarios, Catálogo, Períodos, Ítems medibles
 y Metas. Los ocho salen de un solo registro (`MANTENEDORES` en
 `delegaciones_app/crud.py`) y comparten las mismas cuatro vistas genéricas:
-listado con búsqueda, nuevo, modificar y eliminar o desactivar.
+listado con búsqueda, nuevo, modificar y eliminar con confirmación.
 
 - Roles y Funcionarios son solo de administración. Los demás los administran
   administración y coordinación.
-- Donde corresponde se desactiva en vez de eliminar, para conservar el
-  historial: delegaciones, cargos, funcionarios (que también desactiva su
-  cuenta) y elementos de catálogo.
+- En delegaciones, cargos, funcionarios y catálogo, eliminar depende de los
+  datos relacionados (`datos_relacionados` en `crud.py`, que recorre las tablas
+  que apuntan al registro). Sin datos relacionados la fila se elimina; un
+  funcionario se elimina junto con su cuenta y sus roles asignados. Con datos
+  relacionados (por ejemplo, actividades o registros de auditoría) la fila se
+  desactiva para conservar el historial, la confirmación dice cuáles son esos
+  datos y un funcionario desactivado también pierde su cuenta activa. Una fila
+  inactiva se vuelve a activar desde la misma lista.
+- La migración 0020 da nombres legibles a cinco modelos (actividades, roles
+  asignados, mediciones de delegación, períodos y registros de auditoría) para
+  esos mensajes y para la página de perfiles. Solo cambia textos.
 - Los seis roles que consultan los permisos son del sistema y no se eliminan ni se renombran.
-  Nadie puede desactivar su propia cuenta.
+  Nadie puede eliminar ni desactivar su propia cuenta.
 - Los períodos tienen las acciones Iniciar, Cerrar y Reabrir (con motivo) en su
   listado.
 - Al guardar una meta se genera su indicador; al eliminarla, se avisa cuántos
@@ -155,7 +185,7 @@ Resumen; no tiene mantenedor.
   cambia con `EVIDENCIA_TAMANO_MAXIMO_MB`. El rechazo informa el motivo exacto.
 - El código de cada evidencia deriva del de su actividad (`EVD-...-01`) y no
   cambia.
-- Rechazar o pedir corrección exige una observación. Solo una validación
+- La revisión solo aprueba o rechaza. Rechazar exige un motivo. Solo una validación
   aprobada hace que la actividad aporte al avance.
 - El archivo se abre o descarga desde el detalle de la actividad, por la vista protegida
   `evidencia_archivo`: exige sesión y los mismos permisos de la actividad, y un intento fuera del ámbito queda
@@ -257,9 +287,10 @@ estos ajustes mínimos, porque el diseño no cubre algo que el sistema ya usa:
   necesita saber quién la hace o sobre qué registro: `reabrir_periodo(motivo, usuario)`,
   `subir_evidencia(actividad, archivo)` y `set_estado`, `derivar_compromiso` y
   `cerrar_compromiso` con `autor`.
-- Actividad y Evidencia tienen el estado adicional «correccion», que deja
-  `Validacion.solicitar_correccion()`. `Validacion.version` es el número de
-  revisión de la evidencia.
+- La opción «Solicitar corrección» se eliminó: la migración `0017_sin_solicitar_correccion`
+  convierte cada fila con estado «correccion» en «rechazada» (en `actividad`, `evidencia` y
+  `validacion`) y conserva la observación como motivo del rechazo. `Validacion.version` es el número
+  de revisión de la evidencia.
 - `Indicador.ajuste` y `Validacion.resultado` se guardan, pero no entran en el
   cálculo, porque el informe no define cómo se aplican.
 - Las transiciones de estado de un compromiso (avanzar, y reabrir un realizado

@@ -312,7 +312,7 @@ class EvidenciaUnitTests(EscenarioBase, TestCase):
     def test_reemplazar_archivo_vuelve_a_revision(self):
         """CU-11 Validación de actividades (RF-013). Un archivo nuevo debe revisarse de nuevo."""
         evidencia = self.autor.subir_evidencia(self.actividad, self._archivo())
-        Validacion(evidencia=evidencia, funcionario_verificador=self.verificador).solicitar_correccion('Foto borrosa')
+        Validacion(evidencia=evidencia, funcionario_verificador=self.verificador).rechazar_evidencia('Foto borrosa')
         evidencia.refresh_from_db()
         evidencia.reemplazar_archivo(self._archivo('nueva.pdf'))
         evidencia.refresh_from_db()
@@ -356,7 +356,7 @@ class ValidacionUnitTests(EscenarioBase, TestCase):
 
     def test_cada_revision_incrementa_el_numero_de_version(self):
         """CU-11.1 Registrar trazabilidad de decisión (RF-013). Primera, segunda revisión, y así."""
-        primera = self._validacion().solicitar_correccion('Falta foto')
+        primera = self._validacion().rechazar_evidencia('Falta foto')
         self.evidencia.refresh_from_db()
         segunda = self._validacion().aprobar_evidencia()
         self.assertEqual((primera.version, segunda.version), (1, 2))
@@ -373,16 +373,15 @@ class ValidacionUnitTests(EscenarioBase, TestCase):
         self.assertEqual(self.actividad.estado, 'rechazada')
         self.assertEqual(Validacion.objects.get().observacion, 'Foto ilegible')
 
-    def test_pedir_correccion_exige_una_observacion(self):
-        """CU-11.2 Bloquear aporte al avance (RF-014). La solicitud de corrección se explica."""
-        with self.assertRaises(ValidationError):
-            self._validacion().solicitar_correccion('')
-        self._validacion().solicitar_correccion('Adjunta la foto del frente')
-        self.actividad.refresh_from_db()
-        self.assertEqual(self.actividad.estado, 'correccion')
+    def test_la_revision_solo_aprueba_o_rechaza(self):
+        """CU-11 Validación de actividades (RF-013). Ya no existe «Solicitar corrección»: solo aprobar o rechazar."""
+        self.assertFalse(hasattr(Validacion, 'solicitar_correccion'))
+        self.assertEqual([valor for valor, _ in Validacion.DECISIONES], ['aprobada', 'rechazada'])
+        self.assertNotIn('correccion', dict(Actividad.ESTADOS))
+        self.assertNotIn('correccion', dict(Evidencia.ESTADOS_REVISION))
 
     def test_solo_las_actividades_aprobadas_cuentan_para_la_meta(self):
-        """CU-11.2 Bloquear aporte al avance (RF-014). RN-009: rechazada o en corrección no suma."""
+        """CU-11.2 Bloquear aporte al avance (RF-014). RN-009: rechazada no suma."""
         meta = Meta.objects.create(item=self.item, funcionario=self.autor, valor_objetivo=5)
         self._validacion().rechazar_evidencia('No sirve')
         self.assertEqual(meta.actividades_que_aportan().count(), 0)

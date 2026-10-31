@@ -1,9 +1,13 @@
 """Mantenedores de las ocho tablas maestras.
 
 Cada mantenedor se describe una sola vez en MANTENEDORES (modelo, formulario, columnas, búsqueda).
-Las cuatro vistas genéricas (lista, nuevo, editar y eliminar o desactivar) leen esa descripción, así
+Las cuatro vistas genéricas (lista, nuevo, editar y eliminar) leen esa descripción, así
 que no se repite código por tabla. Cada vista exige el permiso de Django del modelo que le corresponde
 (view, add, change o delete), que el usuario recibe por su perfil (grupo).
+
+Eliminar borra la fila si no tiene datos relacionados. En las tablas con campo de baja (delegaciones, cargos,
+funcionarios y catálogo), si la fila tiene datos relacionados se desactiva en su lugar, para no perder el
+historial, y la confirmación explica cuáles son esos datos.
 """
 import datetime
 from dataclasses import dataclass
@@ -13,7 +17,7 @@ from django.contrib import messages
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import ProtectedError, Q
+from django.db.models import CASCADE, ProtectedError, Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -36,7 +40,7 @@ class Mantenedor:
     form: type
     columnas: list  # (etiqueta, nombre de atributo o función del objeto)
     busqueda: tuple
-    baja: str = ''  # campo booleano que se desactiva en vez de eliminar la fila
+    baja: str = ''  # campo booleano: si la fila tiene datos relacionados se desactiva en vez de eliminarse
     select_related: tuple = ()
     prefetch_related: tuple = ()
     con_actor: bool = False  # el formulario necesita saber quién lo usa
@@ -44,6 +48,7 @@ class Mantenedor:
     cambiar_baja: Optional[Callable] = None  # (objeto, nuevo_valor)
     bloqueo: Optional[Callable] = None  # (objeto, request) -> motivo o None
     advertencia_eliminar: Optional[Callable] = None  # (objeto) -> texto o None
+    eliminar: Optional[Callable] = None  # (objeto) elimina la fila y lo que depende de ella
     despues_de_guardar: Optional[Callable] = None  # (objeto)
     acciones_fila: Optional[Callable] = None  # (objeto) -> lista de acciones extra
 
@@ -84,7 +89,17 @@ def _cambiar_funcionario(funcionario, activo):
 
 def _bloqueo_funcionario(funcionario, request):
     if funcionario.usuario_id == request.user.pk and funcionario.estado:
-        return 'No puedes desactivar tu propia cuenta.'
+        return 'No puedes eliminar ni desactivar tu propia cuenta.'
+
+
+def _advertencia_funcionario(funcionario):
+    return f'También se elimina su cuenta de acceso «{funcionario.usuario.username}».'
+
+
+def _eliminar_funcionario(funcionario):
+    usuario = funcionario.usuario
+    funcionario.delete()  # sus roles asignados (funcionario_rol) se borran en cascada
+    usuario.delete()
 
 
 def _bloqueo_rol(rol, request):
@@ -146,6 +161,7 @@ MANTENEDORES = {mantenedor.slug: mantenedor for mantenedor in (
         ('nombre__icontains', 'identificador_institucional__icontains', 'usuario__email__icontains', 'cargo__nombre__icontains', 'delegacion__nombre__icontains', 'roles__nombre_rol__icontains', 'usuario__groups__name__icontains'),
         baja='estado', select_related=('cargo', 'delegacion', 'usuario'), prefetch_related=('roles', 'usuario__groups'),
         con_actor=True, cambiar_baja=_cambiar_funcionario, bloqueo=_bloqueo_funcionario,
+        advertencia_eliminar=_advertencia_funcionario, eliminar=_eliminar_funcionario,
         ayuda='Al crear un funcionario también se crea su cuenta de acceso y se le asigna su perfil (grupo). Al editar, deja la contraseña vacía para conservarla. El correo se usa para recuperar la contraseña.',
     ),
     Mantenedor(
@@ -201,6 +217,24 @@ def _texto(objeto, acceso):
 
 def _auditar(request, config, accion, objeto, anterior=None, nuevo=None):
     Auditoria.registrar_evento(request.user, accion, config.entidad, objeto.pk, anterior, nuevo)
+
+
+def datos_relacionados(objeto):
+    """Registros de otras tablas que apuntan al objeto, como [('actividades', 3), ('funcionario', 1)]. No cuenta
+    lo que se borra junto con el objeto (on_delete=CASCADE, como los roles asignados a un funcionario)."""
+    relacionados = []
+    for relacion in objeto._meta.related_objects:
+        if relacion.many_to_many or relacion.on_delete is CASCADE:
+            continue
+        total = relacion.related_model._default_manager.filter(**{relacion.field.name: objeto}).count()
+        if total:
+            opciones = relacion.related_model._meta
+            relacionados.append((opciones.verbose_name if total == 1 else opciones.verbose_name_plural, total))
+    return relacionados
+
+
+def texto_relacionados(relacionados):
+    return ', '.join(f'{total} {nombre}' for nombre, total in relacionados)
 
 
 def _motivo_de_proteccion(error):
@@ -314,42 +348,61 @@ class MantenedorEditar(MantenedorFormularioMixin, UpdateView):
 
 
 class MantenedorEliminar(MantenedorMixin, DeleteView):
-    """Confirma y elimina la fila o, si el mantenedor tiene `baja`, la activa o desactiva."""
+    """Confirma y elimina la fila. En los mantenedores con `baja`, una fila con datos relacionados no se
+    elimina: se desactiva y la confirmación explica la razón. Una fila inactiva se vuelve a activar."""
 
     accion = 'delete'
     template_name = 'delegaciones_app/mantenedor_confirmar_eliminar.html'
+    SUSTANTIVOS = {'eliminar': 'eliminación', 'desactivar': 'desactivación', 'activar': 'activación'}
 
     def _bloqueo(self):
         return self.config.bloqueo(self.object, self.request) if self.config.bloqueo else None
 
+    def _decision(self):
+        """Qué hará la confirmación ('eliminar', 'desactivar' o 'activar') y los datos relacionados que la explican.
+        Se calcula de nuevo al confirmar, por si la fila ganó datos relacionados mientras tanto."""
+        config, objeto = self.config, self.object
+        if not config.baja:
+            return 'eliminar', []
+        if not getattr(objeto, config.baja):
+            return 'activar', []
+        relacionados = datos_relacionados(objeto)
+        return ('desactivar' if relacionados else 'eliminar'), relacionados
+
+    def _advertencia(self, decision, relacionados):
+        config, objeto = self.config, self.object
+        if decision == 'activar':
+            return None
+        if decision == 'desactivar':
+            return (f'No se puede eliminar porque tiene datos relacionados: {texto_relacionados(relacionados)}. '
+                    'Se desactivará: la fila se conserva con su historial y se puede volver a activar.')
+        extra = config.advertencia_eliminar(objeto) if config.advertencia_eliminar else None
+        if config.baja:
+            return ' '.join(filter(None, ('No tiene datos relacionados: se eliminará definitivamente.', extra, 'Esta acción no se puede deshacer.')))
+        return extra or 'Esta acción no se puede deshacer.'
+
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)
-        config, objeto = self.config, self.object
-        if config.baja:
-            activo = getattr(objeto, config.baja)
-            verbo, sustantivo = ('desactivar', 'desactivación') if activo else ('activar', 'activación')
-            advertencia = 'La fila se conserva con su historial y se puede volver a activar.' if activo else None
-        else:
-            verbo, sustantivo = 'eliminar', 'eliminación'
-            advertencia = config.advertencia_eliminar(objeto) if config.advertencia_eliminar else 'Esta acción no se puede deshacer.'
+        decision, relacionados = self._decision()
         contexto.update(
-            objeto=objeto, titulo=f'{verbo.capitalize()} {config.singular}', advertencia=advertencia,
-            pregunta=f'¿Confirmas {verbo}', boton=f'Confirmar {sustantivo}', bloqueo=self._bloqueo(),
-            peligro=verbo != 'activar',
+            objeto=self.object, titulo=f'{decision.capitalize()} {self.config.singular}',
+            advertencia=self._advertencia(decision, relacionados),
+            pregunta=f'¿Confirmas {decision}', boton=f'Confirmar {self.SUSTANTIVOS[decision]}', bloqueo=self._bloqueo(),
+            peligro=decision != 'activar',
         )
         return contexto
 
     def form_valid(self, form):
-        objeto, config = self.object, self.config
         motivo = self._bloqueo()
         if motivo:
             messages.error(self.request, motivo)
             return redirect(self.get_success_url())
-        if config.baja:
-            return self._cambiar_baja(objeto)
-        return self._eliminar(objeto)
+        decision, relacionados = self._decision()
+        if decision == 'eliminar':
+            return self._eliminar(self.object)
+        return self._cambiar_baja(self.object, relacionados)
 
-    def _cambiar_baja(self, objeto):
+    def _cambiar_baja(self, objeto, relacionados):
         config = self.config
         activar = not getattr(objeto, config.baja)
         with transaction.atomic():
@@ -359,7 +412,10 @@ class MantenedorEliminar(MantenedorMixin, DeleteView):
                 setattr(objeto, config.baja, activar)
                 objeto.save(update_fields=[config.baja])
             _auditar(self.request, config, 'activar' if activar else 'desactivar', objeto, {config.baja: not activar}, {config.baja: activar})
-        messages.success(self.request, f'{objeto}: {"activado" if activar else "desactivado"}.')
+        if activar:
+            messages.success(self.request, f'{objeto}: activado.')
+        else:
+            messages.success(self.request, f'{objeto}: desactivado. No se eliminó porque tiene datos relacionados: {texto_relacionados(relacionados)}.')
         return redirect(self.get_success_url())
 
     def _eliminar(self, objeto):
@@ -367,7 +423,10 @@ class MantenedorEliminar(MantenedorMixin, DeleteView):
         try:
             with transaction.atomic():
                 _auditar(self.request, self.config, 'eliminar', objeto, {'descripcion': descripcion})
-                objeto.delete()
+                if self.config.eliminar:
+                    self.config.eliminar(objeto)
+                else:
+                    objeto.delete()
         except ProtectedError as error:
             messages.error(self.request, f'No se puede eliminar «{descripcion}» porque tiene registros asociados: {_motivo_de_proteccion(error)}.')
         except ValidationError as error:

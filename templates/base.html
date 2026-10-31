@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}SGR | Municipalidad de La Serena{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'bootstrap/css/bootstrap.min.css' %}">
-    <link rel="stylesheet" href="{% static 'css/sgr.css' %}?v=eva3-20261027">
+    <link rel="stylesheet" href="{% static 'css/sgr.css' %}?v=eva3-20261031">
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark sticky-top sgr-nav">
@@ -23,7 +23,7 @@
                     {% if user.is_authenticated %}
                     <li class="nav-item"><a class="nav-link" href="{% url 'panel' %}">Mi panel</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'actividades' %}">Actividades</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'agenda' %}">Compromisos</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'agenda' %}">Tubo de trabajo</a></li>
                     {% if es_coordinacion %}<li class="nav-item"><a class="nav-link" href="{% url 'delegados' %}">Delegados</a></li>
                     {% elif mi_delegacion %}<li class="nav-item"><a class="nav-link" href="{% url 'delegacion_detalle' mi_delegacion.nombre %}">Mi delegación</a></li>{% endif %}
                     <li class="nav-item dropdown">
@@ -73,8 +73,6 @@
             <div>
                 <strong>Municipalidad de La Serena</strong><br>
                 <small>Departamento de Gestión Territorial</small>
-            </div>
-            <div>
             </div>
         </div>
     </footer>

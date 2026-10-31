@@ -147,6 +147,8 @@ class FuncionarioRol(models.Model):
 
 	class Meta:
 		db_table = 'funcionario_rol'
+		verbose_name = 'rol asignado'
+		verbose_name_plural = 'roles asignados'
 		constraints = [models.UniqueConstraint(fields=['funcionario', 'rol'], name='funcionario_rol_unico')]
 
 	def __str__(self):
@@ -190,7 +192,7 @@ class VersionOptimistaMixin:
 
 
 class Actividad(VersionOptimistaMixin, models.Model):
-	ESTADOS = [('borrador', 'Borrador'), ('pendiente', 'Pendiente de revisión'), ('aprobada', 'Aprobada'), ('rechazada', 'Rechazada'), ('correccion', 'Requiere corrección')]
+	ESTADOS = [('borrador', 'Borrador'), ('pendiente', 'Pendiente de revisión'), ('aprobada', 'Aprobada'), ('rechazada', 'Rechazada')]
 	codigo_verificador = models.CharField(max_length=50, unique=True, editable=False)
 	funcionario_autor = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='actividades')
 	# Ajuste 9: se conserva para filtrar y medir por delegación (también la de coordinadores sin delegación).
@@ -211,6 +213,8 @@ class Actividad(VersionOptimistaMixin, models.Model):
 
 	class Meta:
 		db_table = 'actividad'
+		verbose_name = 'actividad'
+		verbose_name_plural = 'actividades'
 		ordering = ['-fecha', '-creada']
 
 	def __str__(self):
@@ -293,7 +297,7 @@ EXTENSIONES_EVIDENCIA = ['jpg', 'jpeg', 'png', 'pdf']
 
 
 class Evidencia(models.Model):
-	ESTADOS_REVISION = [('pendiente', 'Pendiente de revisión'), ('aprobada', 'Aprobada'), ('rechazada', 'Rechazada'), ('correccion', 'Requiere corrección')]
+	ESTADOS_REVISION = [('pendiente', 'Pendiente de revisión'), ('aprobada', 'Aprobada'), ('rechazada', 'Rechazada')]
 	codigo_evidencia = models.CharField(max_length=60, unique=True, editable=False)
 	actividad = models.ForeignKey(Actividad, on_delete=models.CASCADE, related_name='evidencias')
 	funcionario_autor = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='evidencias')
@@ -341,7 +345,8 @@ class Evidencia(models.Model):
 
 
 class Validacion(models.Model):
-	DECISIONES = [('aprobada', 'Aprobada'), ('rechazada', 'Rechazada'), ('correccion', 'Requiere corrección')]
+	# La revisión solo aprueba o rechaza con motivo; quien registró corrige y vuelve a enviar (migración 0017).
+	DECISIONES = [('aprobada', 'Aprobada'), ('rechazada', 'Rechazada')]
 	evidencia = models.ForeignKey(Evidencia, on_delete=models.CASCADE, related_name='validaciones')
 	funcionario_verificador = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='validaciones')
 	decision = models.CharField(max_length=20, choices=DECISIONES)
@@ -386,14 +391,10 @@ class Validacion(models.Model):
 			raise ValidationError('El rechazo de una evidencia exige un motivo.')
 		return self._decidir('rechazada', motivo)
 
-	def solicitar_correccion(self, observacion):
-		if not (observacion or '').strip():
-			raise ValidationError('La solicitud de corrección exige una observación.')
-		return self._decidir('correccion', observacion)
-
 
 class Compromiso(VersionOptimistaMixin, models.Model):
-	ESTADOS = [('ingresado', 'Ingresado'), ('pendiente', 'Pendiente'), ('proceso', 'En proceso'), ('realizado', 'Realizado')]
+	# En la interfaz cada compromiso es una «tarea» del tubo de trabajo: las etiquetas van en femenino.
+	ESTADOS = [('ingresado', 'Ingresada'), ('pendiente', 'Pendiente'), ('proceso', 'En proceso'), ('realizado', 'Realizada')]
 	EJES = [
 		('Seguridad', 'Seguridad'),
 		('DISERCO', 'DISERCO'),
@@ -423,6 +424,8 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 	class Meta:
 		db_table = 'compromiso'
 		ordering = ['-fecha_comprometida', '-creado']
+		verbose_name = 'tarea del tubo de trabajo'
+		verbose_name_plural = 'tareas del tubo de trabajo'
 
 	def __str__(self):
 		return f'{self.folio} - {self.descripcion[:50]}'
@@ -451,14 +454,14 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 	def validar_transicion(self, estado):
 		etiquetas = dict(self.ESTADOS)
 		if estado not in etiquetas:
-			raise ValidationError(f'Estado de compromiso no válido: {estado}.')
+			raise ValidationError(f'Estado de tarea no válido: {estado}.')
 		if estado not in [permitido for permitido, _ in self.estados_permitidos()]:
 			raise ValidationError(f'Transición no permitida: de «{etiquetas[self.estado]}» a «{etiquetas[estado]}».')
 
 	def motivo_no_eliminable(self):
 		"""CU-14.2: un incumplimiento (vencido y sin realizar) se conserva con su historial de seguimiento."""
 		if self.vencido:
-			return 'El compromiso está vencido sin realizarse: se conserva con su historial de seguimiento.'
+			return 'La tarea está vencida sin realizarse: se conserva con su historial de seguimiento.'
 		return None
 
 	def delete(self, *args, **kwargs):
@@ -484,7 +487,7 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 	@transaction.atomic
 	def derivar_compromiso(self, nuevo_responsable, autor):
 		if self.estado == 'realizado':
-			raise ValidationError('Un compromiso realizado no se puede derivar.')
+			raise ValidationError('Una tarea realizada no se puede derivar.')
 		anterior = self.funcionario_responsable
 		self.funcionario_responsable = nuevo_responsable
 		self.save(update_fields=['funcionario_responsable'])
@@ -493,7 +496,7 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 	@transaction.atomic
 	def cerrar_compromiso(self, resolucion, autor):
 		if not (resolucion or '').strip():
-			raise ValidationError('Cerrar un compromiso exige una resolución.')
+			raise ValidationError('Cerrar una tarea exige una resolución.')
 		self.validar_transicion('realizado')
 		anterior = self.estado
 		self.estado = 'realizado'
@@ -513,6 +516,8 @@ class MedicionDelegacion(models.Model):
 
 	class Meta:
 		db_table = 'medicion_delegacion'
+		verbose_name = 'medición de delegación'
+		verbose_name_plural = 'mediciones de delegación'
 		ordering = ['delegacion__nombre', '-fecha_datos']
 		constraints = [models.UniqueConstraint(fields=['delegacion', 'fecha_datos'], name='medicion_delegacion_fecha_unica')]
 
@@ -536,6 +541,8 @@ class Periodo(models.Model):
 
 	class Meta:
 		db_table = 'periodo'
+		verbose_name = 'período'
+		verbose_name_plural = 'períodos'
 		ordering = ['-fecha_inicio']
 
 	def __str__(self):
@@ -838,12 +845,14 @@ class HistorialCompromiso(models.Model):
 
 	class Meta:
 		db_table = 'historial_compromiso'
+		verbose_name = 'historial de tarea'
+		verbose_name_plural = 'historial de tareas'
 
 	def __str__(self):
 		return f'{self.compromiso.folio}: {self.estado_anterior or "inicio"} -> {self.estado_nuevo}'
 
 
-MENSAJE_AUDITORIA_SOLO_LECTURA = 'La auditoría es de solo lectura: sus registros no se modifican ni se eliminan (RNF-008).'
+MENSAJE_AUDITORIA_SOLO_LECTURA = 'La auditoría es de solo lectura: sus registros no se modifican ni se eliminan.'
 
 
 class AuditoriaQuerySet(models.QuerySet):
@@ -870,6 +879,8 @@ class Auditoria(models.Model):
 
 	class Meta:
 		db_table = 'auditoria'
+		verbose_name = 'registro de auditoría'
+		verbose_name_plural = 'registros de auditoría'
 
 	def __str__(self):
 		return f'{self.fecha:%Y-%m-%d %H:%M} - {self.evento} - {self.entidad} {self.identificador_registro}'
