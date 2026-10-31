@@ -1268,9 +1268,9 @@ class AccesoAutenticadoTests(BaseOperacion):
 			respuesta = self.client.get(url)
 			self.assertContains(respuesta, 'FOL-CENTRO-1')
 			self.assertNotContains(respuesta, 'FOL-RURAL-1')
-		ajena = self.client.get(reverse('delegacion_detalle', args=['Rural']), follow=True)
-		self.assertRedirects(ajena, reverse('delegacion_detalle', args=['Centro']))
-		self.assertNotContains(ajena, 'FOL-RURAL-1')
+		ajena = self.client.get(reverse('delegacion_detalle', args=['Rural']))
+		self.assertEqual(ajena.status_code, 404)
+		self.assertNotContains(ajena, 'FOL-RURAL-1', status_code=404)
 
 	def test_coordinador_ve_compromisos_de_todas_las_delegaciones(self):
 		self.client.force_login(self.coordinador)

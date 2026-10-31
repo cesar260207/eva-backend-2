@@ -238,6 +238,10 @@ Administrador > Coordinador > Delegado > Funcionario, y cada perfil tiene todos 
 - Revisar evidencias exige el rol (delegado, verificador, coordinador o administrador) **y** el permiso
   `add_validacion` del perfil (`permisos.puede_revisar`): el perfil Funcionario nunca revisa. El delegado
   revisa solo las actividades de su delegación; las de otra responden 404.
+- Ámbito: quien trabaja una delegación (delegado, funcionario) ve solo su delegación en actividades, tubo de
+  trabajo, portada, panel, medición, semáforo, resumen, informes (pantalla y CSV), alertas y ficha. Un
+  registro de otra delegación (actividad, evidencia, tarea o página de la delegación) responde 404 y el
+  intento queda en la auditoría.
 - Cada vista de mantenedor exige el permiso de Django de su acción (`PermisoRequeridoMixin` en
   `delegaciones_app/permisos.py`); los botones Agregar, Modificar y Eliminar se muestran según esos permisos.
 - El perfil se asigna al crear o editar un usuario en el mantenedor de funcionarios.

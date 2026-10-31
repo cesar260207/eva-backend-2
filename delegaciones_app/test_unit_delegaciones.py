@@ -1,11 +1,13 @@
 """Pruebas de los ajustes de la revisión del equipo: carga de evidencia en su propia pantalla, indicador de
 evidencia, revisión aprobar/rechazar, ámbito del delegado, coordinación de delegados y creación de compromisos."""
+from datetime import date
+
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
-from .models import Auditoria, Indicador, Meta, Validacion
+from .models import Auditoria, Funcionario, Indicador, MedicionDelegacion, Meta, Validacion
 from .pruebas_base import EscenarioBase, crear_funcionario
 
 
@@ -154,10 +156,74 @@ class AmbitoDelDelegadoTests(EscenarioBase, TestCase):
         self.assertContains(respuesta, reverse('delegacion_detalle', args=['Centro']))
 
     def test_el_delegado_no_abre_otra_delegacion(self):
-        """CU-26.1 Denegar acceso por ámbito (RF-029). La delegación ajena lo devuelve a la suya."""
+        """CU-26.1 Denegar acceso por ámbito (RF-029). La delegación ajena no existe para él (404)."""
         self.client.force_login(self.delegado)
-        self.assertRedirects(self.client.get(reverse('delegacion_detalle', args=['Rural'])), reverse('delegacion_detalle', args=['Centro']))
+        self.assertEqual(self.client.get(reverse('delegacion_detalle', args=['Rural'])).status_code, 404)
         self.assertEqual([d.nombre for d in self.client.get(reverse('actividades')).context['delegaciones_filtro']], ['Centro'])
+
+    def _datos_de_rural(self):
+        """Actividad, tarea vencida y medición histórica en Rural, junto a las equivalentes de Centro."""
+        rural = Funcionario.objects.get(identificador_institucional='func-rural')
+        self.actividad_centro = self.nueva_actividad(solicitud_problema='Actividad de Centro')
+        self.actividad_rural = self.nueva_actividad(funcionario_autor=rural, delegacion=self.rural, solicitud_problema='Actividad de Rural')
+        self.tarea_centro = self.nuevo_compromiso(dias=-2, folio='AMB-CENTRO')
+        self.tarea_rural = self.nuevo_compromiso(dias=-2, folio='AMB-RURAL', delegacion=self.rural, funcionario_responsable=rural)
+        for delegacion in (self.centro, self.rural):
+            MedicionDelegacion.objects.create(delegacion=delegacion, cumplimiento=50, meta=100, fecha_datos=date(2026, 8, 31), estado_reportado='rojo')
+        self.client.force_login(self.delegado)
+
+    def test_los_informes_del_delegado_son_solo_de_su_delegacion(self):
+        """CU-26.1 Denegar acceso por ámbito (RF-029, RF-033). Los cinco informes, en pantalla y en CSV, solo traen su delegación."""
+        self._datos_de_rural()
+        informe = lambda **filtros: self.client.get(reverse('informe'), filtros)
+        self.assertEqual([fila[0] for fila in informe(tipo='actividades').context['filas']], [self.actividad_centro.codigo_verificador])
+        self.assertEqual([fila[0] for fila in informe(tipo='compromisos').context['filas']], ['AMB-CENTRO'])
+        self.assertNotIn('func-rural', [fila[0] for fila in informe(tipo='resumen').context['filas']])
+        self.assertEqual({fila[1] for fila in informe(tipo='reciente').context['filas']}, {'Centro'})
+        self.assertEqual([fila[0] for fila in informe(tipo='cumplimiento').context['filas']], ['Centro'])
+        self.assertEqual(informe(tipo='cumplimiento', delegacion=self.rural.pk).context['filas'], [])
+        csv = informe(tipo='compromisos', formato='csv').content.decode('utf-8')
+        self.assertIn('AMB-CENTRO', csv)
+        self.assertNotIn('AMB-RURAL', csv)
+
+    def test_las_alertas_del_delegado_son_solo_de_su_delegacion(self):
+        """CU-26.1 Denegar acceso por ámbito (RF-029, RF-037). Ninguna alerta menciona otra delegación."""
+        self._datos_de_rural()
+        motivos = ' '.join(alerta['motivo'] for alerta in self.client.get(reverse('alertas')).context['alertas'])
+        self.assertIn('AMB-CENTRO', motivos)
+        self.assertNotIn('AMB-RURAL', motivos)
+        self.assertNotIn('func-rural', motivos)
+
+    def test_el_resumen_y_el_panel_no_mezclan_otras_delegaciones(self):
+        """CU-18.1 Consolidar datos de delegación (RF-028, RF-029). Mediciones históricas y cifras del panel, solo de Centro."""
+        self._datos_de_rural()
+        historicas = self.client.get(reverse('resumen')).context['mediciones_historicas']
+        self.assertEqual({medicion.delegacion.nombre for medicion in historicas}, {'Centro'})
+        panel = self.client.get(reverse('panel')).context
+        self.assertEqual((panel['actividades_total'], panel['compromisos_abiertos'], panel['compromisos_vencidos']), (1, 1, 1))
+
+    def test_la_portada_del_delegado_muestra_solo_sus_cifras(self):
+        """CU-18.1 Consolidar datos de delegación (RF-028, RF-029). Con sesión, la portada cuenta solo su delegación."""
+        self._datos_de_rural()
+        self.assertEqual(self.client.get(reverse('inicio')).context['total_solicitudes'], 1)
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse('inicio')).context['total_solicitudes'], 2)
+
+    def test_los_registros_de_otra_delegacion_responden_404(self):
+        """CU-26.1 Denegar acceso por ámbito (RF-029). Actividad, evidencia, tarea y delegación ajenas no existen para él."""
+        self._datos_de_rural()
+        evidencia = self.nueva_evidencia(self.actividad_rural)
+        codigo = self.actividad_rural.codigo_verificador
+        urls = [
+            reverse('actividad_detalle', args=[codigo]), reverse('evidencia_subir', args=[codigo]),
+            reverse('evidencia_archivo', args=[evidencia.codigo_evidencia]), reverse('compromiso_editar', args=[self.tarea_rural.pk]),
+            reverse('delegacion_detalle', args=['Rural']),
+        ]
+        for url in urls:
+            self.assertEqual(self.client.get(url).status_code, 404, url)
+        for url in (reverse('revisar_actividad', args=[codigo, 'aprobar']), reverse('compromiso_estado', args=[self.tarea_rural.pk, 'proceso'])):
+            self.assertEqual(self.client.post(url).status_code, 404, url)
+        self.assertFalse(Validacion.objects.exists())
 
 
 class CoordinacionDeDelegadosTests(EscenarioBase, TestCase):

@@ -148,13 +148,20 @@ def _decorar_compromiso(compromiso):
 
 
 def index(request):
+    """Portada. Sin sesión muestra las cifras generales; quien trabaja una delegación ve solo las suyas."""
     ejes = [nombre for nombre, _ in Compromiso.EJES]
     delegaciones = list(Delegacion.objects.filter(estado=True).values_list('nombre', flat=True))
-    compromisos = list(Compromiso.objects.select_related('delegacion'))
+    compromisos = Compromiso.objects.select_related('delegacion')
+    resultados = resultados_por_delegacion(periodo_vigente())
+    propia = delegacion_propia(request.user)
+    if propia:
+        compromisos = compromisos.filter(delegacion=propia)
+        resultados = [fila for fila in resultados if fila['nombre'] == propia.nombre]
+    compromisos = list(compromisos)
     for compromiso in compromisos:
         _decorar_compromiso(compromiso)
     alertas = sum(1 for item in compromisos if item.estado_display == 'Alerta Roja por Vencimiento')
-    cumplimiento_promedio = promedio_general(resultados_por_delegacion(periodo_vigente()))
+    cumplimiento_promedio = promedio_general(resultados)
     return render(request, 'delegaciones_app/index.html', {
         'ejes': ejes,
         'delegaciones': delegaciones,
@@ -189,9 +196,9 @@ def solicitudes(request):
 def delegacion_detalle(request, nombre):
     propia = delegacion_propia(request.user)
     if propia and propia.nombre != nombre:
+        # Como los demás registros fuera del ámbito: no existe para el usuario, y el intento queda auditado.
         registrar_acceso_denegado(request, 'Delegacion', nombre, 'fuera del ámbito')
-        messages.error(request, f'Solo puedes ver la información de la delegación {propia.nombre}.')
-        return redirect('delegacion_detalle', nombre=propia.nombre)
+        raise Http404('Delegación no encontrada.')
     compromisos = list(_compromisos_autorizados(request.user).filter(delegacion__nombre=nombre))
     for compromiso in compromisos:
         _decorar_compromiso(compromiso)
