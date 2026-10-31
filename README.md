@@ -265,8 +265,26 @@ EMAIL_HOST_PASSWORD=contrasena-de-aplicacion-de-16-caracteres
 DEFAULT_FROM_EMAIL=SGR La Serena <tu-cuenta@gmail.com>
 ```
 
-En Gmail, la contraseña de aplicación se crea en la cuenta de Google con la verificación en dos
-pasos activa. AWS bloquea el puerto 25 de salida, por eso se usa el 587.
+Pasos para obtener la «contraseña de aplicación» de Gmail (no se usa la clave normal de la cuenta):
+
+1. En la cuenta de Google que enviará los correos, activar la **verificación en dos pasos**
+   (Cuenta de Google → Seguridad).
+2. Abrir **Contraseñas de aplicaciones** (`https://myaccount.google.com/apppasswords`), escribir un
+   nombre (por ejemplo «SGR La Serena») y crearla.
+3. Copiar los 16 caracteres que muestra Google, sin espacios, en `EMAIL_HOST_PASSWORD` del `.env`.
+   Ese valor nunca se sube a GitHub.
+4. Reiniciar Django (en EC2, `sudo systemctl restart gunicorn`) para que lea el `.env`.
+5. Probar el envío: `python manage.py sendtestemail tu-correo@ejemplo.com`.
+
+AWS bloquea el puerto 25 de salida, por eso se usa el 587 con TLS.
+
+Variables: `EMAIL_BACKEND` (SMTP para enviar de verdad; sin ella, consola), `EMAIL_HOST`, `EMAIL_PORT`,
+`EMAIL_USE_TLS`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` y
+`PASSWORD_RESET_TIMEOUT` (vigencia del enlace en segundos, 3600 por defecto).
+
+Seguridad del flujo: la pantalla responde lo mismo exista o no el correo (no revela qué cuentas
+existen), una cuenta inactiva no recibe enlace, el token sirve una sola vez y vence. Las pruebas usan el
+backend de correo en memoria (`locmem`) y cubren el envío, el enlace, el uso único y el vencimiento.
 
 ## Validacion y pruebas
 

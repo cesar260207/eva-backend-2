@@ -1,10 +1,13 @@
 """Pruebas de seguridad de la Evaluación Sumativa 3: perfiles (grupos y permisos de Django), paneles por
 perfil, recuperación de contraseña por correo y ausencia de Django Admin."""
 import re
+from datetime import timedelta
+from unittest import mock
 
 from django.contrib.auth.models import Group, User
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.core import mail
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .models import Auditoria, Cargo, Delegacion, Funcionario, Rol
@@ -195,6 +198,7 @@ class AccesoPorPerfilTests(TestCase):
         self.assertEqual(self.client.get('/admin/').status_code, 404)
 
 
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend', PASSWORD_RESET_TIMEOUT=3600)
 class RecuperarContrasenaTests(TestCase):
     """Recuperación de contraseña por correo: solicitud, token, enlace, nueva contraseña y acceso."""
 
@@ -244,8 +248,32 @@ class RecuperarContrasenaTests(TestCase):
 
     def test_un_correo_desconocido_no_envia_nada_ni_lo_revela(self):
         """HU-26 Recuperar contraseña por correo (RF-002, RNF-004). La respuesta es la misma exista o no la cuenta."""
-        self.assertRedirects(self._solicitar('nadie@example.com'), reverse('password_reset_done'))
+        desconocido = self.client.post(reverse('password_reset'), {'email': 'nadie@example.com'}, follow=True)
         self.assertEqual(len(mail.outbox), 0)
+        conocido = self.client.post(reverse('password_reset'), {'email': 'recupera@example.com'}, follow=True)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(desconocido.redirect_chain, conocido.redirect_chain)
+        self.assertEqual(desconocido.content, conocido.content)
+        self.assertContains(desconocido, 'Si el correo pertenece a una cuenta activa')
+
+    def test_el_enlace_vence(self):
+        """HU-26 Validar token de recuperación (RF-002, RNF-004). Pasado PASSWORD_RESET_TIMEOUT el enlace ya no sirve."""
+        self._solicitar('recupera@example.com')
+        enlace = self._enlace()
+        despues = PasswordResetTokenGenerator()._now() + timedelta(seconds=3601)
+        with mock.patch.object(PasswordResetTokenGenerator, '_now', return_value=despues):
+            respuesta = self.client.get(enlace, follow=True)
+        self.assertFalse(respuesta.context['validlink'])
+        self.assertContains(respuesta, 'Enlace no válido')
+        self.assertTrue(User.objects.get(pk=self.usuario.pk).check_password(CLAVE_PRUEBA))
+
+    def test_el_correo_lleva_el_enlace_y_la_vigencia(self):
+        """HU-26 Recuperar contraseña por correo (RF-002). El mensaje trae el enlace con el token y cuánto dura."""
+        self._solicitar('recupera@example.com')
+        correo = mail.outbox[0]
+        self.assertIn('/recuperar/', correo.body)
+        self.assertIn('60 minutos', correo.body)
+        self.assertTrue(correo.alternatives, 'Debe incluir la versión HTML')
 
     def test_una_cuenta_inactiva_no_recibe_enlace(self):
         """HU-26 Recuperar contraseña por correo (RF-002, RNF-004). Desactivar la cuenta también corta la recuperación."""
