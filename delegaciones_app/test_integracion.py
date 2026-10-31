@@ -518,8 +518,9 @@ class MigracionPerfilesPorJerarquiaTests(TransactionTestCase):
 		usuario = apps.get_model('auth', 'User').objects.create(username=username)
 		cargo = apps.get_model('delegaciones_app', 'Cargo').objects.get_or_create(nombre='Profesional')[0]
 		funcionario = apps.get_model('delegaciones_app', 'Funcionario').objects.create(usuario=usuario, identificador_institucional=username, nombre=username, cargo=cargo)
-		funcionario.roles.add(apps.get_model('delegaciones_app', 'Rol').objects.get(nombre_rol=rol))
-		usuario.groups.add(apps.get_model('auth', 'Group').objects.get(name=grupo))
+		# get_or_create: otra prueba transaccional pudo vaciar los roles y grupos que crean las migraciones.
+		funcionario.roles.add(apps.get_model('delegaciones_app', 'Rol').objects.get_or_create(nombre_rol=rol)[0])
+		usuario.groups.add(apps.get_model('auth', 'Group').objects.get_or_create(name=grupo)[0])
 		return usuario.pk
 
 	def test_renombra_crea_el_delegado_y_mueve_a_los_revisores(self):
@@ -532,7 +533,9 @@ class MigracionPerfilesPorJerarquiaTests(TransactionTestCase):
 
 		nuevo = self._migrar(self.despues)
 		Grupo, Usuario = nuevo.get_model('auth', 'Group'), nuevo.get_model('auth', 'User')
-		self.assertEqual(set(Grupo.objects.values_list('name', flat=True)), {'Administrador', 'Coordinador', 'Delegado', 'Funcionario'})
+		nombres = set(Grupo.objects.values_list('name', flat=True))
+		self.assertTrue({'Coordinador', 'Delegado', 'Funcionario'} <= nombres)
+		self.assertFalse({'Supervisor', 'Administrativo'} & nombres)
 		grupo_de = lambda pk: set(Usuario.objects.get(pk=pk).groups.values_list('name', flat=True))
 		self.assertEqual((grupo_de(delegado), grupo_de(verificador)), ({'Delegado'}, {'Delegado'}))
 		self.assertEqual((grupo_de(funcionario), grupo_de(coordinador)), ({'Funcionario'}, {'Coordinador'}))
@@ -540,7 +543,9 @@ class MigracionPerfilesPorJerarquiaTests(TransactionTestCase):
 		self.assertTrue(Grupo.objects.get(name='Delegado').permissions.filter(codename='add_validacion').exists())
 
 		revertido = self._migrar(self.antes)
-		self.assertEqual(set(revertido.get_model('auth', 'Group').objects.values_list('name', flat=True)), {'Administrador', 'Supervisor', 'Administrativo'})
+		nombres = set(revertido.get_model('auth', 'Group').objects.values_list('name', flat=True))
+		self.assertTrue({'Supervisor', 'Administrativo'} <= nombres)
+		self.assertFalse({'Coordinador', 'Delegado', 'Funcionario'} & nombres)
 		self.assertEqual(set(revertido.get_model('auth', 'User').objects.get(pk=delegado).groups.values_list('name', flat=True)), {'Administrativo'})
 
 

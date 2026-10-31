@@ -12,6 +12,7 @@
 Las tablas propias (rol, funcionario, funcionario_rol) no cambian: el rol sigue definiendo la función y el
 alcance, y el perfil el nivel de permisos. La reversa devuelve los tres perfiles anteriores.
 """
+from django.contrib.auth.management import create_permissions
 from django.db import migrations
 
 APP = 'delegaciones_app'
@@ -27,6 +28,12 @@ PERMISOS_DELEGADO = (
 
 
 def a_cuatro_perfiles(apps, schema_editor):
+    # Como en la 0015: en una base nueva los permisos se crean después de migrar; aquí se aseguran antes.
+    for app_config in apps.get_app_configs():
+        app_config.models_module = True
+        create_permissions(app_config, apps=apps, verbosity=0)
+        app_config.models_module = None
+
     Group = apps.get_model('auth', 'Group')
     Permission = apps.get_model('auth', 'Permission')
     User = apps.get_model('auth', 'User')
