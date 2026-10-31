@@ -97,7 +97,7 @@ class Command(BaseCommand):
         if clave_generada:
             self.stdout.write(self.style.WARNING(f'Clave generada para las cuentas demo NUEVAS (se muestra una sola vez): {clave}'))
         self.stdout.write(f'{len(delegaciones)} delegaciones, {len(metas)} metas, {compromisos} compromisos, {mediciones} mediciones historicas, {indicadores} indicadores nuevos.')
-        self.stdout.write(self.style.SUCCESS('Datos demo cargados. Cuentas demo: admin.demo (Administrador), coordinador.demo (Supervisor), funcionario.centro y verificador.demo, delegado de Centro (Administrativo)'))
+        self.stdout.write(self.style.SUCCESS('Datos demo cargados. Cuentas demo: admin.demo (Administrador), coordinador.demo (Coordinador), verificador.demo, delegado de Centro (Delegado) y funcionario.centro (Funcionario)'))
 
     def _funcionario(self, username, nombre, rol, cargo_nombre, delegacion=None, activo=True):
         usuario, creado = User.objects.get_or_create(username=username, defaults={'first_name': nombre, 'is_active': activo})

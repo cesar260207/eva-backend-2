@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% block title %}Panel Administrativo | SGR{% endblock %}
+{% block title %}Panel {{ perfil }} | SGR{% endblock %}
 {% block content %}
-{% include 'gestion_app/_panel_encabezado.html' with descripcion='Permisos mínimos: solo las funciones asignadas a tu cuenta. Las operaciones críticas quedan restringidas.' %}
+{% if puede_revisar %}{% include 'gestion_app/_panel_encabezado.html' with descripcion='Permisos intermedios: trabajas tu delegación y revisas sus evidencias. Lo demás queda restringido.' %}{% else %}{% include 'gestion_app/_panel_encabezado.html' with descripcion='Permisos mínimos: solo las funciones asignadas a tu cuenta. Las operaciones críticas quedan restringidas.' %}{% endif %}
 
 <div class="row g-3 mb-4">
     <div class="col-6 col-lg-3"><div class="metric h-100"><small>Actividades en tu ámbito</small><strong>{{ actividades_total }}</strong><small>{{ actividades_pendientes }} esperando revisión</small></div></div>
@@ -40,7 +40,7 @@
             <li>Mantenedores (delegaciones, cargos, catálogo, períodos, ítems, metas).</li>
             <li>Crear usuarios, asignar perfiles o roles.</li>
             <li>Eliminar tareas del tubo de trabajo y abrir o cerrar períodos.</li>
-            <li>Aprobar o rechazar evidencias fuera de tu delegación (los delegados y verificadores revisan las de su ámbito).</li>
+            {% if puede_revisar %}<li>Aprobar o rechazar evidencias fuera de tu delegación.</li>{% else %}<li>Aprobar, rechazar o anular evidencias (lo hacen los perfiles Delegado y Coordinador).</li>{% endif %}
             <li>Ver métricas y registros de otras delegaciones.</li>
             <li>Asignar delegados o tareas a otros (lo hace la coordinación).</li>
             <li>Consultar la auditoría.</li>

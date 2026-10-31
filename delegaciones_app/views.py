@@ -17,17 +17,16 @@ from .informes import PLAZOS, filtrar_actividades, filtrar_compromisos, resumen_
 from .medicion import periodo_vigente, promedio_general, resultados_por_delegacion
 from .models import Actividad, Auditoria, Compromiso, Delegacion, Evidencia, Funcionario, Periodo, Validacion
 from .permisos import (
-    ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICADOR, delegacion_propia, funcionario_de, puede_crear_tarea, puede_ver_todo,
-    registrar_acceso_denegado, rol_requerido, tiene_rol,
+    ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICADOR, delegacion_propia, funcionario_de, puede_crear_tarea, puede_revisar,
+    puede_ver_todo, registrar_acceso_denegado, rol_requerido, tiene_rol,
 )
 
 # Decisión de la revisión -> método de Validacion que la aplica a cada evidencia pendiente. La revisión
 # se simplificó a aprobar o rechazar con motivo: quien registró corrige y sube una evidencia nueva.
 DECISIONES = {'aprobar': 'aprobar_evidencia', 'rechazar': 'rechazar_evidencia'}
 
-# Quién revisa evidencias: el delegado revisa las de su delegación (su ámbito lo limita
-# _actividades_autorizadas); verificador, coordinación y administración, las de su alcance.
-ROLES_REVISORES = (ADMINISTRADOR, COORDINADOR, DELEGADO, VERIFICADOR)
+# Quién revisa evidencias lo decide permisos.puede_revisar (rol revisor y permiso del perfil). El delegado
+# revisa las de su delegación porque _actividades_autorizadas limita lo que ve.
 MENSAJE_REVISION_PROPIA = 'No puedes revisar una actividad que registraste tú: la revisa otro delegado, un verificador o la coordinación.'
 
 def _delegaciones_visibles(user):
@@ -258,8 +257,8 @@ def actividad_detalle(request, codigo):
         'puede_modificar': _bloqueo_actividad(propio, actividad, ve_todo) is None,
         # El aviso de carga es para quien sube evidencias (el autor); quien revisa no lo ve.
         'aviso_evidencia': bloqueo_evidencia if es_autor else None,
-        'puede_validar': tiene_rol(request.user, *ROLES_REVISORES) and not es_autor,
-        'puede_anular': tiene_rol(request.user, *ROLES_REVISORES) and not es_autor and actividad.estado == 'aprobada' and actividad.item.periodo.estado != 'cerrado',
+        'puede_validar': puede_revisar(request.user) and not es_autor,
+        'puede_anular': puede_revisar(request.user) and not es_autor and actividad.estado == 'aprobada' and actividad.item.periodo.estado != 'cerrado',
         'hay_pendientes': any(evidencia.estado_revision == 'pendiente' for evidencia in actividad.evidencias.all()),
     })
 
@@ -313,7 +312,7 @@ def revisar_actividad(request, codigo, decision):
     """Aprueba o rechaza (con motivo): una Validacion por cada evidencia pendiente (RN-009)."""
     if request.method != 'POST' or decision not in DECISIONES:
         return redirect('actividad_detalle', codigo=codigo)
-    if not tiene_rol(request.user, *ROLES_REVISORES):
+    if not puede_revisar(request.user):
         registrar_acceso_denegado(request, 'Actividad', codigo)
         return redirect('actividad_detalle', codigo=codigo)
     verificador = _funcionario_requerido(request)
@@ -350,7 +349,7 @@ def anular_actividad(request, codigo):
     """Anula la aprobación de una actividad con un motivo; recalcula los indicadores (CU-07.2)."""
     if request.method != 'POST':
         return redirect('actividad_detalle', codigo=codigo)
-    if not tiene_rol(request.user, *ROLES_REVISORES):
+    if not puede_revisar(request.user):
         registrar_acceso_denegado(request, 'Actividad', codigo)
         return redirect('actividad_detalle', codigo=codigo)
     verificador = _funcionario_requerido(request)

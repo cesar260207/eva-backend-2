@@ -8,8 +8,8 @@ from django.utils import timezone
 
 from .models import Actividad, Cargo, Catalogo, Compromiso, Delegacion, Evidencia, Funcionario, ItemMedible, Meta, Periodo, Rol, VersionOptimistaMixin
 from .permisos import (
-    ADMINISTRADOR, COORDINADOR, PERFIL_ADMINISTRADOR, PERFIL_ADMINISTRATIVO, PERFILES, ROLES_DEL_SISTEMA, asignar_perfil, funcionario_de,
-    perfil_sugerido, puede_ver_todo,
+    ADMINISTRADOR, COORDINADOR, DELEGADO, VERIFICADOR, PERFIL_ADMINISTRADOR, PERFIL_FUNCIONARIO, PERFILES, ROLES_DEL_SISTEMA, asignar_perfil,
+    funcionario_de, perfil_sugerido, puede_ver_todo,
 )
 
 
@@ -71,8 +71,9 @@ class FuncionarioForm(FormularioBootstrap, forms.ModelForm):
     perfil = forms.ModelChoiceField(
         queryset=Group.objects.filter(name__in=PERFILES).order_by('name'), required=False, label='Perfil de acceso',
         empty_label='Según sus roles',
-        help_text='Administrador: acceso total y gestión de usuarios. Supervisor: mantenedores operativos y transacciones. '
-                  'Administrativo: solo sus actividades y compromisos. Si lo dejas vacío, se deduce de los roles.',
+        help_text='Administrador: acceso total y gestión de usuarios. Coordinador: mantenedores operativos, transacciones y '
+                  'revisión en todas las delegaciones. Delegado: revisa evidencias y trabaja su delegación. Funcionario: '
+                  'solo sus actividades, evidencias y tareas. Si lo dejas vacío, se deduce de los roles.',
     )
     roles = forms.ModelMultipleChoiceField(queryset=Rol.objects.all(), label='Roles', help_text='Mantén Ctrl presionado para elegir más de uno.')
     password = forms.CharField(required=False, label='Contraseña', widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}), help_text='Obligatoria al crear. Déjala vacía al editar para conservar la actual.')
@@ -138,15 +139,17 @@ class FuncionarioForm(FormularioBootstrap, forms.ModelForm):
 
     def _validar_perfil_y_roles(self, cleaned_data):
         """El perfil no puede dar menos alcance que los roles: un administrador o coordinador
-        con perfil Administrativo tendría el alcance de su rol sin los permisos para usarlo."""
+        con perfil Funcionario tendría el alcance de su rol sin los permisos para usarlo."""
         perfil, roles = cleaned_data.get('perfil'), cleaned_data.get('roles')
         if not perfil or roles is None:
             return
         nombres = {rol.nombre_rol for rol in roles}
         if ADMINISTRADOR in nombres and perfil.name != PERFIL_ADMINISTRADOR:
             self.add_error('perfil', 'El rol administrador requiere el perfil Administrador.')
-        elif COORDINADOR in nombres and perfil.name == PERFIL_ADMINISTRATIVO:
-            self.add_error('perfil', 'El rol coordinador requiere el perfil Supervisor o Administrador.')
+        elif COORDINADOR in nombres and perfil.name not in PERFILES[:2]:
+            self.add_error('perfil', 'El rol coordinador requiere el perfil Coordinador o Administrador.')
+        elif nombres & {DELEGADO, VERIFICADOR} and perfil.name == PERFIL_FUNCIONARIO:
+            self.add_error('perfil', 'Los roles delegado y verificador revisan evidencias: requieren el perfil Delegado o uno superior.')
 
     @transaction.atomic
     def save(self, commit=True):

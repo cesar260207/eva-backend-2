@@ -315,7 +315,7 @@ class MantenedoresUnitTests(TestCase):
             self.assertTrue(config.columnas and config.busqueda, slug)
 
     def test_roles_y_funcionarios_son_solo_de_administracion(self):
-        """CU-26.1 Denegar acceso por ámbito (RF-002). El perfil Supervisor no administra cuentas ni roles."""
+        """CU-26.1 Denegar acceso por ámbito (RF-002). El perfil Coordinador no administra cuentas ni roles."""
         supervisor = crear_funcionario('coord-permisos', 'coordinador')
         administrador = crear_funcionario('adm-permisos', 'administrador')
         for slug in ('roles', 'funcionarios'):

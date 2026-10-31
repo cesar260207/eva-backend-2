@@ -500,6 +500,50 @@ class MigracionSinCorreccionTests(TransactionTestCase):
 		self.assertEqual((validacion.decision, validacion.observacion), ('rechazada', 'Falta la firma'))
 
 
+class MigracionPerfilesPorJerarquiaTests(TransactionTestCase):
+	"""Sin CU (migración de datos). La migración 0018 deja los perfiles Administrador, Coordinador, Delegado y Funcionario."""
+
+	antes = [('delegaciones_app', '0017_sin_solicitar_correccion')]
+	despues = [('delegaciones_app', '0018_perfiles_por_jerarquia')]
+
+	def _migrar(self, destino):
+		executor = MigrationExecutor(connection)
+		executor.migrate(destino)
+		return executor.loader.project_state(destino).apps
+
+	def tearDown(self):
+		self._migrar(MigrationExecutor(connection).loader.graph.leaf_nodes())
+
+	def _usuario(self, apps, username, rol, grupo):
+		usuario = apps.get_model('auth', 'User').objects.create(username=username)
+		cargo = apps.get_model('delegaciones_app', 'Cargo').objects.get_or_create(nombre='Profesional')[0]
+		funcionario = apps.get_model('delegaciones_app', 'Funcionario').objects.create(usuario=usuario, identificador_institucional=username, nombre=username, cargo=cargo)
+		funcionario.roles.add(apps.get_model('delegaciones_app', 'Rol').objects.get(nombre_rol=rol))
+		usuario.groups.add(apps.get_model('auth', 'Group').objects.get(name=grupo))
+		return usuario.pk
+
+	def test_renombra_crea_el_delegado_y_mueve_a_los_revisores(self):
+		viejo = self._migrar(self.antes)
+		delegado = self._usuario(viejo, 'del-0018', 'delegado', 'Administrativo')
+		verificador = self._usuario(viejo, 'ver-0018', 'verificador', 'Administrativo')
+		funcionario = self._usuario(viejo, 'fun-0018', 'funcionario', 'Administrativo')
+		coordinador = self._usuario(viejo, 'coo-0018', 'coordinador', 'Supervisor')
+		permisos_supervisor = set(viejo.get_model('auth', 'Group').objects.get(name='Supervisor').permissions.values_list('pk', flat=True))
+
+		nuevo = self._migrar(self.despues)
+		Grupo, Usuario = nuevo.get_model('auth', 'Group'), nuevo.get_model('auth', 'User')
+		self.assertEqual(set(Grupo.objects.values_list('name', flat=True)), {'Administrador', 'Coordinador', 'Delegado', 'Funcionario'})
+		grupo_de = lambda pk: set(Usuario.objects.get(pk=pk).groups.values_list('name', flat=True))
+		self.assertEqual((grupo_de(delegado), grupo_de(verificador)), ({'Delegado'}, {'Delegado'}))
+		self.assertEqual((grupo_de(funcionario), grupo_de(coordinador)), ({'Funcionario'}, {'Coordinador'}))
+		self.assertEqual(set(Grupo.objects.get(name='Coordinador').permissions.values_list('pk', flat=True)), permisos_supervisor)
+		self.assertTrue(Grupo.objects.get(name='Delegado').permissions.filter(codename='add_validacion').exists())
+
+		revertido = self._migrar(self.antes)
+		self.assertEqual(set(revertido.get_model('auth', 'Group').objects.values_list('name', flat=True)), {'Administrador', 'Supervisor', 'Administrativo'})
+		self.assertEqual(set(revertido.get_model('auth', 'User').objects.get(pk=delegado).groups.values_list('name', flat=True)), {'Administrativo'})
+
+
 class PermisosTests(TestCase):
 	"""CU-26, CU-26.1 (RF-002). tiene_rol y control de acceso por rol."""
 

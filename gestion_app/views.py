@@ -15,7 +15,7 @@ from delegaciones_app.medicion import periodo_vigente, periodos_con_indicadores,
 from delegaciones_app.crud import mantenedores_visibles
 from delegaciones_app.models import Actividad, Auditoria, Compromiso, Delegacion, Evidencia, Funcionario, MedicionDelegacion, Periodo
 from delegaciones_app.permisos import (
-    DELEGADO, VERIFICADOR, PERFIL_ADMINISTRADOR, PERFIL_SUPERVISOR, PERFILES, delegacion_propia, funcionario_de, perfil_de, roles_de, tiene_rol,
+    PERFIL_ADMINISTRADOR, PERFIL_COORDINADOR, PERFILES, delegacion_propia, funcionario_de, perfil_de, puede_revisar, roles_de,
 )
 from delegaciones_app.views import _delegaciones_visibles
 from delegaciones_app.views import _actividades_autorizadas, _compromisos_autorizados
@@ -59,11 +59,11 @@ def _resumen_operacional(user):
 
 @login_required
 def panel(request):
-    """Panel de inicio según el perfil autenticado (Administrador, Supervisor o Administrativo).
+    """Panel de inicio según el perfil autenticado (Administrador, Coordinador, Delegado o Funcionario).
 
     Cada perfil ve un panel distinto: el administrador, la visión global con todos los mantenedores,
-    las transacciones y la gestión de usuarios; el supervisor, los mantenedores y transacciones que
-    sus permisos autorizan y la información operacional; el administrativo, solo sus funciones.
+    las transacciones y la gestión de usuarios; el coordinador, los mantenedores y transacciones que
+    sus permisos autorizan y la información operacional; delegado y funcionario, sus funciones.
     """
     user = request.user
     perfil = perfil_de(user)
@@ -74,7 +74,7 @@ def panel(request):
         'alertas': alertas_de(user)[:5],
         **_resumen_operacional(user),
     }
-    if perfil in (PERFIL_ADMINISTRADOR, PERFIL_SUPERVISOR):
+    if perfil in (PERFIL_ADMINISTRADOR, PERFIL_COORDINADOR):
         periodo = periodo_vigente()
         delegaciones = resultados_por_delegacion(periodo) if periodo else []
         contexto.update({
@@ -98,8 +98,8 @@ def panel(request):
             'auditoria_reciente': Auditoria.objects.select_related('funcionario', 'usuario_maestro').order_by('-pk')[:6],
         })
         plantilla = 'gestion_app/panel_administrador.html'
-    elif perfil == PERFIL_SUPERVISOR:
-        plantilla = 'gestion_app/panel_supervisor.html'
+    elif perfil == PERFIL_COORDINADOR:
+        plantilla = 'gestion_app/panel_coordinador.html'
     else:
         propio = contexto['funcionario']
         periodo = periodo_vigente()
@@ -108,9 +108,9 @@ def panel(request):
             'resultado_delegacion': _solo_su_delegacion(user, resultados_por_delegacion(periodo))[:1] if periodo and delegacion_propia(user) else [],
             'mis_actividades': Actividad.objects.filter(funcionario_autor=propio).select_related('delegacion').order_by('-fecha')[:5] if propio else [],
             'mis_compromisos': Compromiso.objects.filter(funcionario_responsable=propio).exclude(estado='realizado').order_by('fecha_comprometida')[:5] if propio else [],
-            'puede_revisar': tiene_rol(user, DELEGADO, VERIFICADOR),
+            'puede_revisar': puede_revisar(user),
         })
-        plantilla = 'gestion_app/panel_administrativo.html'
+        plantilla = 'gestion_app/panel_funcionario.html'
     return render(request, plantilla, contexto)
 
 

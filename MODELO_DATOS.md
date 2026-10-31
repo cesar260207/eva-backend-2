@@ -5,9 +5,24 @@ las tablas al ejecutar las migraciones (`python manage.py migrate`); no se crean
 manualmente desde phpMyAdmin. El ORM usa estas mismas tablas en las vistas propias del
 sistema; desde la Evaluación Sumativa 3 no se usa Django Admin.
 
-Los perfiles de acceso (Administrador, Supervisor y Administrativo) son las tablas de grupos y
-permisos de `django.contrib.auth` (`auth_group`, `auth_group_permissions`, `auth_user_groups`);
-la migración `0015_perfiles_de_acceso` los crea y asigna un perfil a cada usuario existente.
+Los perfiles de acceso (Administrador, Coordinador, Delegado y Funcionario) son las tablas de grupos y
+permisos de `django.contrib.auth` (`auth_group`, `auth_group_permissions`, `auth_user_groups`).
+La migración `0015_perfiles_de_acceso` creó los tres perfiles de la pauta (Administrador, Supervisor y
+Administrativo) y la `0018_perfiles_por_jerarquia` los dejó según la jerarquía de la Municipalidad:
+renombra Supervisor a Coordinador y Administrativo a Funcionario (conservan su id, permisos y usuarios),
+crea Delegado y mueve allí a los usuarios con rol delegado o verificador.
+
+**Perfil y rol.** El perfil es el nivel de permisos; el rol, la función y el alcance. Los dos roles que
+revisan evidencias quedan así:
+
+- `delegado`: trabaja su delegación (tubo de trabajo, actividades) y además verifica, con las mismas
+  funciones del verificador pero limitadas a su delegación. Usa el perfil Delegado.
+- `verificador`: se conserva para no romper datos existentes. Revisa evidencias de su delegación o, si no
+  tiene, de todas. También usa el perfil Delegado.
+
+Revisar exige el rol y el permiso `add_validacion` del perfil. La tabla `rol` solo guarda el nombre
+(`nombre_rol`), así que esta descripción vive en la documentación y en `permisos.py`; la migración 0018
+no modifica las tablas `rol`, `funcionario` ni `funcionario_rol`.
 
 **Equivalencia de nombres.** «Tubo de trabajo» en la interfaz = modelo `Compromiso` (tabla
 `compromiso`) = «Agenda colectiva» del diseño (CU-12). Cada registro del tubo se muestra como una
@@ -27,7 +42,7 @@ el histórico importado de la Matriz SGR. En total son 19 tablas propias.
 |---|---|---|
 | `Delegacion` | Unidad territorial municipal. | Tiene funcionarios, actividades y compromisos. Calcula su cumplimiento ponderado. |
 | `Cargo` | Cargo de los funcionarios y su vigencia. | Tiene funcionarios e ítems medibles. |
-| `Rol` | Rol que define permisos: administrador, coordinador, delegado, funcionario, verificador y consulta. | Se asigna a funcionarios mediante `FuncionarioRol`. |
+| `Rol` | Rol que define la función y el alcance: administrador, coordinador, delegado (también verifica en su delegación), funcionario, verificador y consulta. | Se asigna a funcionarios mediante `FuncionarioRol`. |
 | `Funcionario` | Persona con cuenta de acceso, cargo, delegación opcional y uno o más roles. | `usuario` uno a uno con el usuario de Django; autor de actividades y compromisos. |
 | `UsuarioMaestro` | Superusuario con alcance total. | `usuario` uno a uno opcional con el usuario de Django. |
 | `FuncionarioRol` (adicional) | Asigna un rol a un funcionario. | Único por funcionario y rol. |

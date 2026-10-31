@@ -11,9 +11,10 @@ desplegable en una instancia AWS EC2.
 - Dashboard, semáforo y resumen de cumplimiento por delegación, calculados desde los indicadores.
 - Ficha personal del funcionario: metas, avance, diferencia con lo esperado, detalle de la fórmula,
   evidencias y compromisos.
-- Autenticación Django (login, logout, vistas protegidas) con tres **perfiles de acceso** que son
-  grupos de Django con permisos: **Administrador** (acceso total), **Supervisor** (permisos
-  intermedios) y **Administrativo** (permisos mínimos). Ver «Seguridad y perfiles».
+- Autenticación Django (login, logout, vistas protegidas) con cuatro **perfiles de acceso** que son
+  grupos de Django con permisos y siguen la jerarquía de la Municipalidad: **Administrador** (acceso
+  total), **Coordinador** y **Delegado** (permisos intermedios) y **Funcionario** (permisos mínimos).
+  Ver «Seguridad y perfiles».
 - **Panel distinto por perfil** al iniciar sesión (`/gestion/panel/`).
 - **Recuperación de contraseña por correo** con token seguro de un solo uso.
 - Roles de trabajo (administrador, coordinador, delegado, funcionario, verificador y consulta),
@@ -161,9 +162,9 @@ sola vez si no se indica ninguna. No hay claves fijas en el repositorio.
 | Usuario | Perfil (grupo) | Rol | Ambito |
 |---|---|---|---|
 | `admin.demo` | Administrador | Administrador | Todas las delegaciones |
-| `coordinador.demo` | Supervisor | Coordinador | Todas las delegaciones |
-| `funcionario.centro` | Administrativo | Funcionario | Centro: registra actividades y sube evidencias |
-| `verificador.demo` | Administrativo | Delegado + Verificador | Delegado de Centro: revisa las evidencias de Centro |
+| `coordinador.demo` | Coordinador | Coordinador | Todas las delegaciones |
+| `verificador.demo` | Delegado | Delegado + Verificador | Delegado de Centro: revisa las evidencias de Centro |
+| `funcionario.centro` | Funcionario | Funcionario | Centro: registra actividades y sube evidencias |
 
 Las cuentas demo no tienen correo. Para probar la recuperación de contraseña, entra como
 `admin.demo`, abre **Administración → Funcionarios y usuarios**, edita la cuenta y escribe un
@@ -220,14 +221,23 @@ Los datos son sinteticos y solo sirven para demostracion academica.
 
 ## Seguridad y perfiles
 
-| Perfil (grupo Django) | Nivel | Puede | No puede |
-|---|---|---|---|
-| Administrador | Acceso total | Los 8 mantenedores, gestión de usuarios y perfiles, todas las transacciones, auditoría, visión global | — |
-| Supervisor | Intermedio | 6 mantenedores (delegaciones, cargos, catálogo, períodos, ítems, metas), transacciones, información operacional | Usuarios, roles, perfiles, auditoría |
-| Administrativo | Mínimo | Registrar y seguir sus actividades, evidencias y compromisos; su ficha | Mantenedores, usuarios, eliminar compromisos, cerrar períodos, auditoría |
+Perfil = nivel de permisos (grupo de Django); rol = función y alcance (tabla `rol`). La jerarquía es
+Administrador > Coordinador > Delegado > Funcionario, y cada perfil tiene todos los permisos del siguiente.
 
-- Los grupos y sus permisos (`view`, `add`, `change`, `delete` de cada tabla) los crea la migración
-  `0015_perfiles_de_acceso`, que además asigna perfil a los usuarios existentes según sus roles.
+| Perfil (grupo Django) | En la pauta | Roles que lo usan | Puede | No puede |
+|---|---|---|---|---|
+| Administrador | Administrador (acceso total) | administrador | Los 8 mantenedores, gestión de usuarios y perfiles, todas las transacciones, auditoría, visión global | — |
+| Coordinador | Supervisor (intermedio) | coordinador | 6 mantenedores (delegaciones, cargos, catálogo, períodos, ítems, metas), transacciones, revisión de evidencias y asignación de delegados en todas las delegaciones | Usuarios, roles, perfiles, auditoría |
+| Delegado | Supervisor (intermedio) | delegado, verificador | Revisar evidencias (aprobar, rechazar, anular) y trabajar el tubo y las actividades, solo en su delegación | Mantenedores, usuarios, eliminar, otras delegaciones, auditoría |
+| Funcionario | Administrativo (mínimo) | funcionario, consulta | Registrar y seguir sus actividades, evidencias y tareas; su ficha | Revisar evidencias, mantenedores, usuarios, eliminar tareas, cerrar períodos, auditoría |
+
+- Los grupos y sus permisos (`view`, `add`, `change`, `delete` de cada tabla) los crean las migraciones
+  `0015_perfiles_de_acceso` (tres perfiles iniciales) y `0018_perfiles_por_jerarquia` (renombra
+  Supervisor a Coordinador y Administrativo a Funcionario, crea Delegado y mueve allí a los delegados y
+  verificadores).
+- Revisar evidencias exige el rol (delegado, verificador, coordinador o administrador) **y** el permiso
+  `add_validacion` del perfil (`permisos.puede_revisar`): el perfil Funcionario nunca revisa. El delegado
+  revisa solo las actividades de su delegación; las de otra responden 404.
 - Cada vista de mantenedor exige el permiso de Django de su acción (`PermisoRequeridoMixin` en
   `delegaciones_app/permisos.py`); los botones Agregar, Modificar y Eliminar se muestran según esos permisos.
 - El perfil se asigna al crear o editar un usuario en el mantenedor de funcionarios.
@@ -437,7 +447,7 @@ Se accede con `http://<IP_PUBLICA_EC2>/` (sin https).
 - `git log --oneline`, `git remote -v` y `git status` limpio.
 - `systemctl status` de mysqld, gunicorn, nginx y php-fpm en verde; `nginx -t`.
 - La aplicacion respondiendo en el navegador desde la IP publica.
-- Login con cada cuenta demo y su panel (Administrador, Supervisor, Administrativo).
+- Login con cada cuenta demo y su panel (Administrador, Coordinador, Delegado, Funcionario).
 - Mantenedores con CRUD y búsqueda; restricciones al entrar con un perfil sin permiso.
 - Recuperación de contraseña: solicitud, correo recibido, enlace, cambio e ingreso con la nueva clave.
 - phpMyAdmin (`/phpmyadmin/`) mostrando tablas, estructura, relaciones y registros.
