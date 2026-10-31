@@ -48,9 +48,12 @@
                     <td>{{ compromiso.funcionario_responsable.nombre|default:'Sin responsable' }}</td>
                     <td><span class="badge {% if compromiso.estado_class == 'danger' %}badge-danger-soft{% elif compromiso.estado_class == 'success' %}badge-success-soft{% else %}badge-warning-soft{% endif %}">{{ compromiso.estado_display }}</span></td>
                     <td class="d-flex flex-wrap gap-2">
+                        {% if compromiso.puede_modificar %}
                         <form method="post" class="d-flex flex-wrap gap-1 align-items-center">{% csrf_token %}<input class="form-control form-control-sm" name="observacion" placeholder="Observación (opcional)" aria-label="Observación del cambio de estado" style="max-width: 190px">{% for valor, etiqueta in compromiso.estados_permitidos %}<button class="btn btn-sm btn-outline-sgr" type="submit" formaction="{% url 'compromiso_estado' compromiso.pk valor %}">{{ etiqueta }}</button>{% endfor %}</form>
                         <a class="btn btn-sm btn-outline-sgr" href="{% url 'compromiso_editar' compromiso.pk %}">Modificar</a>
+                        {% endif %}
                         {% if puede_eliminar_compromiso %}<a class="btn btn-sm btn-outline-danger" href="{% url 'compromiso_eliminar' compromiso.pk %}">Eliminar</a>{% endif %}
+                        {% if not compromiso.puede_modificar and not puede_eliminar_compromiso %}<span class="small text-muted">Solo lectura</span>{% endif %}
                     </td>
                 </tr>
             {% empty %}

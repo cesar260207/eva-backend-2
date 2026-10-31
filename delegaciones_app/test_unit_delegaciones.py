@@ -159,3 +159,70 @@ class CoordinacionDeDelegadosTests(EscenarioBase, TestCase):
         self.assertContains(agenda, '¿Quién agrega tareas al tubo de trabajo?')
         self.assertContains(agenda, '+ Agregar al tubo de trabajo')
         self.assertNotContains(agenda, 'Eliminar</a>')
+
+
+class ModificarEnSuPaginaTests(EscenarioBase, TestCase):
+    """«Modificar» está en la página de cada registro (detalle o fila) y solo lo ve quien puede modificar."""
+
+    def setUp(self):
+        self.crear_escenario()
+        self.companero = crear_funcionario('companero-mod', 'funcionario', cargo=self.cargo, delegacion=self.centro)
+        self.coordinador = crear_funcionario('coord-mod', 'coordinador', cargo=self.cargo)
+
+    def test_el_detalle_ofrece_modificar_actividad_a_su_autor(self):
+        """CU-01 Registro de actividades (RF-009). El autor ve «Modificar actividad» en el detalle; otro funcionario no."""
+        actividad = self.nueva_actividad()
+        detalle, editar = reverse('actividad_detalle', args=[actividad.codigo_verificador]), reverse('actividad_editar', args=[actividad.codigo_verificador])
+        self.client.force_login(self.usuario_autor)
+        self.assertContains(self.client.get(detalle), f'href="{editar}">Modificar actividad</a>', html=False)
+        self.client.force_login(self.companero)
+        self.assertNotContains(self.client.get(detalle), editar)
+
+    def test_una_actividad_aprobada_no_ofrece_modificar(self):
+        """CU-11 Validación de actividades (RF-013). Aprobada ya suma al avance: ni el detalle ni la lista ofrecen modificarla."""
+        actividad = self.nueva_actividad(estado='aprobada')
+        editar = reverse('actividad_editar', args=[actividad.codigo_verificador])
+        self.client.force_login(self.usuario_autor)
+        self.assertNotContains(self.client.get(reverse('actividad_detalle', args=[actividad.codigo_verificador])), editar)
+        self.assertNotContains(self.client.get(reverse('actividades')), editar)
+
+    def test_la_lista_no_muestra_botones_desactivados(self):
+        """CU-10.1 Buscar actividad por código (RF-032). Quien no puede modificar no ve Modificar ni Eliminar en la fila."""
+        actividad = self.nueva_actividad()
+        self.client.force_login(self.companero)
+        lista = self.client.get(reverse('actividades'))
+        self.assertNotContains(lista, 'disabled')
+        self.assertNotContains(lista, reverse('actividad_editar', args=[actividad.codigo_verificador]))
+        self.client.force_login(self.usuario_autor)
+        self.assertContains(self.client.get(reverse('actividades')), reverse('actividad_editar', args=[actividad.codigo_verificador]))
+
+    def test_la_fila_del_tubo_ofrece_modificar_solo_a_quien_puede(self):
+        """CU-13 Actualización de estados (RF-018). El responsable y la coordinación ven Modificar y los estados; otro funcionario no."""
+        compromiso = self.nuevo_compromiso()
+        editar, estado = reverse('compromiso_editar', args=[compromiso.pk]), reverse('compromiso_estado', args=[compromiso.pk, 'proceso'])
+        for usuario in (self.usuario_autor, self.coordinador):
+            self.client.force_login(usuario)
+            respuesta = self.client.get(reverse('agenda'))
+            self.assertContains(respuesta, editar, msg_prefix=usuario.username)
+            self.assertContains(respuesta, estado, msg_prefix=usuario.username)
+        self.client.force_login(self.companero)
+        respuesta = self.client.get(reverse('agenda'))
+        self.assertNotContains(respuesta, editar)
+        self.assertNotContains(respuesta, estado)
+        self.assertContains(respuesta, 'Solo lectura')
+
+    def test_cambiar_el_estado_exige_ser_responsable(self):
+        """CU-13 Actualización de estados (RF-018). Quien no es responsable no cambia el estado aunque envíe el formulario."""
+        compromiso = self.nuevo_compromiso()
+        self.client.force_login(self.companero)
+        self.client.post(reverse('compromiso_estado', args=[compromiso.pk, 'proceso']))
+        compromiso.refresh_from_db()
+        self.assertEqual(compromiso.estado, 'ingresado')
+        self.assertFalse(compromiso.historial.exists())
+        self.assertTrue(Auditoria.objects.filter(evento='acceso_denegado', identificador_registro=compromiso.folio).exists())
+
+    def test_modificar_una_tarea_de_otra_delegacion_responde_404(self):
+        """CU-26.1 Denegar acceso por ámbito (RF-016). Una tarea de otra delegación no existe para el usuario."""
+        compromiso = self.nuevo_compromiso()
+        self.client.force_login(crear_funcionario('rural-mod', 'funcionario', cargo=self.cargo, delegacion=self.rural))
+        self.assertEqual(self.client.get(reverse('compromiso_editar', args=[compromiso.pk])).status_code, 404)

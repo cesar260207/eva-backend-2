@@ -43,9 +43,7 @@
                     <td>
                         <div class="d-flex flex-wrap gap-2">
                             {% if actividad.puede_subir_evidencia %}<a class="btn btn-sm btn-sgr" href="{% url 'evidencia_subir' actividad.codigo_verificador %}">Subir evidencia</a>{% endif %}
-                            {% if actividad.bloqueo %}
-                            <span class="d-flex gap-2" title="{{ actividad.bloqueo }}"><button class="btn btn-sm btn-outline-sgr" type="button" disabled>Modificar</button><button class="btn btn-sm btn-outline-danger" type="button" disabled>Eliminar</button></span>
-                            {% else %}
+                            {% if not actividad.bloqueo %}
                             <a class="btn btn-sm btn-outline-sgr" href="{% url 'actividad_editar' actividad.codigo_verificador %}">Modificar</a>
                             <a class="btn btn-sm btn-outline-danger" href="{% url 'actividad_eliminar' actividad.codigo_verificador %}">Eliminar</a>
                             {% endif %}

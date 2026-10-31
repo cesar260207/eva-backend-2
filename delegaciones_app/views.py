@@ -252,13 +252,14 @@ def actividad_detalle(request, codigo):
     está en su propia pantalla (evidencia_subir)."""
     actividades = _actividades_autorizadas(request.user).prefetch_related('evidencias__validaciones__funcionario_verificador')
     actividad = _obtener_autorizado(request, actividades, 'Actividad', codigo_verificador=codigo)
-    propio = funcionario_de(request.user)
-    bloqueo_evidencia = _bloqueo_evidencia(propio, actividad, puede_ver_todo(request.user))
+    propio, ve_todo = funcionario_de(request.user), puede_ver_todo(request.user)
+    bloqueo_evidencia = _bloqueo_evidencia(propio, actividad, ve_todo)
     es_autor = bool(propio and actividad.funcionario_autor_id == propio.pk)
     return render(request, 'delegaciones_app/actividad_detalle.html', {
         'actividad': actividad,
         'url_lista': _url_de_lista(request, 'actividades'),
         'puede_subir_evidencia': bloqueo_evidencia is None,
+        'puede_modificar': _bloqueo_actividad(propio, actividad, ve_todo) is None,
         # A quien solo revisa no se le muestra el aviso de carga: no es su tarea.
         'aviso_evidencia': bloqueo_evidencia if bloqueo_evidencia != MENSAJE_SOLO_AUTOR_EVIDENCIA else None,
         'puede_validar': tiene_rol(request.user, *ROLES_REVISORES) and not es_autor,
@@ -473,6 +474,10 @@ def compromiso_estado(request, pk, estado):
     if funcionario is None:
         return redirect(_url_de_lista(request, 'agenda'))
     compromiso = _obtener_autorizado(request, _compromisos_autorizados(request.user), 'Compromiso', pk=pk)
+    if not _editor_de_compromisos(request.user)(compromiso):
+        registrar_acceso_denegado(request, 'Compromiso', compromiso.folio, 'no es el responsable')
+        messages.error(request, MENSAJE_SOLO_RESPONSABLE)
+        return redirect(_url_de_lista(request, 'agenda'))
     anterior = compromiso.estado
     observacion = request.POST.get('observacion', '').strip()
     try:
@@ -487,18 +492,26 @@ def compromiso_estado(request, pk, estado):
     return redirect(_url_de_lista(request, 'agenda'))
 
 
-def _puede_editar_compromiso(user, funcionario, compromiso):
+MENSAJE_SOLO_RESPONSABLE = 'No tienes permiso para modificar esta tarea: lo hace su responsable o la coordinación.'
+
+
+def _editor_de_compromisos(user):
+    """Función que dice si el usuario modifica una tarea (sus datos y su estado): la modifican su responsable,
+    si es delegado o funcionario, y la coordinación. Consulta los roles una sola vez para toda una lista."""
     if puede_ver_todo(user):
-        return True
-    return bool(funcionario and tiene_rol(user, DELEGADO, FUNCIONARIO) and compromiso.funcionario_responsable_id == funcionario.pk)
+        return lambda compromiso: True
+    funcionario = funcionario_de(user)
+    if funcionario is None or not tiene_rol(user, DELEGADO, FUNCIONARIO):
+        return lambda compromiso: False
+    return lambda compromiso: compromiso.funcionario_responsable_id == funcionario.pk
 
 
 @login_required
 def compromiso_editar(request, pk):
-    compromiso = get_object_or_404(Compromiso, pk=pk)
-    if not _puede_editar_compromiso(request.user, funcionario_de(request.user), compromiso):
+    compromiso = _obtener_autorizado(request, _compromisos_autorizados(request.user), 'Compromiso', pk=pk)
+    if not _editor_de_compromisos(request.user)(compromiso):
         registrar_acceso_denegado(request, 'Compromiso', compromiso.folio, 'no es el responsable')
-        messages.error(request, 'No tienes permiso para modificar esta tarea.')
+        messages.error(request, MENSAJE_SOLO_RESPONSABLE)
         return redirect(_url_de_lista(request, 'agenda'))
     form = CompromisoForm(request.POST or None, instance=compromiso, user=request.user)
     if request.method == 'POST' and form.is_valid():
@@ -551,8 +564,10 @@ def agenda(request):
     estado = request.GET.get('estado')
     query = request.GET.get('q', '').strip()
     compromisos = list(filtrar_compromisos(_compromisos_autorizados(request.user), request.GET))
+    puede_modificar = _editor_de_compromisos(request.user)
     for compromiso in compromisos:
         compromiso.estado_display, compromiso.estado_class = situacion_de_plazo(compromiso)
+        compromiso.puede_modificar = puede_modificar(compromiso)
     resumen_responsables, resumen_total = resumen_por_responsable(compromisos)
     return render(request, 'delegaciones_app/agenda.html', {
         'compromisos': compromisos,
