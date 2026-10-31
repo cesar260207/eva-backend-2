@@ -19,7 +19,8 @@ desplegable en una instancia AWS EC2.
 - **Recuperación de contraseña por correo** con token seguro de un solo uso.
 - Roles de trabajo (administrador, coordinador, delegado, funcionario, verificador y consulta),
   con acceso limitado a la delegación de cada usuario.
-- Ocho mantenedores visuales con CRUD propio, búsqueda y baja lógica donde corresponde:
+- Ocho mantenedores visuales con CRUD propio, búsqueda, validaciones y eliminación con confirmación; un registro
+  con datos relacionados no se elimina, se desactiva y la confirmación explica la razón:
   Delegaciones, Cargos, Roles, Funcionarios, Catálogo, Períodos, Ítems medibles y Metas.
 - Registro de actividades con código verificador único e inmutable, carga de evidencias
   (JPG, PNG o PDF, hasta 5 MB), revisión por verificadores y anulación de aprobaciones con motivo.

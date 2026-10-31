@@ -337,7 +337,7 @@ class MantenedoresUnitTests(TestCase):
         """CU-26.1 Denegar acceso por ámbito (RF-002). Evita el bloqueo de quien administra."""
         usuario = crear_funcionario('yo-mismo', 'administrador')
         otro = crear_funcionario('otro-func', 'funcionario')
-        self.assertEqual(crud._bloqueo_funcionario(usuario.funcionario, peticion(usuario)), 'No puedes desactivar tu propia cuenta.')
+        self.assertEqual(crud._bloqueo_funcionario(usuario.funcionario, peticion(usuario)), 'No puedes eliminar ni desactivar tu propia cuenta.')
         self.assertIsNone(crud._bloqueo_funcionario(otro.funcionario, peticion(usuario)))
         Funcionario.objects.filter(pk=usuario.funcionario.pk).update(estado=False)
         usuario.funcionario.refresh_from_db()

@@ -4,14 +4,17 @@ from datetime import date
 from decimal import Decimal
 from types import SimpleNamespace
 
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase, TestCase
+from django.urls import reverse
 
+from .crud import datos_relacionados, texto_relacionados
 from .forms import CatalogoForm, FuncionarioForm, PeriodoForm
 from .models import (
-    Actividad, Auditoria, Cargo, Catalogo, Delegacion, Funcionario, ItemMedible, Meta, ParametroVersionado, Periodo, Rol,
+    Actividad, Auditoria, Cargo, Catalogo, Delegacion, Funcionario, FuncionarioRol, ItemMedible, Meta, ParametroVersionado, Periodo, Rol,
 )
-from .pruebas_base import crear_funcionario
+from .pruebas_base import EscenarioBase, crear_funcionario
 
 
 def un_periodo(nombre='Septiembre 2026', estado='borrador', inicio=date(2026, 9, 1), termino=date(2026, 9, 30), **cambios):
@@ -530,3 +533,81 @@ class ParametroUnitTests(TestCase):
         with self.assertRaises(ValidationError):
             ParametroVersionado.objects.create(periodo=self.periodo, clave='otra', valor='1')
         self.assertEqual(self.periodo.obtener_parametro('maximo_cumplimiento'), '120')
+
+class EliminarEnMantenedoresTests(EscenarioBase, TestCase):
+    """Eliminar en los mantenedores con campo de baja: se elimina sin datos relacionados; con ellos se desactiva."""
+
+    def setUp(self):
+        self.crear_escenario()
+        self.admin = crear_funcionario('admin-elim', 'administrador', cargo=self.cargo)
+        self.client.force_login(self.admin)
+
+    def _url(self, slug, objeto):
+        return reverse('mantenedor_eliminar', args=[slug, objeto.pk])
+
+    def test_sin_datos_relacionados_se_elimina_con_auditoria(self):
+        """CU-25 Mantener tablas maestras (RF-001, RF-003, RF-004). Delegación, cargo y catálogo sin uso se eliminan."""
+        registros = {
+            'delegaciones': Delegacion.objects.create(nombre='Temporal'),
+            'cargos': Cargo.objects.create(nombre='Cargo sin uso'),
+            'catalogo': Catalogo.objects.create(codigo='SIN-USO', nombre='Sin uso', tipo='servicio'),
+        }
+        for slug, objeto in registros.items():
+            confirmacion = self.client.get(self._url(slug, objeto))
+            self.assertContains(confirmacion, 'No tiene datos relacionados: se eliminará definitivamente.', msg_prefix=slug)
+            self.assertContains(confirmacion, 'Confirmar eliminación', msg_prefix=slug)
+            self.client.post(self._url(slug, objeto))
+            self.assertFalse(type(objeto).objects.filter(pk=objeto.pk).exists(), slug)
+            self.assertTrue(Auditoria.objects.filter(evento='eliminar', entidad=type(objeto).__name__, identificador_registro=str(objeto.pk)).exists(), slug)
+
+    def test_con_datos_relacionados_se_desactiva_y_explica_la_razon(self):
+        """CU-25 Mantener tablas maestras (RF-001, RF-003, RF-004). Con datos relacionados no se elimina: se desactiva y se dice por qué."""
+        self.nueva_actividad()
+        casos = (
+            ('delegaciones', self.centro, 'estado', '1 actividad'),
+            ('catalogo', self.catalogo, 'activo', '1 actividad'),
+            ('cargos', self.cargo, 'vigencia', 'funcionarios'),
+        )
+        for slug, objeto, baja, motivo in casos:
+            confirmacion = self.client.get(self._url(slug, objeto))
+            self.assertContains(confirmacion, 'No se puede eliminar porque tiene datos relacionados', msg_prefix=slug)
+            self.assertContains(confirmacion, motivo, msg_prefix=slug)
+            self.assertContains(confirmacion, 'Confirmar desactivación', msg_prefix=slug)
+            respuesta = self.client.post(self._url(slug, objeto), follow=True)
+            self.assertContains(respuesta, 'No se eliminó porque tiene datos relacionados', msg_prefix=slug)
+            objeto.refresh_from_db()
+            self.assertFalse(getattr(objeto, baja), slug)
+
+    def test_funcionario_sin_datos_se_elimina_con_su_cuenta(self):
+        """CU-26 Administración de usuarios y roles (RF-002). Sin datos relacionados se eliminan el funcionario, su cuenta y sus roles."""
+        usuario = crear_funcionario('sin-datos', 'funcionario', cargo=self.cargo, delegacion=self.centro)
+        funcionario = usuario.funcionario
+        self.assertContains(self.client.get(self._url('funcionarios', funcionario)), 'También se elimina su cuenta de acceso «sin-datos».')
+        self.client.post(self._url('funcionarios', funcionario))
+        self.assertFalse(Funcionario.objects.filter(pk=funcionario.pk).exists())
+        self.assertFalse(User.objects.filter(pk=usuario.pk).exists())
+        self.assertFalse(FuncionarioRol.objects.filter(funcionario_id=funcionario.pk).exists())
+
+    def test_funcionario_que_trabajo_en_el_sistema_se_desactiva(self):
+        """CU-26 Administración de usuarios y roles (RF-002). Quien registró actividades se desactiva con su cuenta: su trabajo se conserva."""
+        self.nueva_actividad()
+        respuesta = self.client.post(self._url('funcionarios', self.autor), follow=True)
+        self.assertContains(respuesta, '1 actividad')
+        self.autor.refresh_from_db()
+        self.usuario_autor.refresh_from_db()
+        self.assertEqual((self.autor.estado, self.usuario_autor.is_active), (False, False))
+
+    def test_los_datos_relacionados_no_cuentan_lo_que_se_borra_junto(self):
+        """CU-25 Mantener tablas maestras (RF-002). Los roles asignados se borran con el funcionario: no impiden eliminarlo."""
+        self.assertEqual(datos_relacionados(self.verificador), [])
+        self.nueva_actividad()
+        self.assertEqual(datos_relacionados(self.autor), [('actividad', 1)])
+        self.assertEqual(texto_relacionados(datos_relacionados(self.centro)), '1 funcionario, 1 actividad')
+
+    def test_la_lista_ofrece_eliminar_en_activos_y_activar_en_inactivos(self):
+        """CU-25 Mantener tablas maestras (RF-001). La fila activa dice «Eliminar» y la inactiva «Activar»."""
+        Delegacion.objects.create(nombre='Cerrada', estado=False)
+        lista = self.client.get(reverse('mantenedor_lista', args=['delegaciones']))
+        self.assertContains(lista, '>Eliminar</a>')
+        self.assertContains(lista, '>Activar</a>')
+        self.assertNotContains(lista, '>Desactivar</a>')

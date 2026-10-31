@@ -39,7 +39,7 @@
                             </form>
                             {% endfor %}{% endif %}
                             {% if not puede.delete %}{% elif config.baja %}
-                            <a class="btn btn-sm btn-outline-danger" href="{% url 'mantenedor_eliminar' config.slug fila.pk %}">{% if fila.activo %}Desactivar{% else %}Activar{% endif %}</a>
+                            <a class="btn btn-sm btn-outline-danger" href="{% url 'mantenedor_eliminar' config.slug fila.pk %}">{% if fila.activo %}Eliminar{% else %}Activar{% endif %}</a>
                             {% else %}
                             <a class="btn btn-sm btn-outline-danger" href="{% url 'mantenedor_eliminar' config.slug fila.pk %}">Eliminar</a>
                             {% endif %}

@@ -131,15 +131,23 @@ La interfaz presenta exactamente ocho mantenedores en `/administracion/`:
 Delegaciones, Cargos, Roles, Funcionarios, Catálogo, Períodos, Ítems medibles
 y Metas. Los ocho salen de un solo registro (`MANTENEDORES` en
 `delegaciones_app/crud.py`) y comparten las mismas cuatro vistas genéricas:
-listado con búsqueda, nuevo, modificar y eliminar o desactivar.
+listado con búsqueda, nuevo, modificar y eliminar con confirmación.
 
 - Roles y Funcionarios son solo de administración. Los demás los administran
   administración y coordinación.
-- Donde corresponde se desactiva en vez de eliminar, para conservar el
-  historial: delegaciones, cargos, funcionarios (que también desactiva su
-  cuenta) y elementos de catálogo.
+- En delegaciones, cargos, funcionarios y catálogo, eliminar depende de los
+  datos relacionados (`datos_relacionados` en `crud.py`, que recorre las tablas
+  que apuntan al registro). Sin datos relacionados la fila se elimina; un
+  funcionario se elimina junto con su cuenta y sus roles asignados. Con datos
+  relacionados (por ejemplo, actividades o registros de auditoría) la fila se
+  desactiva para conservar el historial, la confirmación dice cuáles son esos
+  datos y un funcionario desactivado también pierde su cuenta activa. Una fila
+  inactiva se vuelve a activar desde la misma lista.
+- La migración 0020 da nombres legibles a cinco modelos (actividades, roles
+  asignados, mediciones de delegación, períodos y registros de auditoría) para
+  esos mensajes y para la página de perfiles. Solo cambia textos.
 - Los seis roles que consultan los permisos son del sistema y no se eliminan ni se renombran.
-  Nadie puede desactivar su propia cuenta.
+  Nadie puede eliminar ni desactivar su propia cuenta.
 - Los períodos tienen las acciones Iniciar, Cerrar y Reabrir (con motivo) en su
   listado.
 - Al guardar una meta se genera su indicador; al eliminarla, se avisa cuántos

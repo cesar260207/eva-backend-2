@@ -710,19 +710,22 @@ class MantenedoresTests(TestCase):
 		self.assertIn('codigo', respuesta.context['form'].errors)
 		self.assertEqual(Catalogo.objects.filter(codigo='DUP').count(), 1)
 
-	def test_catalogo_se_desactiva_y_activa_sin_borrar_la_fila(self):
+	def test_catalogo_sin_uso_se_elimina_y_uno_inactivo_se_activa(self):
 		elemento = Catalogo.objects.create(codigo='SRV-BAJA', nombre='Servicio', tipo='servicio')
 		url = self._url('mantenedor_eliminar', 'catalogo', elemento.pk)
-		self.assertContains(self.client.get(url), 'Confirmar desactivación')
-		self.assertTrue(Catalogo.objects.get(pk=elemento.pk).activo)
+		self.assertContains(self.client.get(url), 'Confirmar eliminación')
+		self.assertTrue(Catalogo.objects.filter(pk=elemento.pk).exists())
 
 		self.assertRedirects(self.client.post(url), reverse('mantenedor_lista', args=['catalogo']))
-		self.assertFalse(Catalogo.objects.get(pk=elemento.pk).activo)
-		self.assertTrue(self._auditoria('desactivar', 'Catalogo').exists())
+		self.assertFalse(Catalogo.objects.filter(pk=elemento.pk).exists())
+		self.assertTrue(self._auditoria('eliminar', 'Catalogo').exists())
 
+		inactivo = Catalogo.objects.create(codigo='SRV-OFF', nombre='Inactivo', tipo='servicio', activo=False)
+		url = self._url('mantenedor_eliminar', 'catalogo', inactivo.pk)
 		self.assertContains(self.client.get(url), 'Confirmar activación')
 		self.client.post(url)
-		self.assertTrue(Catalogo.objects.get(pk=elemento.pk).activo)
+		self.assertTrue(Catalogo.objects.get(pk=inactivo.pk).activo)
+		self.assertTrue(self._auditoria('activar', 'Catalogo').exists())
 
 	def test_roles_del_sistema_no_se_renombran_ni_se_eliminan(self):
 		consulta = Rol.objects.get(nombre_rol='consulta')
@@ -766,6 +769,8 @@ class MantenedoresTests(TestCase):
 
 	def test_desactivar_funcionario_tambien_desactiva_su_cuenta(self):
 		funcionario = self.funcionario.funcionario
+		# Con un registro de auditoría a su nombre tiene datos relacionados: se desactiva en vez de eliminarse.
+		Auditoria.registrar_evento(self.funcionario, 'editar', 'Delegacion', self.centro.pk)
 		self.client.post(self._url('mantenedor_eliminar', 'funcionarios', funcionario.pk))
 		funcionario.refresh_from_db()
 		self.assertFalse(funcionario.estado)

@@ -147,6 +147,8 @@ class FuncionarioRol(models.Model):
 
 	class Meta:
 		db_table = 'funcionario_rol'
+		verbose_name = 'rol asignado'
+		verbose_name_plural = 'roles asignados'
 		constraints = [models.UniqueConstraint(fields=['funcionario', 'rol'], name='funcionario_rol_unico')]
 
 	def __str__(self):
@@ -211,6 +213,8 @@ class Actividad(VersionOptimistaMixin, models.Model):
 
 	class Meta:
 		db_table = 'actividad'
+		verbose_name = 'actividad'
+		verbose_name_plural = 'actividades'
 		ordering = ['-fecha', '-creada']
 
 	def __str__(self):
@@ -512,6 +516,8 @@ class MedicionDelegacion(models.Model):
 
 	class Meta:
 		db_table = 'medicion_delegacion'
+		verbose_name = 'medición de delegación'
+		verbose_name_plural = 'mediciones de delegación'
 		ordering = ['delegacion__nombre', '-fecha_datos']
 		constraints = [models.UniqueConstraint(fields=['delegacion', 'fecha_datos'], name='medicion_delegacion_fecha_unica')]
 
@@ -535,6 +541,8 @@ class Periodo(models.Model):
 
 	class Meta:
 		db_table = 'periodo'
+		verbose_name = 'período'
+		verbose_name_plural = 'períodos'
 		ordering = ['-fecha_inicio']
 
 	def __str__(self):
@@ -871,6 +879,8 @@ class Auditoria(models.Model):
 
 	class Meta:
 		db_table = 'auditoria'
+		verbose_name = 'registro de auditoría'
+		verbose_name_plural = 'registros de auditoría'
 
 	def __str__(self):
 		return f'{self.fecha:%Y-%m-%d %H:%M} - {self.evento} - {self.entidad} {self.identificador_registro}'
