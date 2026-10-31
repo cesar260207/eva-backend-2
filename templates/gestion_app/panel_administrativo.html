@@ -30,8 +30,7 @@
             <a class="btn btn-sgr" href="{% url 'actividad_nueva' %}">Registrar actividad con evidencia</a>
             <a class="btn btn-outline-sgr" href="{% url 'actividades' %}">Mis actividades</a>
             {% if puede_revisar %}<a class="btn btn-outline-sgr" href="{% url 'actividades' %}?estado=pendiente">Revisar evidencias de mi delegación</a>{% endif %}
-            {% if puede_registrar_compromiso %}<a class="btn btn-outline-sgr" href="{% url 'compromiso_nuevo' %}">Registrar tarea de mi delegación</a>{% endif %}
-            <a class="btn btn-outline-sgr" href="{% url 'agenda' %}">Tubo de trabajo</a>
+            <a class="btn btn-outline-sgr" href="{% url 'agenda' %}">Ver tubo de trabajo</a>
             <a class="btn btn-outline-sgr" href="{% url 'ficha_personal' %}">Mi ficha y mis metas</a>
         </div>
     </div></div>

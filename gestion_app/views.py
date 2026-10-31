@@ -15,8 +15,7 @@ from delegaciones_app.medicion import periodo_vigente, periodos_con_indicadores,
 from delegaciones_app.crud import mantenedores_visibles
 from delegaciones_app.models import Actividad, Auditoria, Compromiso, Delegacion, Evidencia, Funcionario, MedicionDelegacion, Periodo
 from delegaciones_app.permisos import (
-    ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICADOR, PERFIL_ADMINISTRADOR, PERFIL_SUPERVISOR, PERFILES, delegacion_propia, funcionario_de,
-    perfil_de, roles_de, tiene_rol,
+    DELEGADO, VERIFICADOR, PERFIL_ADMINISTRADOR, PERFIL_SUPERVISOR, PERFILES, delegacion_propia, funcionario_de, perfil_de, roles_de, tiene_rol,
 )
 from delegaciones_app.views import _delegaciones_visibles
 from delegaciones_app.views import _actividades_autorizadas, _compromisos_autorizados
@@ -109,8 +108,6 @@ def panel(request):
             'resultado_delegacion': _solo_su_delegacion(user, resultados_por_delegacion(periodo))[:1] if periodo and delegacion_propia(user) else [],
             'mis_actividades': Actividad.objects.filter(funcionario_autor=propio).select_related('delegacion').order_by('-fecha')[:5] if propio else [],
             'mis_compromisos': Compromiso.objects.filter(funcionario_responsable=propio).exclude(estado='realizado').order_by('fecha_comprometida')[:5] if propio else [],
-            # Las mismas reglas que compromiso_nuevo: un verificador o una cuenta de consulta no registra compromisos.
-            'puede_registrar_compromiso': tiene_rol(user, ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO),
             'puede_revisar': tiene_rol(user, DELEGADO, VERIFICADOR),
         })
         plantilla = 'gestion_app/panel_administrativo.html'

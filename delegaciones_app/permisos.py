@@ -96,6 +96,15 @@ def puede_ver_todo(user):
     return tiene_rol(user, ADMINISTRADOR, COORDINADOR)
 
 
+# Quién agrega tareas al tubo de trabajo: administración y coordinación, para cualquier delegación y eligiendo
+# al responsable; delegados y funcionarios, para su propia delegación y a su cargo. Verificador y consulta no.
+ROLES_CREAN_TAREAS = (ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO)
+
+
+def puede_crear_tarea(user):
+    return tiene_rol(user, *ROLES_CREAN_TAREAS)
+
+
 def delegacion_propia(user):
     """Delegación a la que se limita lo que ve el usuario: la suya si no tiene alcance global
     (un delegado de Centro ve solo Centro). None si ve todas o si no tiene delegación asignada."""

@@ -205,9 +205,14 @@ Los datos son sinteticos y solo sirven para demostracion academica.
 | Verificador | Revisa evidencias | Su delegación si tiene una; si no, todas |
 | Funcionario | Registra actividades, sube evidencias y registra compromisos de su delegación | Su delegación |
 
-- **Compromisos:** los crea la coordinación (eligiendo la delegación y el delegado responsable) o
-  el delegado/funcionario para su propia delegación, quedando a su cargo. Solo coordinación y
-  administración los eliminan.
+- **Tareas del tubo de trabajo: quién y dónde las crea.** Se agregan solo desde la página del tubo
+  (`/agenda/`), con el botón «+ Agregar al tubo de trabajo», que ven únicamente quienes pueden crear:
+  - administración y coordinación: para cualquier delegación, eligiendo al delegado responsable;
+  - delegado y funcionario: para su propia delegación, y la tarea queda a su cargo;
+  - verificador y consulta: no agregan tareas (si abren la URL, el acceso se rechaza y queda en la auditoría).
+
+  Los paneles, la pantalla de delegados y la página de cada delegación solo llevan al tubo («Ver tubo de
+  trabajo»). La regla está en `permisos.ROLES_CREAN_TAREAS`. Solo coordinación y administración eliminan tareas.
 - **Evidencias:** se suben desde el botón «Subir evidencia» (lista o detalle), separado de
   «Modificar». La lista de actividades indica si cada una tiene evidencia cargada.
 - **Revisión:** aprobar, o rechazar indicando el motivo. Quien registró corrige y sube una evidencia

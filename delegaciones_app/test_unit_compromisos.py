@@ -392,3 +392,38 @@ class TuboDeTrabajoUnitTests(CompromisoBase):
         self.assertEqual(dict(Compromiso.ESTADOS)['realizado'], 'Realizada')
         self.client.force_login(self.coordinador)
         self.assertContains(self.client.get(reverse('compromiso_nuevo')), 'Agregar al tubo de trabajo')
+
+    def test_solo_quien_puede_crear_ve_el_boton_agregar(self):
+        """CU-02 Registro de compromisos ciudadanos (RF-016). Administración, coordinación, delegados y funcionarios ven
+        «+ Agregar al tubo de trabajo»; verificador y consulta no."""
+        delegado = crear_funcionario('delegado-tubo', 'delegado', cargo=self.cargo, delegacion=self.centro)
+        consulta = crear_funcionario('consulta-tubo', 'consulta', cargo=self.cargo, delegacion=self.centro)
+        boton = f'href="{reverse("compromiso_nuevo")}">+ Agregar al tubo de trabajo</a>'
+        casos = ((self.coordinador, True), (delegado, True), (self.usuario_autor, True), (self.usuario_verificador, False), (consulta, False))
+        for usuario, ve_el_boton in casos:
+            self.client.force_login(usuario)
+            comprobar = self.assertContains if ve_el_boton else self.assertNotContains
+            comprobar(self.client.get(reverse('agenda')), boton, msg_prefix=usuario.username)
+
+    def test_consulta_no_puede_agregar_tareas(self):
+        """CU-26.1 Denegar acceso por rol (RF-016). Aunque escriba la URL, una cuenta de consulta no agrega tareas."""
+        self.client.force_login(crear_funcionario('consulta-url', 'consulta', cargo=self.cargo, delegacion=self.centro))
+        self.assertRedirects(self.client.get(reverse('compromiso_nuevo')), reverse('inicio'))
+        self.assertFalse(Compromiso.objects.exists())
+
+    def test_el_boton_esta_solo_en_la_pagina_del_tubo(self):
+        """CU-12 Agenda colectiva (RF-016). Paneles, delegados y la delegación llevan al tubo y no crean tareas."""
+        url_nueva = f'href="{reverse("compromiso_nuevo")}'
+        paginas = [(self.coordinador, reverse('panel')), (self.coordinador, reverse('delegados')), (self.coordinador, reverse('solicitudes')),
+                   (self.usuario_autor, reverse('panel')), (self.usuario_autor, reverse('delegacion_detalle', args=['Centro']))]
+        for usuario, url in paginas:
+            self.client.force_login(usuario)
+            respuesta = self.client.get(url)
+            self.assertNotContains(respuesta, url_nueva, msg_prefix=url)
+            self.assertContains(respuesta, 'Ver tubo de trabajo', msg_prefix=url)
+
+    def test_el_boton_conserva_la_delegacion_filtrada(self):
+        """CU-12.1 Filtrar agenda compartida (RF-016). Al filtrar por una delegación, la tarea nueva parte en ella."""
+        self.client.force_login(self.coordinador)
+        respuesta = self.client.get(reverse('agenda'), {'delegacion': self.rural.pk})
+        self.assertContains(respuesta, f'{reverse("compromiso_nuevo")}?delegacion={self.rural.pk}')

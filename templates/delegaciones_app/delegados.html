@@ -5,9 +5,9 @@
     <div>
         <div class="page-kicker">Coordinación</div>
         <h1 class="page-title mb-2">Delegados y asignaciones</h1>
-        <p class="page-intro mb-0">Cada delegado trabaja solo su delegación. Desde aquí la coordinación ve todas las delegaciones, asigna a cada delegado su delegación y le asigna tareas del tubo de trabajo.</p>
+        <p class="page-intro mb-0">Cada delegado trabaja solo su delegación. Desde aquí la coordinación ve todas las delegaciones, asigna a cada delegado su delegación y sigue su tubo de trabajo. Las tareas se agregan desde la página del tubo de trabajo.</p>
     </div>
-    <a class="btn btn-sgr" href="{% url 'compromiso_nuevo' %}">+ Asignar tarea</a>
+    <a class="btn btn-outline-sgr" href="{% url 'agenda' %}">Ver tubo de trabajo</a>
 </div>
 
 <div class="panel mb-4">
@@ -24,7 +24,6 @@
                     <td class="text-end">{{ fila.actividades_pendientes }}</td>
                     <td class="text-end">{% if fila.cumplimiento %}<span class="badge bg-{{ fila.cumplimiento.estado_class }}">{{ fila.cumplimiento.cumplimiento }} %</span>{% else %}-{% endif %}</td>
                     <td><div class="d-flex flex-wrap gap-2">
-                        <a class="btn btn-sm btn-outline-sgr" href="{% url 'compromiso_nuevo' %}?delegacion={{ fila.delegacion.pk }}">Asignar tarea</a>
                         <a class="btn btn-sm btn-outline-sgr" href="{% url 'agenda' %}?delegacion={{ fila.delegacion.pk }}">Ver tubo de trabajo</a>
                     </div></td>
                 </tr>

@@ -17,8 +17,8 @@ from .informes import PLAZOS, filtrar_actividades, filtrar_compromisos, resumen_
 from .medicion import periodo_vigente, promedio_general, resultados_por_delegacion
 from .models import Actividad, Auditoria, Compromiso, Delegacion, Evidencia, Funcionario, Periodo, Validacion
 from .permisos import (
-    ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICADOR, delegacion_propia, funcionario_de, puede_ver_todo, registrar_acceso_denegado,
-    rol_requerido, tiene_rol,
+    ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICADOR, delegacion_propia, funcionario_de, puede_crear_tarea, puede_ver_todo,
+    registrar_acceso_denegado, rol_requerido, tiene_rol,
 )
 
 # Decisión de la revisión -> método de Validacion que la aplica a cada evidencia pendiente. La revisión
@@ -444,7 +444,7 @@ def actividad_eliminar(request, codigo):
 
 @login_required
 def compromiso_nuevo(request):
-    if not tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO):
+    if not puede_crear_tarea(request.user):
         registrar_acceso_denegado(request, 'Compromiso', None, 'rol insuficiente')
         return redirect('inicio')
     funcionario = _funcionario_requerido(request)
@@ -559,8 +559,7 @@ def agenda(request):
         'delegaciones_filtro': _delegaciones_visibles(request.user),
         'estado_filtro': estado or '',
         'estados_filtro': Compromiso.ESTADOS,
-        'asigna': puede_ver_todo(request.user),
-        'puede_crear_compromiso': tiene_rol(request.user, ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO),
+        'puede_crear_compromiso': puede_crear_tarea(request.user),
         'puede_eliminar_compromiso': puede_ver_todo(request.user),
         'delegacion_filtro': delegacion_id or '',
         'filtros': request.GET,
