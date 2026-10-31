@@ -61,10 +61,7 @@
                     <div class="col-md-6"><strong>Ingreso:</strong> {{ solicitud.fecha_ingreso|date:'d-m-Y' }}</div>
                     <div class="col-md-6"><strong>Plazo:</strong> {{ solicitud.fecha_comprometida|date:'d-m-Y' }}</div>
                 </div>
-                <div class="d-flex gap-2">
-                    <a class="btn btn-sm btn-outline-sgr" href="#">Modificar</a>
-                    <a class="btn btn-sm btn-outline-danger" href="#">Eliminar</a>
-                </div>
+                <a class="btn btn-sm btn-outline-sgr" href="{% url 'agenda' %}?q={{ solicitud.folio }}">Ver en el tubo de trabajo</a>
             </div>
         </div>
     </div>

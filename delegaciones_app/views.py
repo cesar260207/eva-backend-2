@@ -200,13 +200,18 @@ def delegacion_detalle(request, nombre):
         # Como los demás registros fuera del ámbito: no existe para el usuario, y el intento queda auditado.
         registrar_acceso_denegado(request, 'Delegacion', nombre, 'fuera del ámbito')
         raise Http404('Delegación no encontrada.')
-    compromisos = list(_compromisos_autorizados(request.user).filter(delegacion__nombre=nombre))
+    query = request.GET.get('q', '').strip()
+    compromisos = _compromisos_autorizados(request.user).filter(delegacion__nombre=nombre)
+    if query:
+        compromisos = compromisos.filter(Q(folio__icontains=query) | Q(descripcion__icontains=query))
+    compromisos = list(compromisos)
     for compromiso in compromisos:
         _decorar_compromiso(compromiso)
 
     return render(request, 'delegaciones_app/delegacion_detalle.html', {
         'nombre': nombre,
         'solicitudes': compromisos,
+        'query': query,
     })
 
 

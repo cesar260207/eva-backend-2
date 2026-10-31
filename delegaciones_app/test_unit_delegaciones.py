@@ -398,3 +398,26 @@ class ModificarEnSuPaginaTests(EscenarioBase, TestCase):
         compromiso = self.nuevo_compromiso()
         self.client.force_login(crear_funcionario('rural-mod', 'funcionario', cargo=self.cargo, delegacion=self.rural))
         self.assertEqual(self.client.get(reverse('compromiso_editar', args=[compromiso.pk])).status_code, 404)
+
+
+class ListasSinBotonesFalsosTests(EscenarioBase, TestCase):
+    """Las listas de solicitudes y de la delegación no muestran botones sin función: llevan a la fila del tubo."""
+
+    def setUp(self):
+        self.crear_escenario()
+        self.nuevo_compromiso(folio='LST-1', descripcion='Poda de árboles')
+        self.nuevo_compromiso(folio='LST-2', descripcion='Luminaria apagada')
+
+    def test_no_hay_botones_modificar_ni_eliminar_sin_destino(self):
+        """CU-13 Actualización de estados (RF-018). Modificar está solo en la fila del tubo, para quien puede."""
+        self.client.force_login(self.usuario_autor)
+        for url in (reverse('solicitudes'), reverse('delegacion_detalle', args=['Centro'])):
+            respuesta = self.client.get(url)
+            self.assertNotContains(respuesta, 'href="#"', msg_prefix=url)
+            self.assertContains(respuesta, f'{reverse("agenda")}?q=LST-1', msg_prefix=url)
+
+    def test_el_buscador_de_la_delegacion_filtra(self):
+        """CU-12.1 Filtrar agenda compartida (RF-032). El buscador de la delegación filtra por folio o descripción."""
+        self.client.force_login(self.usuario_autor)
+        respuesta = self.client.get(reverse('delegacion_detalle', args=['Centro']), {'q': 'luminaria'})
+        self.assertEqual([c.folio for c in respuesta.context['solicitudes']], ['LST-2'])
