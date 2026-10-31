@@ -260,8 +260,8 @@ def actividad_detalle(request, codigo):
         'url_lista': _url_de_lista(request, 'actividades'),
         'puede_subir_evidencia': bloqueo_evidencia is None,
         'puede_modificar': _bloqueo_actividad(propio, actividad, ve_todo) is None,
-        # A quien solo revisa no se le muestra el aviso de carga: no es su tarea.
-        'aviso_evidencia': bloqueo_evidencia if bloqueo_evidencia != MENSAJE_SOLO_AUTOR_EVIDENCIA else None,
+        # El aviso de carga es para quien sube evidencias (el autor); quien revisa no lo ve.
+        'aviso_evidencia': bloqueo_evidencia if es_autor else None,
         'puede_validar': tiene_rol(request.user, *ROLES_REVISORES) and not es_autor,
         'puede_anular': tiene_rol(request.user, *ROLES_REVISORES) and not es_autor and actividad.estado == 'aprobada' and actividad.item.periodo.estado != 'cerrado',
         'hay_pendientes': any(evidencia.estado_revision == 'pendiente' for evidencia in actividad.evidencias.all()),

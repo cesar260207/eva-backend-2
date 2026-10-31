@@ -79,6 +79,16 @@ class EvidenciaEnListadoYDetalleTests(EscenarioBase, TestCase):
         self.assertContains(detalle, reverse('revisar_actividad', args=[actividad.codigo_verificador, 'rechazar']))
         self.assertRedirects(self.client.get(reverse('evidencia_subir', args=[actividad.codigo_verificador])), reverse('actividad_detalle', args=[actividad.codigo_verificador]))
 
+    def test_el_revisor_no_ve_avisos_de_carga(self):
+        """CU-11 Revisión sin elementos de carga (RF-013). El aviso «no admite nuevas evidencias» es solo para el autor."""
+        actividad = self.nueva_actividad(estado='aprobada')
+        self.nueva_evidencia(actividad, estado_revision='aprobada')
+        detalle = reverse('actividad_detalle', args=[actividad.codigo_verificador])
+        self.client.force_login(self.usuario_verificador)
+        self.assertNotContains(self.client.get(detalle), 'no admite nuevas evidencias')
+        self.client.force_login(self.usuario_autor)
+        self.assertContains(self.client.get(detalle), 'no admite nuevas evidencias')
+
 
 class RevisionPorDelegadoTests(EscenarioBase, TestCase):
     """El delegado revisa las evidencias de su delegación, nunca las propias."""
