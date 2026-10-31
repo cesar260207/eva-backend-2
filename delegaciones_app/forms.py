@@ -325,6 +325,26 @@ class EvidenciaForm(FormularioBootstrap, forms.ModelForm):
         self.fields['archivo_vinculo'].required = True
 
 
+class RevisionForm(FormularioBootstrap, forms.Form):
+    """Decisión sobre las evidencias pendientes de una actividad: aprobar, o rechazar indicando el motivo (RN-009).
+    La decisión llega en la URL del botón que se pulsó; el motivo, en el formulario."""
+
+    DECISIONES = [('aprobar', 'Aprobar'), ('rechazar', 'Rechazar')]
+    MENSAJE_SIN_MOTIVO = 'El rechazo de una evidencia exige un motivo: quien registró la actividad lo necesita para corregirla.'
+
+    decision = forms.ChoiceField(choices=DECISIONES)
+    observacion = forms.CharField(
+        label='Motivo u observación', required=False, max_length=1000,
+        widget=forms.Textarea(attrs={'class': 'mb-3', 'rows': 2, 'placeholder': 'Obligatorio para rechazar'}),
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get('decision') == 'rechazar' and not cleaned_data.get('observacion'):
+            self.add_error('observacion', self.MENSAJE_SIN_MOTIVO)
+        return cleaned_data
+
+
 class CompromisoForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm):
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)

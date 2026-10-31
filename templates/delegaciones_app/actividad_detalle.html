@@ -34,8 +34,8 @@
             <p class="small text-muted">Aprueba si la evidencia respalda la actividad. Si no, recházala indicando el motivo: quien la registró podrá corregir y subir una evidencia nueva.</p>
             <form method="post">
                 {% csrf_token %}
-                <label class="form-label" for="observacion">Motivo u observación</label>
-                <textarea class="form-control mb-3" id="observacion" name="observacion" rows="2" placeholder="Obligatorio para rechazar"></textarea>
+                <label class="form-label" for="{{ revision_form.observacion.id_for_label }}">{{ revision_form.observacion.label }}</label>
+                {{ revision_form.observacion }}
                 <div class="d-flex flex-wrap gap-2">
                     <button class="btn btn-sgr" type="submit" formaction="{% url 'revisar_actividad' actividad.codigo_verificador 'aprobar' %}">Aprobar</button>
                     <button class="btn btn-outline-danger" type="submit" formaction="{% url 'revisar_actividad' actividad.codigo_verificador 'rechazar' %}">Rechazar</button>

@@ -7,6 +7,7 @@ from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
+from .forms import RevisionForm
 from .models import Auditoria, Funcionario, Indicador, MedicionDelegacion, Meta, Validacion
 from .pruebas_base import EscenarioBase, crear_funcionario
 
@@ -464,3 +465,39 @@ class EliminarActividadSoloCoordinacionTests(EscenarioBase, TestCase):
         self.assertNotContains(lista, eliminar)
         self.client.force_login(self.coordinador)
         self.assertContains(self.client.get(reverse('actividades')), eliminar)
+
+class RevisionFormTests(EscenarioBase, TestCase):
+    """RevisionForm: el formulario de Django que valida la decisión de quien revisa y su motivo."""
+
+    def test_aprobar_no_exige_motivo(self):
+        """CU-11 Validación de actividades (RF-013). Aprobar con o sin observación es válido."""
+        self.assertTrue(RevisionForm({'decision': 'aprobar', 'observacion': ''}).is_valid())
+        self.assertTrue(RevisionForm({'decision': 'aprobar', 'observacion': 'Conforme'}).is_valid())
+
+    def test_rechazar_exige_motivo_aunque_venga_en_blanco(self):
+        """CU-11.1 Registrar trazabilidad de decisión (RF-013, RF-014). Rechazar sin motivo, o solo con espacios, no es válido."""
+        for observacion in ('', '   '):
+            form = RevisionForm({'decision': 'rechazar', 'observacion': observacion})
+            self.assertFalse(form.is_valid())
+            self.assertEqual(form.errors['observacion'], [RevisionForm.MENSAJE_SIN_MOTIVO])
+        self.assertTrue(RevisionForm({'decision': 'rechazar', 'observacion': 'Falta la firma'}).is_valid())
+
+    def test_solo_se_acepta_aprobar_o_rechazar(self):
+        """CU-11 Validación de actividades (RF-013). «Solicitar corrección» ya no existe: otra decisión no es válida."""
+        self.assertIn('decision', RevisionForm({'decision': 'corregir', 'observacion': 'Falta la firma'}).errors)
+
+    def test_el_motivo_tiene_un_largo_maximo(self):
+        """CU-11.1 Registrar trazabilidad de decisión (RF-014). El motivo admite hasta 1000 caracteres."""
+        self.assertIn('observacion', RevisionForm({'decision': 'rechazar', 'observacion': 'x' * 1001}).errors)
+
+    def test_la_vista_usa_el_formulario_y_no_registra_un_rechazo_sin_motivo(self):
+        """CU-11.1 Registrar trazabilidad de decisión (RF-013). Sin motivo no se crea ninguna validación y se explica por qué."""
+        self.crear_escenario()
+        actividad = self.nueva_actividad()
+        self.nueva_evidencia(actividad)
+        self.client.force_login(self.usuario_verificador)
+        detalle = self.client.get(reverse('actividad_detalle', args=[actividad.codigo_verificador]))
+        self.assertIsInstance(detalle.context['revision_form'], RevisionForm)
+        respuesta = self.client.post(reverse('revisar_actividad', args=[actividad.codigo_verificador, 'rechazar']), {'observacion': ''}, follow=True)
+        self.assertContains(respuesta, 'quien registró la actividad lo necesita para corregirla')
+        self.assertFalse(Validacion.objects.exists())

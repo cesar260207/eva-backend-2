@@ -12,7 +12,7 @@ from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from .forms import ActividadForm, AsignarDelegadoForm, CompromisoForm, EvidenciaForm
+from .forms import ActividadForm, AsignarDelegadoForm, CompromisoForm, EvidenciaForm, RevisionForm
 from .informes import PLAZOS, filtrar_actividades, filtrar_compromisos, resumen_por_responsable, situacion_de_plazo
 from .medicion import periodo_vigente, promedio_general, resultados_por_delegacion
 from .models import Actividad, Auditoria, Compromiso, Delegacion, Evidencia, Funcionario, Periodo, Validacion
@@ -274,6 +274,7 @@ def actividad_detalle(request, codigo):
         'puede_validar': puede_revisar(request.user) and not es_autor,
         'puede_anular': puede_revisar(request.user) and not es_autor and actividad.estado == 'aprobada' and actividad.item.periodo.estado != 'cerrado',
         'hay_pendientes': any(evidencia.estado_revision == 'pendiente' for evidencia in actividad.evidencias.all()),
+        'revision_form': RevisionForm(),
     })
 
 
@@ -323,7 +324,8 @@ def evidencia_archivo(request, codigo):
 
 @login_required
 def revisar_actividad(request, codigo, decision):
-    """Aprueba o rechaza (con motivo): una Validacion por cada evidencia pendiente (RN-009)."""
+    """Aprueba o rechaza (con motivo): una Validacion por cada evidencia pendiente (RN-009). RevisionForm
+    valida la decisión y el motivo antes de tocar la base de datos."""
     if request.method != 'POST' or decision not in DECISIONES:
         return redirect('actividad_detalle', codigo=codigo)
     if not puede_revisar(request.user):
@@ -340,7 +342,13 @@ def revisar_actividad(request, codigo, decision):
     if not pendientes:
         messages.error(request, 'La actividad no tiene evidencias pendientes de revisión.')
         return redirect('actividad_detalle', codigo=codigo)
-    observacion = request.POST.get('observacion', '').strip()
+    datos = request.POST.copy()
+    datos['decision'] = decision
+    form = RevisionForm(datos)
+    if not form.is_valid():
+        messages.error(request, ' '.join(error for errores in form.errors.values() for error in errores))
+        return redirect('actividad_detalle', codigo=codigo)
+    observacion = form.cleaned_data['observacion']
     estado_anterior = actividad.estado
     try:
         with transaction.atomic():
