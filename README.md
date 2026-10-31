@@ -229,7 +229,7 @@ Administrador > Coordinador > Delegado > Funcionario, y cada perfil tiene todos 
 | Administrador | Administrador (acceso total) | administrador | Los 8 mantenedores, gestión de usuarios y perfiles, todas las transacciones, auditoría, visión global | — |
 | Coordinador | Supervisor (intermedio) | coordinador | 6 mantenedores (delegaciones, cargos, catálogo, períodos, ítems, metas), transacciones, revisión de evidencias y asignación de delegados en todas las delegaciones | Usuarios, roles, perfiles, auditoría |
 | Delegado | Supervisor (intermedio) | delegado, verificador | Revisar evidencias (aprobar, rechazar, anular) y trabajar el tubo y las actividades, solo en su delegación | Mantenedores, usuarios, eliminar, otras delegaciones, auditoría |
-| Funcionario | Administrativo (mínimo) | funcionario, consulta | Registrar y seguir sus actividades, evidencias y tareas; su ficha | Revisar evidencias, mantenedores, usuarios, eliminar tareas, cerrar períodos, auditoría |
+| Funcionario | Administrativo (mínimo) | funcionario, consulta | Registrar y seguir sus actividades, evidencias y tareas; su ficha | Revisar evidencias, mantenedores, usuarios, eliminar actividades o tareas, cerrar períodos, auditoría |
 
 - Los grupos y sus permisos (`view`, `add`, `change`, `delete` de cada tabla) los crean las migraciones
   `0015_perfiles_de_acceso` (tres perfiles iniciales) y `0018_perfiles_por_jerarquia` (renombra

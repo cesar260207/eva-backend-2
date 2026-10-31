@@ -421,3 +421,46 @@ class ListasSinBotonesFalsosTests(EscenarioBase, TestCase):
         self.client.force_login(self.usuario_autor)
         respuesta = self.client.get(reverse('delegacion_detalle', args=['Centro']), {'q': 'luminaria'})
         self.assertEqual([c.folio for c in respuesta.context['solicitudes']], ['LST-2'])
+
+class EliminarActividadSoloCoordinacionTests(EscenarioBase, TestCase):
+    """Eliminar actividades es una operación crítica: solo Coordinador y Administrador (permiso delete_actividad)."""
+
+    def setUp(self):
+        self.crear_escenario()
+        self.delegado = crear_funcionario('delegado-elim', 'delegado', cargo=self.cargo, delegacion=self.centro)
+        self.coordinador = crear_funcionario('coord-elim', 'coordinador', cargo=self.cargo)
+        self.administrador = crear_funcionario('admin-elim', 'administrador', cargo=self.cargo)
+
+    def test_el_autor_funcionario_o_delegado_no_elimina_su_actividad(self):
+        """CU-26.1 Restringir operaciones críticas (RF-002, RF-009). Sin el permiso, el autor no elimina: el intento se audita."""
+        for usuario in (self.usuario_autor, self.delegado):
+            actividad = self.nueva_actividad(funcionario_autor=usuario.funcionario)
+            self.client.force_login(usuario)
+            url = reverse('actividad_eliminar', args=[actividad.codigo_verificador])
+            detalle = reverse('actividad_detalle', args=[actividad.codigo_verificador])
+            self.assertRedirects(self.client.get(url), detalle, msg_prefix=usuario.username)
+            respuesta = self.client.post(url, follow=True)
+            self.assertContains(respuesta, 'Modificar actividad', msg_prefix=usuario.username)
+            self.assertTrue(type(actividad).objects.filter(pk=actividad.pk).exists(), usuario.username)
+            self.assertTrue(Auditoria.objects.filter(evento='acceso_denegado', identificador_registro=actividad.codigo_verificador).exists())
+
+    def test_coordinador_y_administrador_eliminan_tras_confirmar(self):
+        """CU-26.1 Restringir operaciones críticas (RF-002, RF-009). Con el permiso, se confirma y la actividad se elimina."""
+        for usuario in (self.coordinador, self.administrador):
+            actividad = self.nueva_actividad()
+            url = reverse('actividad_eliminar', args=[actividad.codigo_verificador])
+            self.client.force_login(usuario)
+            self.assertTemplateUsed(self.client.get(url), 'delegaciones_app/actividad_confirmar_eliminar.html')
+            self.client.post(url)
+            self.assertFalse(type(actividad).objects.filter(pk=actividad.pk).exists(), usuario.username)
+
+    def test_el_boton_eliminar_solo_aparece_con_el_permiso(self):
+        """CU-26.1 Restringir operaciones críticas (RF-002, RF-032). La lista ofrece Eliminar solo a quien puede eliminar."""
+        actividad = self.nueva_actividad()
+        eliminar = reverse('actividad_eliminar', args=[actividad.codigo_verificador])
+        self.client.force_login(self.usuario_autor)
+        lista = self.client.get(reverse('actividades'))
+        self.assertContains(lista, reverse('actividad_editar', args=[actividad.codigo_verificador]))
+        self.assertNotContains(lista, eliminar)
+        self.client.force_login(self.coordinador)
+        self.assertContains(self.client.get(reverse('actividades')), eliminar)

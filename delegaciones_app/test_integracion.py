@@ -968,8 +968,10 @@ class ActividadVistasTests(BaseOperacion):
 		self.client.force_login(self.funcionario)
 		respuesta = self.client.get(reverse('actividades'))
 		self.assertContains(respuesta, reverse('actividad_editar', args=[actividad.codigo_verificador]))
-		self.assertContains(respuesta, reverse('actividad_eliminar', args=[actividad.codigo_verificador]))
+		self.assertNotContains(respuesta, reverse('actividad_eliminar', args=[actividad.codigo_verificador]))
 		self.assertNotContains(respuesta, 'href="#"')
+		self.client.force_login(self.coordinador)
+		self.assertContains(self.client.get(reverse('actividades')), reverse('actividad_eliminar', args=[actividad.codigo_verificador]))
 
 	def test_autor_edita_su_actividad_y_audita(self):
 		actividad = self._actividad()
@@ -1031,7 +1033,7 @@ class ActividadVistasTests(BaseOperacion):
 		actividad = self._actividad()
 		self._evidencia(actividad)
 		url = reverse('actividad_eliminar', args=[actividad.codigo_verificador])
-		self.client.force_login(self.funcionario)
+		self.client.force_login(self.coordinador)
 
 		respuesta = self.client.get(url)
 		self.assertEqual(respuesta.context['total_evidencias'], 1)

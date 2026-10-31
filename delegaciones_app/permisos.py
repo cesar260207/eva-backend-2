@@ -116,6 +116,15 @@ def puede_crear_tarea(user):
     return tiene_rol(user, *ROLES_CREAN_TAREAS)
 
 
+# Eliminar actividades es una operación crítica: solo los perfiles con este permiso (Coordinador y Administrador).
+# Delegado y Funcionario corrigen sus errores con «Modificar actividad».
+PERMISO_ELIMINAR_ACTIVIDAD = 'delegaciones_app.delete_actividad'
+
+
+def puede_eliminar_actividad(user):
+    return user.has_perm(PERMISO_ELIMINAR_ACTIVIDAD)
+
+
 def puede_revisar(user):
     """Aprueba, rechaza o anula evidencias: un rol revisor con el permiso de su perfil. El perfil Funcionario
     no tiene ese permiso, así que nunca revisa aunque tenga asignado un rol revisor."""

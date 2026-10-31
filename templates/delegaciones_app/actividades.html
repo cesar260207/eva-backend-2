@@ -45,7 +45,7 @@
                             {% if actividad.puede_subir_evidencia %}<a class="btn btn-sm btn-sgr" href="{% url 'evidencia_subir' actividad.codigo_verificador %}">Subir evidencia</a>{% endif %}
                             {% if not actividad.bloqueo %}
                             <a class="btn btn-sm btn-outline-sgr" href="{% url 'actividad_editar' actividad.codigo_verificador %}">Modificar</a>
-                            <a class="btn btn-sm btn-outline-danger" href="{% url 'actividad_eliminar' actividad.codigo_verificador %}">Eliminar</a>
+                            {% if puede_eliminar %}<a class="btn btn-sm btn-outline-danger" href="{% url 'actividad_eliminar' actividad.codigo_verificador %}">Eliminar</a>{% endif %}
                             {% endif %}
                         </div>
                     </td>

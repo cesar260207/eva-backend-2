@@ -39,6 +39,11 @@ class PerfilesTests(TestCase):
         self.assertFalse({p for p in permisos[PERFIL_DELEGADO] if p.startswith('delete_') or p.endswith(('_catalogo', '_periodo', '_meta'))})
         self.assertFalse({p for p in permisos[PERFIL_FUNCIONARIO] if p.startswith('delete_') or p.endswith('_validacion')})
 
+    def test_solo_coordinador_y_administrador_tienen_permiso_de_eliminar_actividades(self):
+        """CU-26.1 Restringir operaciones críticas (RF-002). La migración 0019 da delete_actividad al Coordinador; Delegado y Funcionario no lo tienen."""
+        tienen = {nombre: Group.objects.get(name=nombre).permissions.filter(codename='delete_actividad').exists() for nombre in PERFILES}
+        self.assertEqual(tienen, {PERFIL_ADMINISTRADOR: True, PERFIL_COORDINADOR: True, PERFIL_DELEGADO: False, PERFIL_FUNCIONARIO: False})
+
     def test_el_perfil_se_deduce_de_los_roles(self):
         """CU-26 Asignar perfil según roles (RF-002). Administrador, coordinador, delegado o verificador, y los demás."""
         esperados = {

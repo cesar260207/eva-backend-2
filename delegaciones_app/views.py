@@ -17,7 +17,7 @@ from .informes import PLAZOS, filtrar_actividades, filtrar_compromisos, resumen_
 from .medicion import periodo_vigente, promedio_general, resultados_por_delegacion
 from .models import Actividad, Auditoria, Compromiso, Delegacion, Evidencia, Funcionario, Periodo, Validacion
 from .permisos import (
-    ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICADOR, delegacion_propia, funcionario_de, puede_crear_tarea, puede_revisar,
+    ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICADOR, delegacion_propia, funcionario_de, puede_crear_tarea, puede_eliminar_actividad, puede_revisar,
     puede_ver_todo, registrar_acceso_denegado, rol_requerido, tiene_rol,
 )
 
@@ -97,6 +97,7 @@ def _url_de_lista(request, lista):
 
 
 MENSAJE_SOLO_AUTOR = 'Solo quien registró la actividad o la coordinación puede modificarla.'
+MENSAJE_SIN_PERMISO_ELIMINAR = 'Eliminar actividades lo hace la coordinación. Si hay un error, corrígelo con «Modificar actividad».'
 
 
 def _bloqueo_actividad(funcionario, actividad, ve_todo):
@@ -250,7 +251,7 @@ def actividades(request):
         'actividades': registros, 'query': query, 'puede_crear': request.user.is_authenticated,
         'filtros': request.GET, 'filtrado': any(request.GET.get(clave) for clave in ('q', 'delegacion', 'estado', 'periodo', 'desde', 'hasta')),
         'delegaciones_filtro': _delegaciones_visibles(request.user), 'periodos_filtro': Periodo.objects.order_by('-fecha_inicio'),
-        'estados_filtro': Actividad.ESTADOS,
+        'estados_filtro': Actividad.ESTADOS, 'puede_eliminar': puede_eliminar_actividad(request.user),
     })
 
 
@@ -427,7 +428,13 @@ def actividad_editar(request, codigo):
 
 @login_required
 def actividad_eliminar(request, codigo):
+    """Elimina la actividad y sus evidencias tras confirmar. Exige el permiso delete_actividad (Coordinador o
+    Administrador): es una operación crítica que el perfil mínimo no hace (CU-26.1)."""
     actividad = _obtener_autorizado(request, _actividades_autorizadas(request.user), 'Actividad', codigo_verificador=codigo)
+    if not puede_eliminar_actividad(request.user):
+        registrar_acceso_denegado(request, 'Actividad', codigo, 'permiso insuficiente')
+        messages.error(request, MENSAJE_SIN_PERMISO_ELIMINAR)
+        return redirect('actividad_detalle', codigo=codigo)
     bloqueo = _bloqueo_actividad(funcionario_de(request.user), actividad, puede_ver_todo(request.user))
     if bloqueo:
         if bloqueo == MENSAJE_SOLO_AUTOR:
