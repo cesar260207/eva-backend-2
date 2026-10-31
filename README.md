@@ -220,6 +220,61 @@ Los datos son sinteticos y solo sirven para demostracion academica.
 - **Revisión:** aprobar, o rechazar indicando el motivo. Quien registró corrige y sube una evidencia
   nueva, y la actividad vuelve a revisión. Nadie revisa una actividad que registró él mismo.
 
+## Transacciones
+
+Las cuatro transacciones del sistema. Cada una valida los datos con un formulario de Django, guarda dentro
+de `transaction.atomic()` (si algo falla no queda nada a medias), deja un registro en la auditoría y
+responde con un mensaje de éxito o de error.
+
+### 1. Registro de actividad
+
+- **Quién:** cualquier funcionario con cuenta. Queda como autor y la actividad, en su delegación.
+- **Dónde:** `/actividad/nueva/` (vista `actividad_nueva`, formulario `ActividadForm`).
+- **Validaciones:** campos obligatorios, fecha dentro del período del ítem, ítem de un período abierto,
+  teléfono con formato válido. Al modificar, el control de versión rechaza los cambios si otra persona
+  guardó antes.
+- **Qué guarda:** la actividad con un código verificador único e inmutable (`EVD-fecha-sufijo`) y el
+  evento `crear` en la auditoría. Luego lleva a «Subir evidencia».
+- **Después:** el autor o la coordinación la modifican mientras no esté aprobada ni su período esté
+  cerrado. Eliminarla es una operación crítica: exige el permiso `delete_actividad` (Coordinador y
+  Administrador) y una confirmación que avisa cuántas evidencias se borran con ella.
+
+### 2. Carga y revisión de evidencias
+
+- **Carga:** `/actividad/<código>/evidencia/` (vista `evidencia_subir`, formulario `EvidenciaForm`). Solo
+  el autor sube evidencias, en JPG, PNG o PDF de hasta 5 MB. La evidencia queda pendiente de revisión.
+- **Revisión:** botones Aprobar y Rechazar del detalle de la actividad (vista `revisar_actividad`,
+  formulario `RevisionForm`). Revisa quien tiene un rol revisor y el permiso `add_validacion` de su
+  perfil, dentro de su ámbito y nunca sobre una actividad propia. Rechazar exige un motivo.
+- **Qué guarda:** una `Validacion` por cada evidencia pendiente, el nuevo estado de la actividad, el
+  recálculo de los indicadores de las metas y el evento `aprobar` o `rechazar` en la auditoría. Si se
+  rechaza, el autor corrige y la actividad vuelve a revisión.
+- **Anulación:** una aprobación se anula con motivo (vista `anular_actividad`): la actividad deja de sumar
+  al avance y la validación original queda en el historial.
+
+### 3. Tubo de trabajo (tareas con la comunidad)
+
+- **Quién:** administración y coordinación, para cualquier delegación y eligiendo al responsable; delegado
+  y funcionario, para su delegación y a su cargo (`permisos.ROLES_CREAN_TAREAS`).
+- **Dónde:** `/agenda/`, botón «+ Agregar al tubo de trabajo» (vista `compromiso_nuevo`, formulario
+  `CompromisoForm`).
+- **Qué guarda:** la tarea con un folio único (`AGR-fecha-sufijo`), su primera línea de historial
+  («Creación de la tarea») y el evento `crear` en la auditoría.
+- **Cambios de estado:** Ingresada, Pendiente, En proceso y Realizada, solo por transiciones permitidas
+  (`Compromiso.set_estado`). Los hace el responsable o la coordinación; cada cambio agrega una línea al
+  historial con su observación y queda en la auditoría.
+- **Eliminar:** solo coordinación y administración. Una tarea vencida sin realizar no se elimina: se
+  conserva con su historial.
+
+### 4. Asignación de delegados
+
+- **Quién:** la coordinación y la administración.
+- **Dónde:** `/coordinacion/delegados/` (vista `delegados`, formulario `AsignarDelegadoForm`).
+- **Validaciones:** solo funcionarios activos con el rol delegado y delegaciones activas; no se asigna a
+  alguien a la delegación que ya tiene.
+- **Qué guarda:** la nueva delegación del funcionario y el evento `asignar_delegado` en la auditoría, con
+  la delegación anterior y la nueva. Desde ese momento el delegado ve y revisa solo esa delegación.
+
 ## Seguridad y perfiles
 
 Perfil = nivel de permisos (grupo de Django); rol = función y alcance (tabla `rol`). La jerarquía es
@@ -228,14 +283,16 @@ Administrador > Coordinador > Delegado > Funcionario, y cada perfil tiene todos 
 | Perfil (grupo Django) | En la pauta | Roles que lo usan | Puede | No puede |
 |---|---|---|---|---|
 | Administrador | Administrador (acceso total) | administrador | Los 8 mantenedores, gestión de usuarios y perfiles, todas las transacciones, auditoría, visión global | — |
-| Coordinador | Supervisor (intermedio) | coordinador | 6 mantenedores (delegaciones, cargos, catálogo, períodos, ítems, metas), transacciones, revisión de evidencias y asignación de delegados en todas las delegaciones | Usuarios, roles, perfiles, auditoría |
+| Coordinador | Supervisor (intermedio) | coordinador | 6 mantenedores (delegaciones, cargos, catálogo, períodos, ítems, metas), transacciones, revisión de evidencias, asignación de delegados y eliminación de actividades y tareas en todas las delegaciones | Usuarios, roles, perfiles, auditoría |
 | Delegado | Supervisor (intermedio) | delegado, verificador | Revisar evidencias (aprobar, rechazar, anular) y trabajar el tubo y las actividades, solo en su delegación | Mantenedores, usuarios, eliminar, otras delegaciones, auditoría |
 | Funcionario | Administrativo (mínimo) | funcionario, consulta | Registrar y seguir sus actividades, evidencias y tareas; su ficha | Revisar evidencias, mantenedores, usuarios, eliminar actividades o tareas, cerrar períodos, auditoría |
 
 - Los grupos y sus permisos (`view`, `add`, `change`, `delete` de cada tabla) los crean las migraciones
   `0015_perfiles_de_acceso` (tres perfiles iniciales) y `0018_perfiles_por_jerarquia` (renombra
   Supervisor a Coordinador y Administrativo a Funcionario, crea Delegado y mueve allí a los delegados y
-  verificadores).
+  verificadores). La `0019_eliminar_actividad_solo_coordinacion` da al Coordinador el permiso
+  `delete_actividad`: eliminar actividades es una operación crítica que Delegado y Funcionario no hacen
+  (corrigen con «Modificar actividad»).
 - Revisar evidencias exige el rol (delegado, verificador, coordinador o administrador) **y** el permiso
   `add_validacion` del perfil (`permisos.puede_revisar`): el perfil Funcionario nunca revisa. El delegado
   revisa solo las actividades de su delegación; las de otra responden 404.
