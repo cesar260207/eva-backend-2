@@ -445,10 +445,22 @@ mysqldump -u gestion_user -p gestion_laserena > respaldo_$(date +%F).sql
 git pull
 source venv/bin/activate && pip install -r requirements.txt
 nano .env                                  # agregar EMAIL_BACKEND, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD...
-python manage.py migrate                   # 0015 crea los perfiles y asigna uno a cada usuario
+python manage.py migrate --plan            # lista las migraciones pendientes antes de aplicarlas
+python manage.py migrate
 python manage.py collectstatic --noinput
 sudo systemctl restart gunicorn
 ```
+
+Qué hace cada migración de la Evaluación Sumativa 3 (todas son reversibles):
+
+| Migración | Qué cambia | ¿Toca datos? |
+|---|---|---|
+| `0015_perfiles_de_acceso` | Crea los perfiles como grupos de Django y asigna uno a cada usuario según sus roles | Sí: `auth_group`, `auth_group_permissions`, `auth_user_groups` |
+| `0016_textos_tubo_de_trabajo` | Nombres visibles «tarea» y «tubo de trabajo» | No: solo textos, sin SQL |
+| `0017_sin_solicitar_correccion` | Las actividades, evidencias y validaciones en «corrección» pasan a «rechazada» y conservan su observación | Sí: actualiza esas filas, no borra ninguna |
+| `0018_perfiles_por_jerarquia` | Renombra Supervisor a Coordinador y Administrativo a Funcionario, crea Delegado y mueve allí a los delegados y verificadores | Sí: grupos y asignaciones de usuarios |
+| `0019_eliminar_actividad_solo_coordinacion` | Da al Coordinador el permiso `delete_actividad` | Sí: una fila de `auth_group_permissions` |
+| `0020_nombres_legibles_de_modelos` | Nombres legibles de cinco modelos | No: solo textos, sin SQL |
 
 ### 6. Migraciones, datos demo y estaticos
 

@@ -10,7 +10,9 @@ permisos de `django.contrib.auth` (`auth_group`, `auth_group_permissions`, `auth
 La migración `0015_perfiles_de_acceso` creó los tres perfiles de la pauta (Administrador, Supervisor y
 Administrativo) y la `0018_perfiles_por_jerarquia` los dejó según la jerarquía de la Municipalidad:
 renombra Supervisor a Coordinador y Administrativo a Funcionario (conservan su id, permisos y usuarios),
-crea Delegado y mueve allí a los usuarios con rol delegado o verificador.
+crea Delegado y mueve allí a los usuarios con rol delegado o verificador. La
+`0019_eliminar_actividad_solo_coordinacion` agrega al Coordinador el permiso `delete_actividad`
+(una fila de `auth_group_permissions`): eliminar actividades queda para Coordinador y Administrador.
 
 **Perfil y rol.** El perfil es el nivel de permisos; el rol, la función y el alcance. Los dos roles que
 revisan evidencias quedan así:
