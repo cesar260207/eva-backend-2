@@ -844,7 +844,7 @@ class HistorialCompromiso(models.Model):
 		return f'{self.compromiso.folio}: {self.estado_anterior or "inicio"} -> {self.estado_nuevo}'
 
 
-MENSAJE_AUDITORIA_SOLO_LECTURA = 'La auditoría es de solo lectura: sus registros no se modifican ni se eliminan (RNF-008).'
+MENSAJE_AUDITORIA_SOLO_LECTURA = 'La auditoría es de solo lectura: sus registros no se modifican ni se eliminan.'
 
 
 class AuditoriaQuerySet(models.QuerySet):

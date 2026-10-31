@@ -1,11 +1,13 @@
 """Pruebas unitarias transversales: permisos y ámbito, auditoría inmutable, registro de mantenedores e informes exportables."""
 import csv
 import io
+import re
 from datetime import date
 
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ValidationError
 from django.test import RequestFactory, TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from . import crud
@@ -436,3 +438,37 @@ class AdvertenciaMetaUnitTests(EscenarioBase, TestCase):
         Indicador.generar(meta)
         Indicador.generar(meta)
         self.assertIn('2 indicador(es)', crud._advertencia_meta(meta))
+
+
+class SinTextosDeDesarrolloTests(EscenarioBase, TestCase):
+    """Las pantallas no muestran códigos internos del equipo (épicas, historias, requisitos) ni marcas de prototipo."""
+
+    CODIGOS = re.compile(r'\b(EP|HU|RF|RNF|RN|CU)-\d+|\bMVP\b')
+
+    def setUp(self):
+        self.crear_escenario()
+        self.actividad = self.nueva_actividad()
+        self.nueva_evidencia(self.actividad)
+
+    def _sin_codigos(self, url):
+        respuesta = self.client.get(url)
+        self.assertEqual(respuesta.status_code, 200, url)
+        self.assertIsNone(self.CODIGOS.search(respuesta.content.decode('utf-8')), url)
+
+    def test_ninguna_pantalla_muestra_codigos_internos(self):
+        """CU-26 Administración sin Django Admin (RNF-004). Textos para el usuario, no para el equipo de desarrollo."""
+        for url in (reverse('inicio'), reverse('login'), reverse('password_reset'), reverse('institucional')):
+            self._sin_codigos(url)
+        comunes = [
+            reverse('panel'), reverse('actividades'), reverse('agenda'), reverse('dashboard'), reverse('semaforo'), reverse('resumen'),
+            reverse('informe'), reverse('alertas'), reverse('ficha_personal'), reverse('actividad_detalle', args=[self.actividad.codigo_verificador]),
+        ]
+        administrador = crear_funcionario('admin-textos', 'administrador', cargo=self.cargo)
+        administracion = [reverse('mantenedores'), reverse('auditoria_consulta'), reverse('perfiles'), reverse('delegados'), reverse('actividad_nueva'), reverse('compromiso_nuevo')]
+        administracion += [reverse('mantenedor_lista', args=[slug]) for slug in crud.MANTENEDORES]
+        administracion += [reverse('mantenedor_nuevo', args=[slug]) for slug in crud.MANTENEDORES]
+        delegado = crear_funcionario('delegado-textos', 'delegado', cargo=self.cargo, delegacion=self.centro)
+        for usuario, urls in ((administrador, comunes + administracion), (delegado, comunes), (self.usuario_autor, comunes)):
+            self.client.force_login(usuario)
+            for url in urls:
+                self._sin_codigos(url)

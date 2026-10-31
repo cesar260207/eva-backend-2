@@ -184,7 +184,7 @@ class PeriodoForm(FormularioBootstrap, forms.ModelForm):
         model = Periodo
         fields = ['nombre', 'fecha_inicio', 'fecha_termino', 'umbral_minimo']
         labels = {'nombre': 'Nombre del período', 'fecha_inicio': 'Fecha de inicio', 'fecha_termino': 'Fecha de término', 'umbral_minimo': 'Umbral colectivo (%)'}
-        help_texts = {'umbral_minimo': 'Porcentaje mínimo para considerar cumplida la meta colectiva (RN-006).'}
+        help_texts = {'umbral_minimo': 'Porcentaje mínimo para considerar cumplida la meta colectiva.'}
         widgets = {
             'fecha_inicio': forms.DateInput(attrs={'type': 'date'}),
             'fecha_termino': forms.DateInput(attrs={'type': 'date'}),
@@ -203,7 +203,7 @@ class ItemMedibleForm(FormularioBootstrap, forms.ModelForm):
         model = ItemMedible
         fields = ['cargo', 'periodo', 'nombre', 'servicio', 'ponderacion']
         labels = {'ponderacion': 'Ponderación (%)'}
-        help_texts = {'ponderacion': 'Las ponderaciones de un cargo en un período deben sumar 100 % (RN-001).'}
+        help_texts = {'ponderacion': 'Las ponderaciones de un cargo en un período deben sumar 100 %.'}
         widgets = {'ponderacion': forms.NumberInput(attrs={'min': 0, 'max': 100, 'step': '0.01'})}
 
     def __init__(self, *args, **kwargs):
@@ -221,7 +221,7 @@ class MetaForm(FormularioBootstrap, forms.ModelForm):
         model = Meta
         fields = ['item', 'funcionario', 'valor_objetivo', 'unidad', 'ponderador']
         labels = {'item': 'Ítem medible', 'valor_objetivo': 'Valor objetivo', 'ponderador': 'Ponderador (%)'}
-        help_texts = {'valor_objetivo': 'Debe ser mayor que cero (RN-002).', 'ponderador': 'Peso de la meta en el cumplimiento colectivo.'}
+        help_texts = {'valor_objetivo': 'Debe ser mayor que cero.', 'ponderador': 'Peso de la meta en el cumplimiento colectivo.'}
         widgets = {
             'valor_objetivo': forms.NumberInput(attrs={'min': 0.01, 'step': '0.01'}),
             'ponderador': forms.NumberInput(attrs={'min': 0, 'max': 100, 'step': '0.01'}),
