@@ -201,8 +201,8 @@ Los datos son sinteticos y solo sirven para demostracion academica.
 
 | Rol | Qué hace | Qué ve |
 |---|---|---|
-| Coordinador | Gestiona a los delegados: los asigna a su delegación (`/coordinacion/delegados/`) y les asigna compromisos | Todas las delegaciones |
-| Delegado | Trabaja su delegación: revisa (aprueba o rechaza) las evidencias de su delegación y registra compromisos tomados en terreno | Solo su delegación (registros y métricas) |
+| Coordinador | Gestiona a los delegados: asigna o cambia el delegado de cada delegación (`/coordinacion/delegados/`), les asigna tareas del tubo, revisa evidencias y sigue el avance de todas. No hace el trabajo operativo: no sube evidencias en nombre de otros. Su panel muestra todas las delegaciones con su avance y su delegado | Todas las delegaciones |
+| Delegado | Trabaja su delegación: revisa (aprueba o rechaza) sus evidencias, registra actividades y tareas tomadas en terreno. Su panel muestra lo que espera su revisión, su tubo de trabajo y sus métricas | Solo su delegación (registros y métricas) |
 | Verificador | Revisa evidencias | Su delegación si tiene una; si no, todas |
 | Funcionario | Registra actividades, sube evidencias y registra compromisos de su delegación | Su delegación |
 
@@ -214,7 +214,7 @@ Los datos son sinteticos y solo sirven para demostracion academica.
 
   Los paneles, la pantalla de delegados y la página de cada delegación solo llevan al tubo («Ver tubo de
   trabajo»). La regla está en `permisos.ROLES_CREAN_TAREAS`. Solo coordinación y administración eliminan tareas.
-- **Evidencias:** se suben desde el botón «Subir evidencia» (lista o detalle), separado de
+- **Evidencias:** solo quien registró la actividad las sube, desde el botón «Subir evidencia» (lista o detalle), separado de
   «Modificar». La lista de actividades indica si cada una tiene evidencia cargada.
 - **Revisión:** aprobar, o rechazar indicando el motivo. Quien registró corrige y sube una evidencia
   nueva, y la actividad vuelve a revisión. Nadie revisa una actividad que registró él mismo.

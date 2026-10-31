@@ -236,6 +236,26 @@ class MetaForm(FormularioBootstrap, forms.ModelForm):
             self.fields['item'].queryset = ItemMedible.objects.select_related('cargo', 'periodo')
 
 
+class AsignarDelegadoForm(FormularioBootstrap, forms.Form):
+    """Coordinación: asigna un delegado a una delegación o lo cambia de delegación."""
+
+    funcionario = forms.ModelChoiceField(queryset=Funcionario.objects.none(), label='Delegado')
+    delegacion = forms.ModelChoiceField(queryset=Delegacion.objects.filter(estado=True), label='Delegación')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Solo funcionarios activos con el rol delegado; las delegaciones desactivadas no reciben delegados.
+        self.fields['funcionario'].queryset = Funcionario.objects.filter(estado=True, roles__nombre_rol=DELEGADO).select_related('delegacion').distinct()
+        self.fields['funcionario'].label_from_instance = lambda f: f'{f.nombre} · {f.delegacion or "sin delegación"}'
+
+    def clean(self):
+        cleaned_data = super().clean()
+        funcionario, delegacion = cleaned_data.get('funcionario'), cleaned_data.get('delegacion')
+        if funcionario and delegacion and funcionario.delegacion_id == delegacion.pk:
+            raise forms.ValidationError(f'{funcionario.nombre} ya es delegado de {delegacion}.')
+        return cleaned_data
+
+
 class VersionOptimistaForm:
     """Campo oculto `version` para el bloqueo optimista (RF-034): si otro usuario guardó antes, se rechaza."""
 

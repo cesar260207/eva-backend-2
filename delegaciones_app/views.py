@@ -12,7 +12,7 @@ from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from .forms import ActividadForm, CompromisoForm, EvidenciaForm
+from .forms import ActividadForm, AsignarDelegadoForm, CompromisoForm, EvidenciaForm
 from .informes import PLAZOS, filtrar_actividades, filtrar_compromisos, resumen_por_responsable, situacion_de_plazo
 from .medicion import periodo_vigente, promedio_general, resultados_por_delegacion
 from .models import Actividad, Auditoria, Compromiso, Delegacion, Evidencia, Funcionario, Periodo, Validacion
@@ -114,16 +114,17 @@ def _bloqueo_actividad(funcionario, actividad, ve_todo):
     return None
 
 
-MENSAJE_SOLO_AUTOR_EVIDENCIA = 'Solo quien registró la actividad o la coordinación puede subir evidencias.'
+MENSAJE_SOLO_AUTOR_EVIDENCIA = 'Solo quien registró la actividad sube sus evidencias.'
 
 
-def _bloqueo_evidencia(funcionario, actividad, ve_todo):
-    """Motivo por el que el usuario no puede subir evidencia a la actividad, o None."""
+def _bloqueo_evidencia(funcionario, actividad):
+    """Motivo por el que el usuario no puede subir evidencia a la actividad, o None. Sube solo el autor:
+    la coordinación revisa y asigna, pero no hace el trabajo operativo en nombre del delegado o funcionario."""
     if actividad.estado == 'aprobada':
         return 'Actividad aprobada: ya no admite nuevas evidencias.'
     if actividad.item_id and actividad.item.periodo.estado == 'cerrado':
         return 'El período de la actividad está cerrado: no admite nuevas evidencias.'
-    if not (ve_todo or (funcionario and actividad.funcionario_autor_id == funcionario.pk)):
+    if not (funcionario and actividad.funcionario_autor_id == funcionario.pk):
         return MENSAJE_SOLO_AUTOR_EVIDENCIA
     return None
 
@@ -239,7 +240,7 @@ def actividades(request):
     registros = list(registros)
     for actividad in registros:
         actividad.bloqueo = _bloqueo_actividad(funcionario, actividad, ve_todo)
-        actividad.puede_subir_evidencia = _bloqueo_evidencia(funcionario, actividad, ve_todo) is None
+        actividad.puede_subir_evidencia = _bloqueo_evidencia(funcionario, actividad) is None
     return render(request, 'delegaciones_app/actividades.html', {
         'actividades': registros, 'query': query, 'puede_crear': request.user.is_authenticated,
         'filtros': request.GET, 'filtrado': any(request.GET.get(clave) for clave in ('q', 'delegacion', 'estado', 'periodo', 'desde', 'hasta')),
@@ -255,7 +256,7 @@ def actividad_detalle(request, codigo):
     actividades = _actividades_autorizadas(request.user).prefetch_related('evidencias__validaciones__funcionario_verificador')
     actividad = _obtener_autorizado(request, actividades, 'Actividad', codigo_verificador=codigo)
     propio, ve_todo = funcionario_de(request.user), puede_ver_todo(request.user)
-    bloqueo_evidencia = _bloqueo_evidencia(propio, actividad, ve_todo)
+    bloqueo_evidencia = _bloqueo_evidencia(propio, actividad)
     es_autor = bool(propio and actividad.funcionario_autor_id == propio.pk)
     return render(request, 'delegaciones_app/actividad_detalle.html', {
         'actividad': actividad,
@@ -274,7 +275,7 @@ def actividad_detalle(request, codigo):
 def evidencia_subir(request, codigo):
     """Sube una evidencia (JPG, PNG o PDF) a la actividad y la envía a revisión (CU-09)."""
     actividad = _obtener_autorizado(request, _actividades_autorizadas(request.user), 'Actividad', codigo_verificador=codigo)
-    bloqueo = _bloqueo_evidencia(funcionario_de(request.user), actividad, puede_ver_todo(request.user))
+    bloqueo = _bloqueo_evidencia(funcionario_de(request.user), actividad)
     if bloqueo:
         if bloqueo == MENSAJE_SOLO_AUTOR_EVIDENCIA:
             registrar_acceso_denegado(request, 'Actividad', codigo, 'no es el autor')
@@ -597,12 +598,12 @@ def delegados(request):
     """Coordinación: delegados de cada delegación, su carga de trabajo y su asignación.
 
     Es la función propia del coordinador frente al delegado: el delegado trabaja su delegación;
-    el coordinador ve todas, asigna cada delegado a su delegación y le asigna compromisos.
+    el coordinador ve todas y asigna (o cambia) el delegado de cada una con AsignarDelegadoForm.
     """
-    candidatos = Funcionario.objects.filter(estado=True, roles__nombre_rol=DELEGADO).select_related('delegacion').distinct()
-    if request.method == 'POST':
-        funcionario = get_object_or_404(candidatos, pk=request.POST.get('funcionario'))
-        delegacion = get_object_or_404(Delegacion, pk=request.POST.get('delegacion'), estado=True)
+    form = AsignarDelegadoForm(request.POST or None)
+    candidatos = form.fields['funcionario'].queryset
+    if request.method == 'POST' and form.is_valid():
+        funcionario, delegacion = form.cleaned_data['funcionario'], form.cleaned_data['delegacion']
         anterior = funcionario.delegacion.nombre if funcionario.delegacion_id else None
         with transaction.atomic():
             funcionario.delegacion = delegacion
@@ -627,6 +628,7 @@ def delegados(request):
             'cumplimiento': cumplimiento.get(delegacion.nombre),
         })
     return render(request, 'delegaciones_app/delegados.html', {
+        'form': form,
         'filas': filas,
         'candidatos': candidatos,
         'sin_delegacion': [f for f in candidatos if not f.delegacion_id],

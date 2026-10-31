@@ -136,12 +136,14 @@ class AccesoPorPerfilTests(TestCase):
         cls.administrador = crear_funcionario('panel-admin', 'administrador')
         cls.coordinador = crear_funcionario('panel-super', 'coordinador')
         cls.funcionario = crear_funcionario('panel-adm', 'funcionario')
+        cls.delegado = crear_funcionario('panel-del', 'delegado')
 
     def test_el_login_lleva_al_panel_de_cada_perfil(self):
         """HU-26 Panel según perfil (RF-002, RF-028). Cada perfil ve su propio panel."""
         paneles = {
             self.administrador: 'gestion_app/panel_administrador.html',
             self.coordinador: 'gestion_app/panel_coordinador.html',
+            self.delegado: 'gestion_app/panel_delegado.html',
             self.funcionario: 'gestion_app/panel_funcionario.html',
         }
         for usuario, plantilla in paneles.items():

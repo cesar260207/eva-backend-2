@@ -37,20 +37,16 @@
     <div class="col-lg-6"><div class="panel h-100">
         <div class="section-label mb-2">Asignar delegado a una delegación</div>
         {% if candidatos %}
-        <form method="post" class="row g-2">
+        <form method="post" class="row g-2" novalidate>
             {% csrf_token %}
+            {% for error in form.non_field_errors %}<div class="col-12"><div class="alert alert-danger mb-0">{{ error }}</div></div>{% endfor %}
+            {% for campo in form %}
             <div class="col-md-6">
-                <label class="form-label" for="funcionario">Delegado</label>
-                <select class="form-select" id="funcionario" name="funcionario" required>
-                    {% for f in candidatos %}<option value="{{ f.pk }}">{{ f.nombre }} · {{ f.delegacion|default:'sin delegación' }}</option>{% endfor %}
-                </select>
+                <label class="form-label" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+                {{ campo }}
+                {% for error in campo.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
             </div>
-            <div class="col-md-6">
-                <label class="form-label" for="delegacion">Delegación</label>
-                <select class="form-select" id="delegacion" name="delegacion" required>
-                    {% for fila in filas %}<option value="{{ fila.delegacion.pk }}">{{ fila.delegacion.nombre }}</option>{% endfor %}
-                </select>
-            </div>
+            {% endfor %}
             <div class="col-12 d-flex justify-content-end"><button class="btn btn-sgr" type="submit">Asignar</button></div>
         </form>
         {% else %}

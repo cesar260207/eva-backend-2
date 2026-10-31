@@ -248,6 +248,68 @@ class CoordinacionDeDelegadosTests(EscenarioBase, TestCase):
         self.client.force_login(crear_funcionario('delegado-centro2', 'delegado', cargo=self.cargo, delegacion=self.centro))
         self.assertRedirects(self.client.get(reverse('delegados')), reverse('inicio'))
 
+    def test_asignar_delegado_valida_el_formulario(self):
+        """CU-26 Asignar delegado (RF-001, RF-017). Solo delegados activos, delegaciones activas y sin repetir la asignación."""
+        self.client.force_login(self.coordinador)
+        respuesta = self.client.post(reverse('delegados'), {'funcionario': self.autor.pk, 'delegacion': self.rural.pk})
+        self.assertIn('funcionario', respuesta.context['form'].errors)
+        self.rural.set_estado(False)
+        respuesta = self.client.post(reverse('delegados'), {'funcionario': self.delegado.funcionario.pk, 'delegacion': self.rural.pk})
+        self.assertIn('delegacion', respuesta.context['form'].errors)
+        self.client.post(reverse('delegados'), {'funcionario': self.delegado.funcionario.pk, 'delegacion': self.centro.pk})
+        respuesta = self.client.post(reverse('delegados'), {'funcionario': self.delegado.funcionario.pk, 'delegacion': self.centro.pk})
+        self.assertContains(respuesta, 'ya es delegado de Centro')
+        self.assertEqual(Auditoria.objects.filter(evento='asignar_delegado').count(), 1)
+
+    def test_el_coordinador_no_sube_evidencias_en_nombre_de_otro(self):
+        """CU-09 Subir evidencia (RF-012). La coordinación revisa, pero la evidencia la sube quien registró la actividad."""
+        actividad = self.nueva_actividad()
+        url = reverse('evidencia_subir', args=[actividad.codigo_verificador])
+        self.client.force_login(self.coordinador)
+        self.assertNotContains(self.client.get(reverse('actividades')), url)
+        self.assertRedirects(self.client.get(url), reverse('actividad_detalle', args=[actividad.codigo_verificador]))
+        self.client.post(url, {'comentario': 'En nombre del autor'})
+        self.assertFalse(actividad.evidencias.exists())
+
+    def test_el_coordinador_revisa_en_todas_las_delegaciones(self):
+        """CU-11 Validación de actividades (RF-013). La coordinación aprueba evidencias de cualquier delegación."""
+        actividad = self.nueva_actividad()
+        self.nueva_evidencia(actividad)
+        self.client.force_login(self.coordinador)
+        self.client.post(reverse('revisar_actividad', args=[actividad.codigo_verificador, 'aprobar']))
+        actividad.refresh_from_db()
+        self.assertEqual(actividad.estado, 'aprobada')
+
+    def test_el_panel_del_coordinador_muestra_todas_las_delegaciones_y_su_delegado(self):
+        """CU-18.1 Consolidar datos de delegación (RF-028, RF-029). El coordinador ve cada delegación con su avance y su delegado."""
+        for funcionario in (self.autor, crear_funcionario('func-rural-p', 'funcionario', cargo=self.cargo, delegacion=self.rural).funcionario):
+            Indicador.generar(Meta.objects.create(item=self.item, funcionario=funcionario, valor_objetivo=10))
+        self.delegado.funcionario.delegacion = self.centro
+        self.delegado.funcionario.save()
+        self.client.force_login(self.coordinador)
+        respuesta = self.client.get(reverse('panel'))
+        self.assertTemplateUsed(respuesta, 'gestion_app/panel_coordinador.html')
+        filas = {fila['nombre']: fila['delegados'] for fila in respuesta.context['delegaciones']}
+        self.assertEqual(filas, {'Centro': 'delegado-sin', 'Rural': ''})
+        self.assertContains(respuesta, reverse('delegados'))
+        self.assertNotContains(respuesta, reverse('actividad_nueva'))
+
+    def test_el_panel_del_delegado_se_centra_en_su_delegacion(self):
+        """CU-18.1 Consolidar datos de delegación (RF-028, RF-029). Lo que espera su revisión y el tubo, solo de su delegación."""
+        delegado = crear_funcionario('delegado-panel', 'delegado', cargo=self.cargo, delegacion=self.centro)
+        rural = crear_funcionario('func-rural-d', 'funcionario', cargo=self.cargo, delegacion=self.rural).funcionario
+        de_centro = self.nueva_actividad()
+        self.nueva_evidencia(de_centro)
+        self.nueva_evidencia(self.nueva_actividad(funcionario_autor=rural, delegacion=self.rural))
+        self.nuevo_compromiso(folio='PAN-CENTRO')
+        self.nuevo_compromiso(folio='PAN-RURAL', delegacion=self.rural, funcionario_responsable=rural)
+        self.client.force_login(delegado)
+        respuesta = self.client.get(reverse('panel'))
+        self.assertTemplateUsed(respuesta, 'gestion_app/panel_delegado.html')
+        self.assertEqual(respuesta.context['por_revisar'], [de_centro])
+        self.assertEqual([c.folio for c in respuesta.context['tareas_abiertas']], ['PAN-CENTRO'])
+        self.assertNotContains(respuesta, reverse('delegados'))
+
     def test_el_coordinador_asigna_compromisos_a_delegados_de_la_delegacion(self):
         """CU-02.1 Validar datos de compromiso (RF-016, RF-017). El responsable debe ser de la delegación elegida."""
         self.client.force_login(self.coordinador)
