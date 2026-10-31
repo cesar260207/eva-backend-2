@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}Actividades | SGR{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+<div class="page-header">
     <div>
         <div class="page-kicker">Actividades</div>
         <h1 class="page-title">Actividades y evidencias</h1>
@@ -10,15 +10,15 @@
     <a href="{% url 'actividad_nueva' %}" class="btn btn-sgr">+ Nueva actividad</a>
 </div>
 <div class="panel">
-    <form class="row g-2 mb-3" method="get">
-        <div class="col-md-4"><input class="form-control" name="q" value="{{ query }}" placeholder="Buscar por código, solicitud o ítem"></div>
-        <div class="col-md-2"><select class="form-select" name="delegacion" aria-label="Delegación">{% if delegaciones_filtro|length > 1 %}<option value="">Todas las delegaciones</option>{% endif %}{% for d in delegaciones_filtro %}<option value="{{ d.pk }}" {% if filtros.delegacion == d.pk|stringformat:'s' %}selected{% endif %}>{{ d.nombre }}</option>{% endfor %}</select></div>
-        <div class="col-md-2"><select class="form-select" name="estado" aria-label="Estado"><option value="">Todos los estados</option>{% for valor, etiqueta in estados_filtro %}<option value="{{ valor }}" {% if filtros.estado == valor %}selected{% endif %}>{{ etiqueta }}</option>{% endfor %}</select></div>
-        <div class="col-md-2"><select class="form-select" name="periodo" aria-label="Período"><option value="">Todos los períodos</option>{% for p in periodos_filtro %}<option value="{{ p.pk }}" {% if filtros.periodo == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.nombre }}</option>{% endfor %}</select></div>
-        <div class="col-md-2"><button class="btn btn-outline-sgr w-100" type="submit">Filtrar</button></div>
-        <div class="col-md-3"><label class="form-label small mb-0" for="desde">Desde</label><input class="form-control" type="date" id="desde" name="desde" value="{{ filtros.desde }}"></div>
-        <div class="col-md-3"><label class="form-label small mb-0" for="hasta">Hasta</label><input class="form-control" type="date" id="hasta" name="hasta" value="{{ filtros.hasta }}"></div>
-        <div class="col-md-6 d-flex align-items-end gap-2">{% if filtrado %}<a class="btn btn-link" href="{% url 'actividades' %}">Limpiar filtros</a>{% endif %}<a class="btn btn-link" href="{% url 'informe' %}?tipo=actividades&{{ filtros.urlencode }}">Generar informe con estos filtros</a></div>
+    <form class="filtros mb-3" method="get">
+        <div class="filtro-texto"><label class="form-label small mb-1" for="q">Buscar</label><input class="form-control" id="q" name="q" value="{{ query }}" placeholder="Código, solicitud o ítem"></div>
+        <div><label class="form-label small mb-1" for="delegacion">Delegación</label><select class="form-select" id="delegacion" name="delegacion">{% if delegaciones_filtro|length > 1 %}<option value="">Todas</option>{% endif %}{% for d in delegaciones_filtro %}<option value="{{ d.pk }}" {% if filtros.delegacion == d.pk|stringformat:'s' %}selected{% endif %}>{{ d.nombre }}</option>{% endfor %}</select></div>
+        <div><label class="form-label small mb-1" for="estado">Estado</label><select class="form-select" id="estado" name="estado"><option value="">Todos</option>{% for valor, etiqueta in estados_filtro %}<option value="{{ valor }}" {% if filtros.estado == valor %}selected{% endif %}>{{ etiqueta }}</option>{% endfor %}</select></div>
+        <div><label class="form-label small mb-1" for="periodo">Período</label><select class="form-select" id="periodo" name="periodo"><option value="">Todos</option>{% for p in periodos_filtro %}<option value="{{ p.pk }}" {% if filtros.periodo == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.nombre }}</option>{% endfor %}</select></div>
+        <div><label class="form-label small mb-1" for="desde">Desde</label><input class="form-control" type="date" id="desde" name="desde" value="{{ filtros.desde }}"></div>
+        <div><label class="form-label small mb-1" for="hasta">Hasta</label><input class="form-control" type="date" id="hasta" name="hasta" value="{{ filtros.hasta }}"></div>
+        <div class="acciones"><button class="btn btn-outline-sgr" type="submit">Filtrar</button>{% if filtrado %}<a class="btn btn-link" href="{% url 'actividades' %}">Limpiar</a>{% endif %}</div>
+        <div class="acciones"><a class="btn btn-link" href="{% url 'informe' %}?tipo=actividades&{{ filtros.urlencode }}">Generar informe</a></div>
     </form>
     <div class="table-responsive">
         <table class="table align-middle">
@@ -27,8 +27,8 @@
             {% for actividad in actividades %}
                 <tr>
                     <td><a href="{% url 'actividad_detalle' actividad.codigo_verificador %}"><strong>{{ actividad.codigo_verificador }}</strong></a></td>
-                    <td>{{ actividad.fecha|date:'d-m-Y H:i' }}</td>
-                    <td>{{ actividad.solicitud_problema|truncatechars:70 }}</td>
+                    <td class="col-fecha">{{ actividad.fecha|date:'d-m-Y H:i' }}</td>
+                    <td class="col-texto">{{ actividad.solicitud_problema|truncatechars:70 }}</td>
                     <td>{{ actividad.funcionario_autor.nombre }}</td>
                     <td>{{ actividad.delegacion }}</td>
                     <td><span class="badge badge-soft">{{ actividad.get_estado_display }}</span></td>
@@ -41,7 +41,7 @@
                         {% endif %}
                     </td>
                     <td>
-                        <div class="d-flex flex-wrap gap-2">
+                        <div class="acciones">
                             {% if actividad.puede_subir_evidencia %}<a class="btn btn-sm btn-sgr" href="{% url 'evidencia_subir' actividad.codigo_verificador %}">Subir evidencia</a>{% endif %}
                             {% if not actividad.bloqueo %}
                             <a class="btn btn-sm btn-outline-sgr" href="{% url 'actividad_editar' actividad.codigo_verificador %}">Modificar</a>

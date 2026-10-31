@@ -4,7 +4,7 @@
 {% block title %}Control de Gestión | Municipalidad de La Serena{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+<div class="page-header">
     <div>
         <div class="page-kicker">Medición</div>
         <h1 class="page-title mb-2">Medición y desempeño</h1>
@@ -45,7 +45,7 @@
                     <h5 class="mb-0">{{ delegacion.nombre }}</h5>
                     <span class="badge {% if delegacion.estado_class == 'success' %}badge-success-soft{% elif delegacion.estado_class == 'warning' %}badge-warning-soft{% elif delegacion.estado_class == 'danger' %}badge-danger-soft{% else %}bg-secondary{% endif %}">{{ delegacion.estado }}</span>
                 </div>
-                <div class="progress mb-3" style="height: 20px;">
+                <div class="progress progress-lg mb-3">
                     <div class="progress-bar bg-{{ delegacion.estado_class }}" role="progressbar" style="width: {{ delegacion.ancho|unlocalize }}%;" aria-valuenow="{{ delegacion.ancho|unlocalize }}" aria-valuemin="0" aria-valuemax="100">
                         {{ delegacion.cumplimiento }}%
                     </div>

@@ -414,13 +414,16 @@ class TuboDeTrabajoUnitTests(CompromisoBase):
     def test_el_boton_esta_solo_en_la_pagina_del_tubo(self):
         """CU-12 Agenda colectiva (RF-016). Paneles, delegados y la delegación llevan al tubo y no crean tareas."""
         url_nueva = f'href="{reverse("compromiso_nuevo")}'
-        paginas = [(self.coordinador, reverse('panel')), (self.coordinador, reverse('delegados')), (self.coordinador, reverse('solicitudes')),
-                   (self.usuario_autor, reverse('panel')), (self.usuario_autor, reverse('delegacion_detalle', args=['Centro']))]
-        for usuario, url in paginas:
+        paginas = [
+            (self.coordinador, reverse('panel'), 'Ver tubo de trabajo'), (self.coordinador, reverse('delegados'), 'Ver tubo de trabajo'),
+            (self.coordinador, reverse('solicitudes'), 'Ver como tabla'), (self.usuario_autor, reverse('panel'), 'Ver tubo de trabajo'),
+            (self.usuario_autor, reverse('delegacion_detalle', args=['Centro']), 'Ver tubo de trabajo'),
+        ]
+        for usuario, url, enlace in paginas:
             self.client.force_login(usuario)
             respuesta = self.client.get(url)
             self.assertNotContains(respuesta, url_nueva, msg_prefix=url)
-            self.assertContains(respuesta, 'Ver tubo de trabajo', msg_prefix=url)
+            self.assertContains(respuesta, enlace, msg_prefix=url)
 
     def test_el_boton_conserva_la_delegacion_filtrada(self):
         """CU-12.1 Filtrar agenda compartida (RF-016). Al filtrar por una delegación, la tarea nueva parte en ella."""

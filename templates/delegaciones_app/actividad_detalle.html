@@ -2,13 +2,13 @@
 {% block title %}{{ actividad.codigo_verificador }} | SGR{% endblock %}
 {% block content %}
 <a class="btn btn-sm btn-link px-0 mb-2" href="{{ url_lista }}">&larr; Volver a las actividades</a>
-<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+<div class="page-header">
     <div>
         <div class="page-kicker">Actividad</div>
         <h1 class="page-title">{{ actividad.codigo_verificador }}</h1>
         <p class="page-intro mb-0">{{ actividad.solicitud_problema }}</p>
     </div>
-    <div class="d-flex align-items-center gap-2">
+    <div class="acciones">
         <span class="badge badge-soft fs-6">{{ actividad.get_estado_display }}</span>
         {% if puede_modificar %}<a class="btn btn-outline-sgr" href="{% url 'actividad_editar' actividad.codigo_verificador %}">Modificar actividad</a>{% endif %}
         {% if puede_subir_evidencia %}<a class="btn btn-sgr" href="{% url 'evidencia_subir' actividad.codigo_verificador %}">Subir evidencia</a>{% endif %}
