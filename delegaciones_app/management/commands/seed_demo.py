@@ -62,19 +62,18 @@ class Command(BaseCommand):
         # Los cargos se crean solo si hace falta crear al funcionario, así no quedan sueltos en una base ya migrada.
         cargos = {
             'administrador': 'Administración SGR', 'coordinador': 'Coordinación SGR',
-            'delegado': 'Delegado territorial', 'verificador': 'Verificación SGR',
+            'delegado': 'Delegado territorial', 'funcionario': 'Profesional SGR',
         }
         delegaciones = {
             nombre: Delegacion.objects.update_or_create(nombre=nombre, defaults={'ambito': ambito, 'enfasis': enfasis, 'estado': True})[0]
             for nombre, (ambito, enfasis) in DELEGACIONES.items()
         }
+        self._renombrar_delegado_demo()
 
         administrador = self._funcionario('admin.demo', 'Administrador', 'administrador', cargos['administrador'])
         self._funcionario('coordinador.demo', 'Coordinador SGR', 'coordinador', cargos['coordinador'])
-        centro = self._funcionario('funcionario.centro', 'Funcionario Centro', 'funcionario', cargos['delegado'], delegaciones['Centro'])
-        # El verificador demo es el delegado de Centro: revisa las evidencias de su delegación.
-        verificador = self._funcionario('verificador.demo', 'Verificador SGR', 'verificador', cargos['verificador'], delegaciones['Centro'])
-        FuncionarioRol.objects.get_or_create(funcionario=verificador, rol=self.roles['delegado'])
+        centro = self._funcionario('funcionario.centro', 'Profesional Centro', 'funcionario', cargos['funcionario'], delegaciones['Centro'])
+        delegado_centro = self._funcionario('delegado.demo', 'Delegado Centro', 'delegado', cargos['delegado'], delegaciones['Centro'])
         self._configurar_administrador(administrador)
 
         # Un delegado por delegación; las que no tienen funcionario reciben uno con cuenta inactiva,
@@ -90,14 +89,20 @@ class Command(BaseCommand):
         catalogo = self._catalogo()
         metas = self._metas(periodo, delegados)
         compromisos = self._compromisos(delegaciones, delegados)
-        self._actividad_demo(delegaciones['Centro'], centro, verificador, metas['Centro'].item, catalogo[('atencion', 'Solicitud ciudadana')])
+        self._actividad_demo(delegaciones['Centro'], centro, delegado_centro, metas['Centro'].item, catalogo[('atencion', 'Solicitud ciudadana')])
         mediciones = self._mediciones(delegaciones)
         indicadores = self._indicadores(periodo)
 
         if clave_generada:
             self.stdout.write(self.style.WARNING(f'Clave generada para las cuentas demo NUEVAS (se muestra una sola vez): {clave}'))
         self.stdout.write(f'{len(delegaciones)} delegaciones, {len(metas)} metas, {compromisos} compromisos, {mediciones} mediciones historicas, {indicadores} indicadores nuevos.')
-        self.stdout.write(self.style.SUCCESS('Datos demo cargados. Cuentas demo: admin.demo (Administrador), coordinador.demo (Coordinador), verificador.demo, delegado de Centro (Delegado) y funcionario.centro (Funcionario)'))
+        self.stdout.write(self.style.SUCCESS('Datos demo cargados. Cuentas demo: admin.demo (Administrador), coordinador.demo (Coordinador), delegado.demo (Delegado) y funcionario.centro (Profesional)'))
+
+    def _renombrar_delegado_demo(self):
+        antiguo = User.objects.filter(username='delegado.centro').first()
+        if antiguo and not User.objects.filter(username='delegado.demo').exists():
+            antiguo.username = 'delegado.demo'
+            antiguo.save(update_fields=['username'])
 
     def _funcionario(self, username, nombre, rol, cargo_nombre, delegacion=None, activo=True):
         usuario, creado = User.objects.get_or_create(username=username, defaults={'first_name': nombre, 'is_active': activo})
@@ -136,8 +141,12 @@ class Command(BaseCommand):
         )[0]
         ParametroVersionado.objects.get_or_create(
             periodo=periodo, clave='maximo_cumplimiento',
-            defaults={'valor': '150', 'descripcion': 'Tope del cumplimiento de cada meta (RN-005).'},
+            defaults={'valor': '120', 'descripcion': 'Tope del cumplimiento de cada meta.'},
         )
+        ParametroVersionado.objects.get_or_create(periodo=periodo, clave='max_ingresos_diarios', defaults={'valor': '7', 'descripcion': 'Máximo de actividades ingresadas por autor y fecha.'})
+        ParametroVersionado.objects.get_or_create(periodo=periodo, clave='valor_felicitacion', defaults={'valor': '10', 'descripcion': 'Porcentaje por felicitación aplicada.'})
+        ParametroVersionado.objects.get_or_create(periodo=periodo, clave='max_felicitaciones', defaults={'valor': '3', 'descripcion': 'Máximo de felicitaciones aplicables.'})
+        ParametroVersionado.objects.get_or_create(periodo=periodo, clave='valor_reclamo', defaults={'valor': '-30', 'descripcion': 'Porcentaje por reclamo aplicado.'})
         return periodo
 
     def _catalogo(self):

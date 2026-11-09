@@ -9,9 +9,9 @@ from delegaciones_app import medicion
 from delegaciones_app.alertas import alertas_de
 from delegaciones_app.informes import (
     TIPOS_INFORME, filas_de_actividad_reciente, filas_de_actividades, filas_de_compromisos, filas_de_cumplimiento, filas_de_resumen,
-    filtrar_actividades, filtrar_compromisos, respuesta_csv,
+    filtrar_actividades, filtrar_compromisos, respuesta_csv, respuesta_excel,
 )
-from delegaciones_app.medicion import periodo_vigente, periodos_con_indicadores, promedio_general, resultados_por_delegacion
+from delegaciones_app.medicion import periodo_vigente, periodos_con_indicadores, promedio_general, resultados_por_delegacion, resultados_por_persona
 from delegaciones_app.crud import mantenedores_visibles
 from delegaciones_app.models import Actividad, Auditoria, Compromiso, Delegacion, Evidencia, Funcionario, MedicionDelegacion, Periodo
 from delegaciones_app.permisos import (
@@ -40,7 +40,7 @@ def _contexto_medicion(request):
         'delegaciones': _solo_su_delegacion(request.user, resultados_por_delegacion(periodo, texto)),
         'hoy': timezone.localdate(),
         'esperado': periodo.porcentaje_esperado() if periodo else None,
-        'tope': periodo.obtener_parametro('maximo_cumplimiento', '150') if periodo else None,
+        'tope': periodo.obtener_parametro('maximo_cumplimiento', '120') if periodo else None,
     }
 
 
@@ -142,7 +142,9 @@ def dashboard(request):
 
 @login_required
 def semaforo(request):
-    return render(request, 'gestion_app/semaforo.html', _contexto_medicion(request))
+    contexto = _contexto_medicion(request)
+    contexto['personas'] = resultados_por_persona(contexto['periodo'], contexto['delegacion_propia'])
+    return render(request, 'gestion_app/semaforo.html', contexto)
 
 
 @login_required
@@ -214,6 +216,8 @@ def informe(request):
     if formato == 'csv':
         Auditoria.registrar_evento(request.user, 'exportar', 'Informe', tipo, None, {'filtros': request.GET.urlencode(), 'filas': len(filas)})
         return respuesta_csv(f'informe_{tipo}_{timezone.localdate():%Y%m%d}.csv', columnas, filas)
+    if formato == 'excel':
+        return respuesta_excel(f'informe_{tipo}_{timezone.localdate():%Y%m%d}.xlsx', columnas, filas)
     parametros = request.GET.copy()
     parametros.pop('formato', None)
     return render(request, 'gestion_app/informe.html', {
@@ -236,4 +240,3 @@ def alertas(request):
         'dias_sin_registro': settings.ALERTA_DIAS_SIN_REGISTRO,
         'dias_alerta': settings.COMPROMISO_DIAS_ALERTA,
     })
-

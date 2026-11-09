@@ -21,11 +21,8 @@ ADMINISTRADOR = 'administrador'
 COORDINADOR = 'coordinador'
 DELEGADO = 'delegado'
 FUNCIONARIO = 'funcionario'
-VERIFICADOR = 'verificador'
-CONSULTA = 'consulta'
-
 # Los permisos consultan estos nombres: no se renombran ni se eliminan desde el mantenedor de roles.
-ROLES_DEL_SISTEMA = (ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICADOR, CONSULTA)
+ROLES_DEL_SISTEMA = (ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO)
 
 MENSAJE_SIN_PERMISO = 'No tienes permiso para acceder a esta sección.'
 
@@ -33,7 +30,7 @@ MENSAJE_SIN_PERMISO = 'No tienes permiso para acceder a esta sección.'
 PERFIL_ADMINISTRADOR = 'Administrador'
 PERFIL_COORDINADOR = 'Coordinador'
 PERFIL_DELEGADO = 'Delegado'
-PERFIL_FUNCIONARIO = 'Funcionario'
+PERFIL_FUNCIONARIO = 'Profesional'
 PERFILES = (PERFIL_ADMINISTRADOR, PERFIL_COORDINADOR, PERFIL_DELEGADO, PERFIL_FUNCIONARIO)
 
 # Rol que aporta cada perfil de alcance global: así ver todas las delegaciones sigue al grupo asignado.
@@ -42,7 +39,7 @@ ROL_DEL_PERFIL = {PERFIL_ADMINISTRADOR: ADMINISTRADOR, PERFIL_COORDINADOR: COORD
 
 # Quién revisa evidencias (aprobar, rechazar, anular): estos roles, cada uno dentro de su ámbito, y solo
 # con un perfil que tenga el permiso de registrar validaciones (Administrador, Coordinador o Delegado).
-ROLES_REVISORES = (ADMINISTRADOR, COORDINADOR, DELEGADO, VERIFICADOR)
+ROLES_REVISORES = (ADMINISTRADOR, COORDINADOR, DELEGADO)
 PERMISO_REVISAR = 'delegaciones_app.add_validacion'
 
 
@@ -70,7 +67,7 @@ def perfil_sugerido(roles):
         return PERFIL_ADMINISTRADOR
     if COORDINADOR in roles:
         return PERFIL_COORDINADOR
-    if DELEGADO in roles or VERIFICADOR in roles:
+    if DELEGADO in roles:
         return PERFIL_DELEGADO
     return PERFIL_FUNCIONARIO
 
@@ -108,7 +105,7 @@ def puede_ver_todo(user):
 
 
 # Quién agrega tareas al tubo de trabajo: administración y coordinación, para cualquier delegación y eligiendo
-# al responsable; delegados y funcionarios, para su propia delegación y a su cargo. Verificador y consulta no.
+# al responsable; delegados y funcionarios, para su propia delegación y a su cargo.
 ROLES_CREAN_TAREAS = (ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO)
 
 

@@ -6,9 +6,9 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from .models import Actividad, Cargo, Catalogo, Compromiso, Delegacion, Evidencia, Funcionario, ItemMedible, Meta, Periodo, Rol, VersionOptimistaMixin
+from .models import Actividad, Ajuste, Ausencia, Cargo, CasoSocial, Catalogo, Comentario, Compromiso, Delegacion, Evidencia, Funcionario, ItemMedible, Meta, Organizacion, ParametroVersionado, Periodo, Rol, VersionOptimistaMixin
 from .permisos import (
-    ADMINISTRADOR, COORDINADOR, DELEGADO, VERIFICADOR, PERFIL_ADMINISTRADOR, PERFIL_FUNCIONARIO, PERFILES, ROLES_DEL_SISTEMA, asignar_perfil,
+    ADMINISTRADOR, COORDINADOR, DELEGADO, PERFIL_ADMINISTRADOR, PERFIL_FUNCIONARIO, PERFILES, ROLES_DEL_SISTEMA, asignar_perfil,
     funcionario_de, perfil_sugerido, puede_ver_todo,
 )
 
@@ -148,8 +148,8 @@ class FuncionarioForm(FormularioBootstrap, forms.ModelForm):
             self.add_error('perfil', 'El rol administrador requiere el perfil Administrador.')
         elif COORDINADOR in nombres and perfil.name not in PERFILES[:2]:
             self.add_error('perfil', 'El rol coordinador requiere el perfil Coordinador o Administrador.')
-        elif nombres & {DELEGADO, VERIFICADOR} and perfil.name == PERFIL_FUNCIONARIO:
-            self.add_error('perfil', 'Los roles delegado y verificador revisan evidencias: requieren el perfil Delegado o uno superior.')
+        elif DELEGADO in nombres and perfil.name == PERFIL_FUNCIONARIO:
+            self.add_error('perfil', 'El rol delegado revisa evidencias: requiere el perfil Delegado o uno superior.')
 
     @transaction.atomic
     def save(self, commit=True):
@@ -179,6 +179,21 @@ class CatalogoForm(FormularioBootstrap, forms.ModelForm):
         help_texts = {'codigo': 'Debe ser único en todo el catálogo.'}
 
 
+class OrganizacionForm(FormularioBootstrap, forms.ModelForm):
+    class Meta:
+        model = Organizacion
+        fields = ['nombre', 'tipo', 'personalidad_juridica', 'domicilio', 'territorio', 'delegacion', 'verificada', 'observaciones', 'activa']
+        labels = {'personalidad_juridica': 'Personalidad jurídica', 'verificada': 'Registro verificado', 'activa': 'Organización activa'}
+        widgets = {'observaciones': forms.Textarea(attrs={'rows': 3})}
+
+
+class ParametroVersionadoForm(FormularioBootstrap, forms.ModelForm):
+    class Meta:
+        model = ParametroVersionado
+        fields = ['periodo', 'clave', 'valor', 'descripcion']
+        widgets = {'descripcion': forms.Textarea(attrs={'rows': 3})}
+
+
 class PeriodoForm(FormularioBootstrap, forms.ModelForm):
     class Meta:
         model = Periodo
@@ -201,7 +216,7 @@ class PeriodoForm(FormularioBootstrap, forms.ModelForm):
 class ItemMedibleForm(FormularioBootstrap, forms.ModelForm):
     class Meta:
         model = ItemMedible
-        fields = ['cargo', 'periodo', 'nombre', 'servicio', 'ponderacion']
+        fields = ['cargo', 'periodo', 'nombre', 'servicio', 'ponderacion', 'tipo_calculo']
         labels = {'ponderacion': 'Ponderación (%)'}
         help_texts = {'ponderacion': 'Las ponderaciones de un cargo en un período deben sumar 100 %.'}
         widgets = {'ponderacion': forms.NumberInput(attrs={'min': 0, 'max': 100, 'step': '0.01'})}
@@ -289,6 +304,9 @@ class ActividadForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm):
         self.fields['catalogo'].queryset = Catalogo.objects.filter(Q(tipo='atencion', activo=True) | Q(pk=self.instance.catalogo_id))
         self.fields['catalogo'].label_from_instance = lambda elemento: elemento.nombre
         self.fields['compromiso'].queryset = (compromisos if compromisos is not None else Compromiso.objects.all()).select_related('delegacion')
+        self.fields['organizacion'].queryset = Organizacion.objects.filter(activa=True).order_by('nombre')
+        self.fields['tipo_accion'].required = False
+        self.fields['tipo_accion'].initial = 'ejecucion'
         for campo in ('item', 'catalogo', 'fecha'):
             self.fields[campo].required = True
         self.fields['fecha'].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M']
@@ -297,7 +315,7 @@ class ActividadForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm):
 
     class Meta:
         model = Actividad
-        fields = ['delegacion', 'item', 'catalogo', 'fecha', 'solicitud_problema', 'accion', 'contacto_nombre', 'contacto_telefono', 'compromiso']
+        fields = ['delegacion', 'item', 'catalogo', 'fecha', 'solicitud_problema', 'accion', 'contacto_nombre', 'contacto_telefono', 'organizacion', 'tipo_accion', 'compromiso']
         labels = {
             'item': 'Ítem de medición', 'catalogo': 'Tipo de atención', 'fecha': 'Fecha y hora',
             'solicitud_problema': 'Solicitud o problema', 'accion': 'Acción ejecutada',
@@ -377,6 +395,42 @@ class CompromisoForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm)
 
     class Meta:
         model = Compromiso
-        fields = ['delegacion', 'funcionario_responsable', 'origen', 'solicitante', 'territorio', 'eje', 'descripcion', 'fecha_comprometida', 'area_apoyo', 'item', 'estado', 'observacion']
+        fields = ['delegacion', 'funcionario_responsable', 'origen', 'solicitante', 'solicitante_telefono', 'territorio', 'organizacion', 'eje', 'descripcion', 'fecha_comprometida', 'area_apoyo', 'item', 'estado', 'observacion']
+
+
+class AjusteForm(FormularioBootstrap, forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['respaldo'].required = True
+
+    class Meta:
+        model = Ajuste
+        fields = ['tipo', 'origen', 'emisor', 'funcionario', 'delegacion', 'periodo', 'fecha', 'respaldo', 'observacion']
+        widgets = {'fecha': forms.DateInput(attrs={'type': 'date'}), 'observacion': forms.Textarea(attrs={'rows': 3})}
+
+
+class AusenciaForm(FormularioBootstrap, forms.ModelForm):
+    class Meta:
+        model = Ausencia
+        fields = ['funcionario', 'periodo', 'tipo', 'desde', 'hasta', 'observacion']
+        widgets = {
+            'desde': forms.DateInput(attrs={'type': 'date'}),
+            'hasta': forms.DateInput(attrs={'type': 'date'}),
+            'observacion': forms.Textarea(attrs={'rows': 3}),
+        }
+
+
+class CasoSocialForm(FormularioBootstrap, forms.ModelForm):
+    class Meta:
+        model = CasoSocial
+        fields = ['nombre_usuario', 'telefono_usuario', 'etapa', 'tipo', 'subtipo', 'observacion']
+        widgets = {'observacion': forms.Textarea(attrs={'rows': 3})}
+
+
+class ComentarioForm(FormularioBootstrap, forms.ModelForm):
+    class Meta:
+        model = Comentario
+        fields = ['contenido']
+        widgets = {'contenido': forms.Textarea(attrs={'rows': 3})}
         labels = {'funcionario_responsable': 'Responsable', 'area_apoyo': 'Área de apoyo', 'item': 'Ítem medible (opcional)'}
         widgets = {'fecha_comprometida': forms.DateInput(attrs={'type': 'date'}), 'descripcion': forms.Textarea(attrs={'rows': 3}), 'observacion': forms.Textarea(attrs={'rows': 2})}

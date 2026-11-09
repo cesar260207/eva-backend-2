@@ -11,8 +11,9 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .medicion import periodo_vigente, resultados_por_delegacion
+from .reglas import porcentaje_esperado_ajustado
 from .models import Actividad, Funcionario
-from .permisos import ADMINISTRADOR, COORDINADOR, DELEGADO, VERIFICADOR, funcionario_de, puede_ver_todo, tiene_rol
+from .permisos import ADMINISTRADOR, COORDINADOR, DELEGADO, funcionario_de, puede_ver_todo, tiene_rol
 from .views import _actividades_autorizadas, _compromisos_autorizados
 
 ORDEN_NIVEL = {'danger': 0, 'warning': 1}
@@ -45,7 +46,7 @@ def alertas_de_vencimiento(user, hoy):
 
 def alertas_de_evidencias_pendientes(user, hoy):
     """Actividades con evidencias esperando revisión; solo las ve quien puede revisarlas."""
-    if not tiene_rol(user, ADMINISTRADOR, COORDINADOR, DELEGADO, VERIFICADOR):
+    if not tiene_rol(user, ADMINISTRADOR, COORDINADOR, DELEGADO):
         return []
     pendientes = (
         _actividades_autorizadas(user).filter(evidencias__estado_revision='pendiente')
@@ -103,7 +104,14 @@ def alertas_de_avance_bajo(user, hoy):
     if not puede_ver_todo(user):
         nombre = propio.delegacion.nombre if propio and propio.delegacion_id else None
         resultados = [fila for fila in resultados if fila['nombre'] == nombre]
-    esperado = periodo.porcentaje_esperado(hoy)
+    if propio and propio.delegacion_id and not puede_ver_todo(user):
+        equipo = Funcionario.objects.filter(
+            delegacion=propio.delegacion, estado=True, metas__item__periodo=periodo,
+        ).distinct()
+        valores = [porcentaje_esperado_ajustado(funcionario, periodo, hoy) for funcionario in equipo]
+        esperado = sum(valores) / len(valores) if valores else periodo.porcentaje_esperado(hoy)
+    else:
+        esperado = periodo.porcentaje_esperado(hoy)
     return [
         _alerta(
             'avance_bajo', 'Avance bajo el umbral', 'danger',

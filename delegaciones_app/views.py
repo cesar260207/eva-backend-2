@@ -11,13 +11,14 @@ from django.db import transaction
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 
-from .forms import ActividadForm, AsignarDelegadoForm, CompromisoForm, EvidenciaForm, RevisionForm
+from .forms import ActividadForm, AjusteForm, AsignarDelegadoForm, AusenciaForm, CasoSocialForm, ComentarioForm, CompromisoForm, EvidenciaForm, RevisionForm
 from .informes import PLAZOS, filtrar_actividades, filtrar_compromisos, resumen_por_responsable, situacion_de_plazo
 from .medicion import periodo_vigente, promedio_general, resultados_por_delegacion
-from .models import Actividad, Auditoria, Compromiso, Delegacion, Evidencia, Funcionario, Periodo, Validacion
+from .models import Actividad, Ajuste, Auditoria, Ausencia, CasoSocial, Comentario, Compromiso, Delegacion, Evidencia, Funcionario, Periodo, Validacion
 from .permisos import (
-    ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, VERIFICADOR, delegacion_propia, funcionario_de, puede_crear_tarea, puede_eliminar_actividad, puede_revisar,
+    ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, delegacion_propia, funcionario_de, puede_crear_tarea, puede_eliminar_actividad, puede_revisar,
     puede_ver_todo, registrar_acceso_denegado, rol_requerido, tiene_rol,
 )
 
@@ -27,7 +28,7 @@ DECISIONES = {'aprobar': 'aprobar_evidencia', 'rechazar': 'rechazar_evidencia'}
 
 # Quién revisa evidencias lo decide permisos.puede_revisar (rol revisor y permiso del perfil). El delegado
 # revisa las de su delegación porque _actividades_autorizadas limita lo que ve.
-MENSAJE_REVISION_PROPIA = 'No puedes revisar una actividad que registraste tú: la revisa otro delegado, un verificador o la coordinación.'
+MENSAJE_REVISION_PROPIA = 'No puedes revisar una actividad que registraste tú: la revisa otro delegado o la coordinación.'
 
 def _delegaciones_visibles(user):
     """Delegaciones que el usuario puede elegir en los filtros: solo la suya si su ámbito es una delegación."""
@@ -45,8 +46,7 @@ def _funcionario_requerido(request):
 
 
 def _actividades_autorizadas(user):
-    """Actividades que el usuario puede ver: todas si es administrador o coordinador; las de su
-    delegación si tiene una; todas si es verificador sin delegación; si no, solo las que registró."""
+    """Actividades que el usuario puede ver según su perfil y delegación."""
     actividades = Actividad.objects.select_related('delegacion', 'funcionario_autor', 'item__periodo', 'catalogo').order_by('-fecha', '-creada')
     if puede_ver_todo(user):
         return actividades
@@ -55,8 +55,6 @@ def _actividades_autorizadas(user):
         return actividades.none()
     if funcionario.delegacion_id:
         return actividades.filter(delegacion_id=funcionario.delegacion_id)
-    if tiene_rol(user, VERIFICADOR):
-        return actividades
     return actividades.filter(funcionario_autor=funcionario)
 
 
@@ -671,3 +669,83 @@ def institucional(request):
         'urbano': '89,14 %',
         'rural': '10,86 %',
     })
+
+
+@login_required
+def ajuste_nuevo(request):
+    funcionario = _funcionario_requerido(request)
+    if not funcionario or not tiene_rol(request.user, DELEGADO):
+        return redirect('inicio')
+    form = AjusteForm(request.POST or None, request.FILES or None)
+    if request.method == 'POST' and form.is_valid():
+        ajuste = form.save(commit=False)
+        ajuste.informado_por = funcionario
+        ajuste.save()
+        Auditoria.registrar_evento(request.user, 'informar_ajuste', 'Ajuste', ajuste.pk, None, {'tipo': ajuste.tipo})
+        messages.success(request, 'El ajuste fue informado y quedó pendiente de validación.')
+        return redirect('inicio')
+    return render(request, 'delegaciones_app/formulario_nuevo.html', {'form': form, 'titulo': 'Informar felicitación o reclamo'})
+
+
+@login_required
+def ajuste_decidir(request, pk, decision):
+    funcionario = _funcionario_requerido(request)
+    if not funcionario or not tiene_rol(request.user, COORDINADOR, ADMINISTRADOR):
+        return redirect('inicio')
+    ajuste = get_object_or_404(Ajuste, pk=pk, estado='informado')
+    if request.method != 'POST' or decision not in ('aplicar', 'rechazar'):
+        return redirect('inicio')
+    ajuste.estado = 'aplicado' if decision == 'aplicar' else 'rechazado'
+    ajuste.aplicado_por = funcionario
+    ajuste.aplicado_en = timezone.now()
+    ajuste.save(update_fields=['estado', 'aplicado_por', 'aplicado_en'])
+    Auditoria.registrar_evento(request.user, f'{decision}_ajuste', 'Ajuste', ajuste.pk, {'estado': 'informado'}, {'estado': ajuste.estado})
+    messages.success(request, f'El ajuste fue {ajuste.get_estado_display().lower()}.')
+    return redirect('inicio')
+
+
+@login_required
+def ausencia_nueva(request):
+    funcionario = _funcionario_requerido(request)
+    if not funcionario or not tiene_rol(request.user, DELEGADO, COORDINADOR):
+        return redirect('inicio')
+    form = AusenciaForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        ausencia = form.save(commit=False)
+        ausencia.registrada_por = funcionario
+        ausencia.save()
+        messages.success(request, 'La ausencia fue registrada.')
+        return redirect('semaforo')
+    return render(request, 'delegaciones_app/formulario_nuevo.html', {'form': form, 'titulo': 'Registrar ausencia'})
+
+
+@login_required
+def caso_social_nuevo(request):
+    funcionario = _funcionario_requerido(request)
+    if not funcionario or funcionario.cargo.nombre != 'Gestor Social':
+        return redirect('inicio')
+    form = CasoSocialForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        caso = form.save(commit=False)
+        caso.funcionario = funcionario
+        if CasoSocial.objects.filter(funcionario=funcionario, nombre_usuario=caso.nombre_usuario).count() >= 3:
+            form.add_error('nombre_usuario', 'Este usuario ya tiene el máximo de tres gestiones.')
+        else:
+            caso.save()
+            messages.success(request, 'La gestión social fue registrada.')
+            return redirect('inicio')
+    return render(request, 'delegaciones_app/formulario_nuevo.html', {'form': form, 'titulo': 'Registrar atención social'})
+
+
+@login_required
+def comentario_nuevo(request, codigo):
+    funcionario = _funcionario_requerido(request)
+    actividad = get_object_or_404(_actividades_autorizadas(request.user), codigo_verificador=codigo)
+    form = ComentarioForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        comentario = form.save(commit=False)
+        comentario.actividad = actividad
+        comentario.autor = funcionario
+        comentario.save()
+        return redirect('actividad_detalle', codigo=codigo)
+    return render(request, 'delegaciones_app/formulario_nuevo.html', {'form': form, 'titulo': 'Comentar actividad'})

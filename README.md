@@ -17,7 +17,7 @@ desplegable en una instancia AWS EC2.
   Ver «Seguridad y perfiles».
 - **Panel distinto por perfil** al iniciar sesión (`/gestion/panel/`).
 - **Recuperación de contraseña por correo** con token seguro de un solo uso.
-- Roles de trabajo (administrador, coordinador, delegado, funcionario, verificador y consulta),
+- Roles de trabajo (administrador, coordinador, delegado y funcionario),
   con acceso limitado a la delegación de cada usuario.
 - Ocho mantenedores visuales con CRUD propio, búsqueda, validaciones y eliminación con confirmación; un registro
   con datos relacionados no se elimina, se desactiva y la confirmación explica la razón:
@@ -57,8 +57,8 @@ Toda la informacion vive en el modelo relacional de `delegaciones_app` (ver
 `Delegacion`, `Cargo`, `Rol`, `Funcionario`, `UsuarioMaestro`, `Periodo`,
 `ParametroVersionado`, `ItemMedible`, `Catalogo`, `Meta`, `Indicador`,
 `Actividad`, `Evidencia`, `Validacion`, `Compromiso`, `HistorialCompromiso` y
-`Auditoria`. Se suman `FuncionarioRol` (la relación entre funcionarios y roles) y
-`MedicionDelegacion`, que conserva los indicadores iniciales de
+`Auditoria`. Se suman `FuncionarioRol`, `Organizacion`, `Ajuste`, `Ausencia`,
+`CasoSocial` y `Comentario`, además de `MedicionDelegacion`, que conserva los indicadores iniciales de
 `metas_delegaciones.json`. Las vistas obtienen los datos exclusivamente
 mediante el ORM de Django.
 
@@ -142,7 +142,9 @@ La administración se hace desde **Administración** en el menú (`/administraci
 > `DB_ENGINE=sqlite` en tu `.env` para usar SQLite localmente. Para la entrega
 > (evidencia de phpMyAdmin) se necesita `DB_ENGINE=mysql`.
 
-Tres reglas son configurables desde el `.env` (ver `.env.example`):
+Las reglas de negocio se versionan por período: tope de cumplimiento (120 % por defecto),
+máximo de 7 ingresos diarios, felicitaciones (+10 %, máximo 3) y reclamos (-30 %).
+Tres reglas operativas siguen configurables desde el `.env` (ver `.env.example`):
 `EVIDENCIA_TAMANO_MAXIMO_MB` (tamaño máximo de una evidencia, 5 por defecto),
 `COMPROMISO_DIAS_ALERTA` (días de anticipación para marcar un compromiso como
 próximo a vencer, 3 por defecto) y `ALERTA_DIAS_SIN_REGISTRO` (días sin registrar
@@ -164,7 +166,7 @@ sola vez si no se indica ninguna. No hay claves fijas en el repositorio.
 |---|---|---|---|
 | `admin.demo` | Administrador | Administrador | Todas las delegaciones |
 | `coordinador.demo` | Coordinador | Coordinador | Todas las delegaciones |
-| `verificador.demo` | Delegado | Delegado + Verificador | Delegado de Centro: revisa las evidencias de Centro |
+| `delegado.demo` | Delegado | Delegado + Verificador | Delegado de Centro: revisa las evidencias de Centro |
 | `funcionario.centro` | Funcionario | Funcionario | Centro: registra actividades y sube evidencias |
 
 Las cuentas demo no tienen correo. Para probar la recuperación de contraseña, entra como
@@ -186,7 +188,7 @@ Los datos son sinteticos y solo sirven para demostracion academica.
 - `/agenda/`: tubo de trabajo (sus tareas), con filtros y alerta de vencimiento.
 - `/actividad/<código>/evidencia/`: subir evidencia a una actividad.
 - `/coordinacion/delegados/`: delegados por delegación, su carga y su asignación (coordinación).
-- `/administracion/`: índice de los ocho mantenedores.
+- `/administracion/`: índice de los doce mantenedores.
 - `/administracion/<mantenedor>/`: listado, búsqueda y controles de cada mantenedor
   (`delegaciones`, `cargos`, `roles`, `funcionarios`, `catalogo`, `periodos`, `items`, `metas`).
 - `/administracion/auditoria/`: consulta de solo lectura de la auditoría (perfil Administrador).

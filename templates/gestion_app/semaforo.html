@@ -35,4 +35,26 @@
     {% if periodo %}<div class="col-12"><div class="panel text-center py-4">No hay delegaciones con metas para este criterio de búsqueda.</div></div>{% endif %}
     {% endfor %}
 </div>
+
+{% if personas %}
+<div class="panel mt-4">
+    <h3 class="h5 mb-3">Semáforo por profesional</h3>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead><tr><th>Profesional</th><th>Delegación</th><th>Cumplimiento</th><th>Estado</th><th>Diferencia</th></tr></thead>
+            <tbody>
+            {% for persona in personas %}
+            <tr>
+                <td>{{ persona.funcionario.nombre }}</td>
+                <td>{{ persona.funcionario.delegacion|default:'-' }}</td>
+                <td>{{ persona.cumplimiento }}%</td>
+                <td><span class="badge bg-{{ persona.estado_class }}">{{ persona.estado }}</span></td>
+                <td>{{ persona.diferencia|default:'-' }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

@@ -22,6 +22,28 @@ body {
     font-family: "Trebuchet MS", "Segoe UI", sans-serif;
 }
 
+/* Ayudas de orientación y accesibilidad. Conserva la paleta institucional existente. */
+.skip-link { position: absolute; left: .75rem; top: -4rem; z-index: 2000; padding: .65rem 1rem; background: var(--charcoal); color: #fff; text-decoration: none; }
+.skip-link:focus { top: .75rem; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid var(--ochre); outline-offset: 2px; }
+.nav-link { padding-top: .75rem; padding-bottom: .75rem; }
+.dropdown-header { color: var(--muted); font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; }
+.list-help, .form-guidance { padding: .75rem 1rem; border-left: 4px solid var(--ochre); background: #fffaf2; color: var(--muted); font-size: .9rem; }
+.filter-box { padding: 1rem; border: 1px solid var(--line); background: #faf6f1; }
+.form-guidance { margin: -0.25rem 0 1.25rem; }
+.required-mark { color: var(--terracotta); font-weight: 800; }
+.panel h2, .panel h3 { color: var(--ink); }
+.panel a:not(.btn):hover { color: var(--terracotta-dark); }
+.row > [class*="col"] > .panel, .row > [class*="col"] > a > .panel { transition: transform .15s ease, box-shadow .15s ease; }
+.row > [class*="col"] > a:hover > .panel { transform: translateY(-2px); box-shadow: 0 5px 14px rgba(48, 44, 42, .12) !important; }
+.table-responsive { border-radius: var(--radio); }
+.table tbody tr:hover { background: #fffaf7; }
+.empty-state { padding: 2rem 1rem; color: var(--muted); text-align: center; }
+.status-explanation { display: block; margin-top: .2rem; color: var(--muted); font-size: .75rem; }
+.table td:last-child, .table th:last-child { min-width: 150px; }
+.table .acciones { min-width: 150px; }
+.filtros .acciones { align-self: end; }
+
 /* Navegación y estructura */
 .sgr-nav { background: var(--charcoal) !important; min-height: 72px; box-shadow: 0 8px 24px rgba(48, 44, 42, .22); border-bottom: 5px solid var(--terracotta); }
 .navbar-brand { letter-spacing: .02em; }
