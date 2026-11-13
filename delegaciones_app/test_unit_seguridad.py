@@ -9,8 +9,9 @@ from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.core import mail
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
-from .models import Auditoria, Cargo, Delegacion, Funcionario, Rol
+from .models import Auditoria, Cargo, Compromiso, Delegacion, Funcionario, Organizacion, Rol
 from .permisos import (
     PERFIL_ADMINISTRADOR, PERFIL_COORDINADOR, PERFIL_DELEGADO, PERFIL_FUNCIONARIO, PERFILES, delegacion_propia, perfil_de, puede_revisar,
     puede_ver_todo,
@@ -30,13 +31,18 @@ class PerfilesTests(TestCase):
     def test_las_migraciones_crean_los_cuatro_perfiles_con_permisos_diferenciados(self):
         """CU-26 Crear perfiles de acceso (RF-002). Cada perfil tiene más permisos que el siguiente."""
         permisos = {nombre: set(Group.objects.get(name=nombre).permissions.values_list('codename', flat=True)) for nombre in PERFILES}
-        self.assertLess(permisos[PERFIL_FUNCIONARIO], permisos[PERFIL_DELEGADO])
-        self.assertLess(permisos[PERFIL_DELEGADO], permisos[PERFIL_COORDINADOR])
-        self.assertLess(permisos[PERFIL_COORDINADOR], permisos[PERFIL_ADMINISTRADOR])
         self.assertTrue({'add_user', 'change_user', 'view_group', 'view_auditoria', 'change_funcionario', 'delete_rol'} <= permisos[PERFIL_ADMINISTRADOR])
-        self.assertFalse({'add_user', 'view_auditoria', 'view_funcionario', 'view_rol'} & permisos[PERFIL_COORDINADOR])
+        for modelo in ('organizacion', 'ajuste', 'ausencia', 'casosocial', 'comentario', 'parametroversionado'):
+            self.assertTrue({f'{accion}_{modelo}' for accion in ('view', 'add', 'change', 'delete')} <= permisos[PERFIL_ADMINISTRADOR], modelo)
+        self.assertFalse({'add_user', 'view_auditoria', 'view_funcionario'} & permisos[PERFIL_COORDINADOR])
+        self.assertTrue({'view_organizacion', 'change_organizacion', 'view_ajuste', 'change_ajuste', 'view_ausencia', 'change_ausencia', 'view_parametroversionado', 'change_parametroversionado'} <= permisos[PERFIL_COORDINADOR])
+        self.assertFalse({'add_ajuste', 'add_ausencia', 'add_casosocial', 'add_comentario'} & permisos[PERFIL_COORDINADOR])
         self.assertIn('add_validacion', permisos[PERFIL_DELEGADO])
-        self.assertFalse({p for p in permisos[PERFIL_DELEGADO] if p.startswith('delete_') or p.endswith(('_catalogo', '_periodo', '_meta'))})
+        self.assertTrue({'view_organizacion', 'change_organizacion', 'add_ajuste', 'add_ausencia', 'add_comentario'} <= permisos[PERFIL_DELEGADO])
+        self.assertFalse({'delete_organizacion', 'view_ajuste', 'view_ausencia', 'add_casosocial', 'delete_actividad'} & permisos[PERFIL_DELEGADO])
+        self.assertTrue({'view_organizacion', 'add_casosocial', 'add_comentario'} <= permisos[PERFIL_FUNCIONARIO])
+        self.assertFalse({'change_organizacion', 'view_ajuste', 'view_ausencia', 'view_parametroversionado', 'add_ajuste', 'add_ausencia', 'add_validacion'} & permisos[PERFIL_FUNCIONARIO])
+        self.assertTrue({'view_organizacion', 'change_organizacion', 'view_ajuste', 'change_ajuste', 'view_ausencia', 'change_ausencia', 'view_parametroversionado', 'change_parametroversionado', 'view_casosocial', 'change_casosocial', 'view_comentario', 'change_comentario'} <= permisos[PERFIL_COORDINADOR])
         self.assertFalse({p for p in permisos[PERFIL_FUNCIONARIO] if p.startswith('delete_') or p.endswith('_validacion')})
 
     def test_solo_coordinador_y_administrador_tienen_permiso_de_eliminar_actividades(self):
@@ -48,18 +54,18 @@ class PerfilesTests(TestCase):
         """CU-26 Asignar perfil según roles (RF-002). Administrador, coordinador, delegado o verificador, y los demás."""
         esperados = {
             ('administrador',): PERFIL_ADMINISTRADOR, ('coordinador',): PERFIL_COORDINADOR, ('delegado',): PERFIL_DELEGADO,
-            ('funcionario', 'verificador'): PERFIL_DELEGADO, ('funcionario',): PERFIL_FUNCIONARIO, ('consulta',): PERFIL_FUNCIONARIO,
+            ('funcionario',): PERFIL_FUNCIONARIO,
         }
         for numero, (roles, perfil) in enumerate(esperados.items()):
             self.assertEqual(perfiles_de(crear_funcionario(f'p-{numero}', *roles)), {perfil}, roles)
 
     def test_el_perfil_coordinador_aporta_el_alcance_de_su_rol(self):
         """CU-26 Asignar perfil según roles (RF-002). Un Coordinador sin rol coordinador ve todas las delegaciones."""
-        usuario = crear_funcionario('solo-grupo', 'consulta')
+        usuario = crear_funcionario('solo-grupo', 'funcionario')
         usuario.groups.set([Group.objects.get(name=PERFIL_COORDINADOR)])
         self.assertEqual(perfil_de(usuario), PERFIL_COORDINADOR)
         self.assertTrue(puede_ver_todo(usuario))
-        self.assertTrue(User.objects.get(pk=usuario.pk).has_perm('delegaciones_app.add_catalogo'))
+        self.assertTrue(User.objects.get(pk=usuario.pk).has_perm('delegaciones_app.change_catalogo'))
 
     def test_el_perfil_delegado_no_da_alcance_global(self):
         """CU-26 Asignar perfil según roles (RF-002). El Delegado revisa, pero su alcance sigue siendo su delegación."""
@@ -101,7 +107,7 @@ class GestionDeUsuariosTests(TestCase):
 
     def test_crear_usuario_con_perfil_elegido(self):
         """CU-26 Crear usuario y asignar grupo (RF-002). El perfil elegido queda como grupo de la cuenta."""
-        respuesta = self.client.post(reverse('mantenedor_nuevo', args=['funcionarios']), self._datos('nuevo.coordinador', PERFIL_COORDINADOR, rol='consulta'))
+        respuesta = self.client.post(reverse('mantenedor_nuevo', args=['funcionarios']), self._datos('nuevo.coordinador', PERFIL_COORDINADOR, rol='funcionario'))
         self.assertRedirects(respuesta, reverse('mantenedor_lista', args=['funcionarios']))
         usuario = User.objects.get(username='nuevo.coordinador')
         self.assertEqual(perfiles_de(usuario), {PERFIL_COORDINADOR})
@@ -131,9 +137,95 @@ class GestionDeUsuariosTests(TestCase):
     def test_el_rol_delegado_exige_un_perfil_que_revise(self):
         """CU-26.1 Validar perfil y roles (RF-002, RF-013). Un delegado con perfil Funcionario no podría revisar: se rechaza."""
         respuesta = self.client.post(reverse('mantenedor_nuevo', args=['funcionarios']), self._datos('mal.delegado', PERFIL_FUNCIONARIO, rol='delegado'))
-        self.assertFormError(respuesta.context['form'], 'perfil', 'Los roles delegado y verificador revisan evidencias: requieren el perfil Delegado o uno superior.')
+        self.assertFormError(respuesta.context['form'], 'perfil', 'El rol delegado revisa evidencias: requiere el perfil Delegado o uno superior.')
         self.client.post(reverse('mantenedor_nuevo', args=['funcionarios']), self._datos('bien.delegado', PERFIL_DELEGADO, rol='delegado'))
         self.assertEqual(perfiles_de(User.objects.get(username='bien.delegado')), {PERFIL_DELEGADO})
+
+    def test_el_perfil_delegado_exige_el_rol_delegado(self):
+        """CU-26.1 Asignar perfil coherente (RF-002, RF-013). El perfil Delegado necesita capacidad de revisión."""
+        respuesta = self.client.post(reverse('mantenedor_nuevo', args=['funcionarios']), self._datos('mal.perfil.delegado', PERFIL_DELEGADO, rol='funcionario'))
+        self.assertFormError(respuesta.context['form'], 'roles', 'El perfil Delegado requiere el rol delegado para revisar evidencias.')
+        self.assertFalse(User.objects.filter(username='mal.perfil.delegado').exists())
+
+
+class PermisosMantenedoresTests(TestCase):
+    """CU-26.1 Acceso por jerarquía y ámbito en los mantenedores (RF-002)."""
+
+    def test_coordinador_y_delegado_entran_a_sus_mantenedores(self):
+        """CU-26.1 Acceso a mantenedores por perfil (RF-002). Coordinación ve todos y delegado ve su ámbito."""
+        centro = Delegacion.objects.create(nombre='Centro')
+        rural = Delegacion.objects.create(nombre='Rural')
+        coordinador = crear_funcionario('coordinador.demo', 'coordinador')
+        delegado = crear_funcionario('delegado.demo', 'delegado', delegacion=centro)
+        propia = Organizacion.objects.create(nombre='Organización Centro', territorio='Centro', delegacion=centro)
+        Organizacion.objects.create(nombre='Organización Rural', territorio='Rural', delegacion=rural)
+
+        self.client.force_login(coordinador)
+        for slug in ('delegaciones', 'cargos', 'catalogo', 'organizaciones', 'periodos', 'parametros', 'items', 'metas', 'ajustes', 'ausencias'):
+            self.assertEqual(self.client.get(reverse('mantenedor_lista', args=[slug])).status_code, 200, slug)
+        for slug in ('roles', 'funcionarios'):
+            self.assertEqual(self.client.get(reverse('mantenedor_lista', args=[slug])).status_code, 404, slug)
+
+        self.client.force_login(delegado)
+        lista = self.client.get(reverse('mantenedor_lista', args=['organizaciones']))
+        self.assertContains(lista, propia.nombre)
+        self.assertNotContains(lista, 'Organización Rural')
+        for slug in ('delegaciones', 'cargos', 'roles', 'funcionarios', 'catalogo', 'periodos', 'parametros', 'items', 'metas', 'ajustes', 'ausencias'):
+            self.assertEqual(self.client.get(reverse('mantenedor_lista', args=[slug])).status_code, 404, slug)
+        editar = reverse('mantenedor_editar', args=['organizaciones', propia.pk])
+        self.assertEqual(self.client.get(editar).status_code, 200)
+        self.assertContains(self.client.get(editar), 'name="verificada"')
+        indice = self.client.get(reverse('mantenedores'))
+        self.assertContains(indice, reverse('mantenedor_nuevo', args=['ajustes']))
+        self.assertContains(indice, reverse('mantenedor_nuevo', args=['ausencias']))
+        alta_ajuste = self.client.get(reverse('mantenedor_nuevo', args=['ajustes']))
+        alta_ausencia = self.client.get(reverse('mantenedor_nuevo', args=['ausencias']))
+        self.assertEqual((alta_ajuste.status_code, alta_ausencia.status_code), (200, 200))
+        self.assertEqual(set(alta_ajuste.context['form'].fields['delegacion'].queryset.values_list('pk', flat=True)), {centro.pk})
+        self.assertEqual(set(alta_ausencia.context['form'].fields['funcionario'].queryset.values_list('delegacion_id', flat=True)), {centro.pk})
+
+    def test_profesional_solo_ve_organizaciones_y_denegaciones_quedan_auditadas(self):
+        """CU-26.1 Aislar mantenedores por perfil (RF-002). Otros accesos responden 404 y quedan auditados."""
+        centro = Delegacion.objects.create(nombre='Centro')
+        rural = Delegacion.objects.create(nombre='Rural')
+        profesional = crear_funcionario('funcionario.centro', 'funcionario', delegacion=centro)
+        propia = Organizacion.objects.create(nombre='Organización Centro', territorio='Centro', delegacion=centro)
+        ajena = Organizacion.objects.create(nombre='Organización Rural', territorio='Rural', delegacion=rural)
+
+        self.client.force_login(profesional)
+        lista = self.client.get(reverse('mantenedor_lista', args=['organizaciones']))
+        self.assertContains(lista, propia.nombre)
+        self.assertNotContains(lista, ajena.nombre)
+        for slug in ('delegaciones', 'cargos', 'roles', 'funcionarios', 'catalogo', 'periodos', 'parametros', 'items', 'metas', 'ajustes', 'ausencias'):
+            self.assertEqual(self.client.get(reverse('mantenedor_lista', args=[slug])).status_code, 404, slug)
+        self.assertTrue(Auditoria.objects.filter(evento='acceso_denegado', entidad='Ajuste').exists())
+
+        delegado = crear_funcionario('delegado-alcance', 'delegado', delegacion=centro)
+        self.client.force_login(delegado)
+        self.assertEqual(self.client.get(reverse('mantenedor_editar', args=['organizaciones', ajena.pk])).status_code, 404)
+        self.assertTrue(Auditoria.objects.filter(evento='acceso_denegado', entidad='Organizacion', identificador_registro=str(ajena.pk)).exists())
+
+    def test_perfil_local_sin_delegacion_no_recibe_alcance_global(self):
+        """CU-26.1 Aislar datos por delegación (RF-002). Un Profesional sin asignación ve cero ámbitos."""
+        rural = Delegacion.objects.create(nombre='Rural')
+        Organizacion.objects.create(nombre='Organización Rural', territorio='Rural', delegacion=rural)
+        responsable = crear_funcionario('responsable-rural', 'funcionario', delegacion=rural).funcionario
+        Compromiso.objects.create(
+            folio='TAREA-RURAL', delegacion=rural, funcionario_responsable=responsable, origen='externo',
+            solicitante='JJVV', territorio='Rural', descripcion='Registro privado de Rural',
+            fecha_comprometida=timezone.localdate() + timedelta(days=5),
+        )
+        sin_delegacion = crear_funcionario('profesional-sin-ambito', 'funcionario')
+        self.client.force_login(sin_delegacion)
+
+        organizaciones = self.client.get(reverse('mantenedor_lista', args=['organizaciones']))
+        agenda = self.client.get(reverse('agenda'))
+        self.assertNotContains(organizaciones, 'Organización Rural')
+        self.assertNotContains(agenda, 'Registro privado de Rural')
+        self.assertEqual(self.client.get(reverse('delegacion_detalle', args=['Centro'])).status_code, 404)
+        self.assertTrue(Auditoria.objects.filter(
+            evento='acceso_denegado', entidad='Delegacion', identificador_registro='Centro',
+        ).exists())
 
 
 class AccesoPorPerfilTests(TestCase):
@@ -143,8 +235,9 @@ class AccesoPorPerfilTests(TestCase):
     def setUpTestData(cls):
         cls.administrador = crear_funcionario('panel-admin', 'administrador')
         cls.coordinador = crear_funcionario('panel-super', 'coordinador')
-        cls.funcionario = crear_funcionario('panel-adm', 'funcionario')
-        cls.delegado = crear_funcionario('panel-del', 'delegado')
+        cls.centro = Delegacion.objects.create(nombre='Centro')
+        cls.funcionario = crear_funcionario('panel-adm', 'funcionario', delegacion=cls.centro)
+        cls.delegado = crear_funcionario('panel-del', 'delegado', delegacion=cls.centro)
 
     def test_el_login_lleva_al_panel_de_cada_perfil(self):
         """HU-26 Panel según perfil (RF-002, RF-028). Cada perfil ve su propio panel."""
@@ -161,34 +254,43 @@ class AccesoPorPerfilTests(TestCase):
             self.assertTemplateUsed(respuesta, plantilla)
 
     def test_el_panel_administrador_muestra_gestion_de_usuarios_y_todos_los_mantenedores(self):
-        """CU-26 Panel Administrador (RF-002, RF-029). Usuarios, perfiles y los ocho mantenedores."""
+        """CU-26 Panel Administrador (RF-002, RF-029). Usuarios, perfiles y los doce mantenedores."""
         self.client.force_login(self.administrador)
         respuesta = self.client.get(reverse('panel'))
-        self.assertEqual(len(respuesta.context['mantenedores']), 8)
+        self.assertEqual(len(respuesta.context['mantenedores']), 12)
         self.assertContains(respuesta, reverse('mantenedor_nuevo', args=['funcionarios']))
         self.assertContains(respuesta, reverse('perfiles'))
+        for slug in ('delegaciones', 'cargos', 'roles', 'funcionarios', 'catalogo', 'organizaciones', 'periodos', 'parametros', 'items', 'metas', 'ajustes', 'ausencias'):
+            self.assertEqual(self.client.get(reverse('mantenedor_lista', args=[slug])).status_code, 200, slug)
 
     def test_el_panel_coordinador_muestra_solo_los_mantenedores_autorizados(self):
         """CU-26.1 Panel Coordinador (RF-002, RF-029). Seis mantenedores; sin usuarios ni auditoría."""
         self.client.force_login(self.coordinador)
         respuesta = self.client.get(reverse('panel'))
-        self.assertEqual({m['slug'] for m in respuesta.context['mantenedores']}, {'delegaciones', 'cargos', 'catalogo', 'periodos', 'items', 'metas'})
+        self.assertEqual(len(respuesta.context['mantenedores']), 10)
         self.assertNotContains(respuesta, reverse('perfiles'))
         self.assertNotContains(respuesta, reverse('auditoria_consulta'))
 
     def test_el_funcionario_no_entra_a_operaciones_criticas(self):
         """CU-26.1 Restringir operaciones críticas (RF-002, RNF-004). Sin mantenedores, perfiles ni auditoría."""
         self.client.force_login(self.funcionario)
-        for url in (reverse('mantenedores'), reverse('mantenedor_lista', args=['catalogo']), reverse('perfiles'), reverse('auditoria_consulta')):
+        self.assertEqual(self.client.get(reverse('mantenedores')).status_code, 200)
+        self.assertEqual(self.client.get(reverse('mantenedor_lista', args=['organizaciones'])).status_code, 200)
+        for url in (reverse('mantenedor_lista', args=['catalogo']), reverse('mantenedor_lista', args=['ajustes']), reverse('mantenedor_lista', args=['ausencias'])):
+            self.assertEqual(self.client.get(url).status_code, 404, url)
+        for url in (reverse('perfiles'), reverse('auditoria_consulta')):
             self.assertRedirects(self.client.get(url), reverse('inicio'), msg_prefix=url)
-        self.assertNotContains(self.client.get(reverse('panel')), reverse('mantenedores'))
+        self.assertContains(self.client.get(reverse('panel')), reverse('mantenedores'))
 
     def test_el_coordinador_no_gestiona_usuarios_ni_perfiles(self):
         """CU-26.1 Restringir acceso por perfil (RF-002). Permisos intermedios."""
         self.client.force_login(self.coordinador)
         self.assertEqual(self.client.get(reverse('mantenedor_lista', args=['catalogo'])).status_code, 200)
-        for url in (reverse('mantenedor_lista', args=['funcionarios']), reverse('mantenedor_nuevo', args=['roles']), reverse('perfiles')):
-            self.assertRedirects(self.client.get(url), reverse('inicio'), msg_prefix=url)
+        self.assertEqual(self.client.get(reverse('mantenedor_lista', args=['roles'])).status_code, 404)
+        url_funcionarios = reverse('mantenedor_lista', args=['funcionarios'])
+        self.assertEqual(self.client.get(url_funcionarios).status_code, 404)
+        url_perfiles = reverse('perfiles')
+        self.assertRedirects(self.client.get(url_perfiles), reverse('inicio'), msg_prefix=url_perfiles)
 
     def test_la_pagina_de_perfiles_lista_permisos_y_usuarios(self):
         """CU-26 Consultar perfiles y permisos (RF-002). Solo lectura para el administrador."""

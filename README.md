@@ -13,17 +13,17 @@ desplegable en una instancia AWS EC2.
   evidencias y compromisos.
 - Autenticación Django (login, logout, vistas protegidas) con cuatro **perfiles de acceso** que son
   grupos de Django con permisos y siguen la jerarquía de la Municipalidad: **Administrador** (acceso
-  total), **Coordinador** y **Delegado** (permisos intermedios) y **Funcionario** (permisos mínimos).
+  total), **Coordinador** y **Delegado** (permisos intermedios) y **Profesional** (permisos mínimos).
   Ver «Seguridad y perfiles».
 - **Panel distinto por perfil** al iniciar sesión (`/gestion/panel/`).
 - **Recuperación de contraseña por correo** con token seguro de un solo uso.
 - Roles de trabajo (administrador, coordinador, delegado y funcionario),
   con acceso limitado a la delegación de cada usuario.
-- Ocho mantenedores visuales con CRUD propio, búsqueda, validaciones y eliminación con confirmación; un registro
+- Doce mantenedores visuales con CRUD propio, búsqueda, validaciones y eliminación con confirmación; un registro
   con datos relacionados no se elimina, se desactiva y la confirmación explica la razón:
   Delegaciones, Cargos, Roles, Funcionarios, Catálogo, Períodos, Ítems medibles y Metas.
 - Registro de actividades con código verificador único e inmutable, carga de evidencias
-  (JPG, PNG o PDF, hasta 5 MB), revisión por verificadores y anulación de aprobaciones con motivo.
+  (JPG, PNG o PDF, hasta 5 MB), revisión por delegados y coordinación y anulación de aprobaciones con motivo.
 - Tubo de trabajo (tareas con la comunidad) con responsable, plazos, alerta de vencimiento, estados controlados, historial
   y un resumen por responsable y estado.
 - Alertas por vencimientos, evidencias pendientes de revisión, ausencia de registros y avance bajo lo esperado.
@@ -66,7 +66,7 @@ Código de la aplicación:
 
 - `models.py`: clases y reglas de negocio.
 - `permisos.py`: roles y control de acceso.
-- `crud.py`, `forms.py`: los ocho mantenedores y sus formularios.
+- `crud.py`, `forms.py`: los doce mantenedores y sus formularios.
 - `views.py`, `informes.py`, `medicion.py`: actividades, compromisos, informes y cálculo de resultados.
 - `auditoria.py`: auditoría y su consulta.
 - `gestion_app`: dashboard, semáforo, resumen, ficha personal e informes.
@@ -166,8 +166,8 @@ sola vez si no se indica ninguna. No hay claves fijas en el repositorio.
 |---|---|---|---|
 | `admin.demo` | Administrador | Administrador | Todas las delegaciones |
 | `coordinador.demo` | Coordinador | Coordinador | Todas las delegaciones |
-| `delegado.demo` | Delegado | Delegado + Verificador | Delegado de Centro: revisa las evidencias de Centro |
-| `funcionario.centro` | Funcionario | Funcionario | Centro: registra actividades y sube evidencias |
+| `delegado.demo` | Delegado | Delegado | Delegado de Centro: revisa las evidencias de Centro |
+| `funcionario.centro` | Profesional | Funcionario | Centro: registra actividades y sube evidencias |
 
 Las cuentas demo no tienen correo. Para probar la recuperación de contraseña, entra como
 `admin.demo`, abre **Administración → Funcionarios y usuarios**, edita la cuenta y escribe un
@@ -190,7 +190,8 @@ Los datos son sinteticos y solo sirven para demostracion academica.
 - `/coordinacion/delegados/`: delegados por delegación, su carga y su asignación (coordinación).
 - `/administracion/`: índice de los doce mantenedores.
 - `/administracion/<mantenedor>/`: listado, búsqueda y controles de cada mantenedor
-  (`delegaciones`, `cargos`, `roles`, `funcionarios`, `catalogo`, `periodos`, `items`, `metas`).
+  (`delegaciones`, `cargos`, `roles`, `funcionarios`, `catalogo`, `organizaciones`, `periodos`, `parametros`,
+  `items`, `metas`, `ajustes`, `ausencias`).
 - `/administracion/auditoria/`: consulta de solo lectura de la auditoría (perfil Administrador).
 - `/administracion/perfiles/`: perfiles, sus permisos y sus usuarios (perfil Administrador).
 - `/gestion/`, `/gestion/semaforo/`, `/gestion/resumen/`: medicion y cumplimiento.
@@ -204,16 +205,16 @@ Los datos son sinteticos y solo sirven para demostracion academica.
 
 | Rol | Qué hace | Qué ve |
 |---|---|---|
+| Administrador | Configura cuentas y mantenedores, consulta auditoría y supervisa el sistema | Todas las delegaciones y funciones |
 | Coordinador | Gestiona a los delegados: asigna o cambia el delegado de cada delegación (`/coordinacion/delegados/`), les asigna tareas del tubo, revisa evidencias y sigue el avance de todas. No hace el trabajo operativo: no sube evidencias en nombre de otros. Su panel muestra todas las delegaciones con su avance y su delegado | Todas las delegaciones |
 | Delegado | Trabaja su delegación: revisa (aprueba o rechaza) sus evidencias, registra actividades y tareas tomadas en terreno. Su panel muestra lo que espera su revisión, su tubo de trabajo y sus métricas | Solo su delegación (registros y métricas) |
-| Verificador | Revisa evidencias | Su delegación si tiene una; si no, todas |
-| Funcionario | Registra actividades, sube evidencias y registra compromisos de su delegación | Su delegación |
+| Profesional | Registra actividades, sube evidencias y registra compromisos de su delegación | Su delegación |
 
 - **Tareas del tubo de trabajo: quién y dónde las crea.** Se agregan solo desde la página del tubo
   (`/agenda/`), con el botón «+ Agregar al tubo de trabajo», que ven únicamente quienes pueden crear:
   - administración y coordinación: para cualquier delegación, eligiendo al delegado responsable;
-  - delegado y funcionario: para su propia delegación, y la tarea queda a su cargo;
-  - verificador y consulta: no agregan tareas (si abren la URL, el acceso se rechaza y queda en la auditoría).
+  - delegado y profesional: para su propia delegación, y la tarea queda a su cargo;
+  - la migración `0024_migrar_roles_obsoletos` ya trasladó los roles retirados `verificador` y `consulta` a `delegado` y `funcionario`, respectivamente.
 
   Los paneles, la pantalla de delegados y la página de cada delegación solo llevan al tubo («Ver tubo de
   trabajo»). La regla está en `permisos.ROLES_CREAN_TAREAS`. Solo coordinación y administración eliminan tareas.
@@ -279,26 +280,27 @@ responde con un mensaje de éxito o de error.
 
 ## Seguridad y perfiles
 
-Perfil = nivel de permisos (grupo de Django); rol = función y alcance (tabla `rol`). La jerarquía es
-Administrador > Coordinador > Delegado > Funcionario, y cada perfil tiene todos los permisos del siguiente.
+Perfil = nivel de permisos (grupo de Django); rol = función y alcance (tabla `rol`). Los cuatro perfiles
+son Administrador, Coordinador, Delegado y Profesional; cada uno recibe los permisos de las tareas que realiza.
 
 | Perfil (grupo Django) | En la pauta | Roles que lo usan | Puede | No puede |
 |---|---|---|---|---|
-| Administrador | Administrador (acceso total) | administrador | Los 8 mantenedores, gestión de usuarios y perfiles, todas las transacciones, auditoría, visión global | — |
-| Coordinador | Supervisor (intermedio) | coordinador | 6 mantenedores (delegaciones, cargos, catálogo, períodos, ítems, metas), transacciones, revisión de evidencias, asignación de delegados y eliminación de actividades y tareas en todas las delegaciones | Usuarios, roles, perfiles, auditoría |
-| Delegado | Supervisor (intermedio) | delegado, verificador | Revisar evidencias (aprobar, rechazar, anular) y trabajar el tubo y las actividades, solo en su delegación | Mantenedores, usuarios, eliminar, otras delegaciones, auditoría |
-| Funcionario | Administrativo (mínimo) | funcionario, consulta | Registrar y seguir sus actividades, evidencias y tareas; su ficha | Revisar evidencias, mantenedores, usuarios, eliminar actividades o tareas, cerrar períodos, auditoría |
+| Administrador | Administrador (acceso total) | administrador | Los 12 mantenedores, gestión de usuarios y perfiles, todas las transacciones, auditoría, visión global | — |
+| Coordinador | Coordinación | coordinador | Gestionar los seis mantenedores operativos, ver y editar organizaciones, ajustes, ausencias, casos sociales, comentarios y parámetros; decidir ajustes, revisar evidencias y eliminar actividades y tareas en todas las delegaciones | Funcionarios, roles, perfiles, auditoría |
+| Delegado | Delegación | delegado | Verificar organizaciones de su delegación, crear ajustes y ausencias de su equipo, comentar y trabajar el tubo y las actividades de su delegación | Otras delegaciones, usuarios, eliminar, auditoría |
+| Profesional | Profesional | funcionario | Ver organizaciones de su delegación, crear casos sociales y comentarios, registrar y seguir sus actividades, evidencias y tareas | Mantenedores fuera de su alcance, revisión de evidencias, usuarios, eliminar actividades o tareas, auditoría |
 
 - Los grupos y sus permisos (`view`, `add`, `change`, `delete` de cada tabla) los crean las migraciones
   `0015_perfiles_de_acceso` (tres perfiles iniciales) y `0018_perfiles_por_jerarquia` (renombra
-  Supervisor a Coordinador y Administrativo a Funcionario, crea Delegado y mueve allí a los delegados y
-  verificadores). La `0019_eliminar_actividad_solo_coordinacion` da al Coordinador el permiso
-  `delete_actividad`: eliminar actividades es una operación crítica que Delegado y Funcionario no hacen
+  Supervisor a Coordinador y Administrativo a Funcionario, crea Delegado y mueve allí a los delegados).
+  Las migraciones `0024_migrar_roles_obsoletos` y `0025_permisos_perfiles_operativos` retiran los roles antiguos
+  y asignan los permisos de mantenedores por perfil. La `0019_eliminar_actividad_solo_coordinacion` da al Coordinador el permiso
+  `delete_actividad`: eliminar actividades es una operación crítica que Delegado y Profesional no hacen
   (corrigen con «Modificar actividad»).
-- Revisar evidencias exige el rol (delegado, verificador, coordinador o administrador) **y** el permiso
-  `add_validacion` del perfil (`permisos.puede_revisar`): el perfil Funcionario nunca revisa. El delegado
+- Revisar evidencias exige el rol (delegado, coordinador o administrador) **y** el permiso
+  `add_validacion` del perfil (`permisos.puede_revisar`): el perfil Profesional nunca revisa. El delegado
   revisa solo las actividades de su delegación; las de otra responden 404.
-- Ámbito: quien trabaja una delegación (delegado, funcionario) ve solo su delegación en actividades, tubo de
+- Ámbito: quien trabaja una delegación (delegado, profesional) ve solo su delegación en actividades, tubo de
   trabajo, portada, panel, medición, semáforo, resumen, informes (pantalla y CSV), alertas y ficha. Un
   registro de otra delegación (actividad, evidencia, tarea o página de la delegación) responde 404 y el
   intento queda en la auditoría.
@@ -453,7 +455,7 @@ python manage.py collectstatic --noinput
 sudo systemctl restart gunicorn
 ```
 
-Qué hace cada migración de la Evaluación Sumativa 3 (todas son reversibles):
+Qué hacen las migraciones de perfiles y permisos de la Evaluación Sumativa 3:
 
 | Migración | Qué cambia | ¿Toca datos? |
 |---|---|---|
@@ -463,6 +465,8 @@ Qué hace cada migración de la Evaluación Sumativa 3 (todas son reversibles):
 | `0018_perfiles_por_jerarquia` | Renombra Supervisor a Coordinador y Administrativo a Funcionario, crea Delegado y mueve allí a los delegados y verificadores | Sí: grupos y asignaciones de usuarios |
 | `0019_eliminar_actividad_solo_coordinacion` | Da al Coordinador el permiso `delete_actividad` | Sí: una fila de `auth_group_permissions` |
 | `0020_nombres_legibles_de_modelos` | Nombres legibles de cinco modelos | No: solo textos, sin SQL |
+| `0024_migrar_roles_obsoletos` | Mueve `verificador` a `delegado`, mueve usuarios de `consulta` al perfil y rol Profesional y elimina los roles retirados | Sí: usuarios, perfiles y roles |
+| `0025_permisos_perfiles_operativos` | Asigna a cada perfil permisos para los mantenedores y operaciones que le corresponden | Sí: grupos y permisos |
 
 ### 6. Migraciones, datos demo y estaticos
 
@@ -541,7 +545,7 @@ Se accede con `http://<IP_PUBLICA_EC2>/` (sin https).
 - `git log --oneline`, `git remote -v` y `git status` limpio.
 - `systemctl status` de mysqld, gunicorn, nginx y php-fpm en verde; `nginx -t`.
 - La aplicacion respondiendo en el navegador desde la IP publica.
-- Login con cada cuenta demo y su panel (Administrador, Coordinador, Delegado, Funcionario).
+- Login con cada cuenta demo y su panel (Administrador, Coordinador, Delegado, Profesional).
 - Mantenedores con CRUD y búsqueda; restricciones al entrar con un perfil sin permiso.
 - Recuperación de contraseña: solicitud, correo recibido, enlace, cambio e ingreso con la nueva clave.
 - phpMyAdmin (`/phpmyadmin/`) mostrando tablas, estructura, relaciones y registros.

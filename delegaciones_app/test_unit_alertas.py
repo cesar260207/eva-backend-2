@@ -210,10 +210,10 @@ class AlertasDeAvanceTests(AlertasBase):
         self.assertEqual([a['responsable'] for a in self._alertas(rural)], ['Delegación Rural'])
         self.assertEqual(len(self._alertas(self.coordinador)), 2)
 
-    def test_un_usuario_sin_delegacion_ni_alcance_global_no_recibe_alertas_de_avance(self):
+    def test_el_delegado_solo_recibe_alertas_de_su_delegacion(self):
         """CU-26.1 Denegar acceso por ámbito (RF-037). Un verificador sin delegación no las ve."""
         self._indicador(self.meta, 1)
-        self.assertEqual(self._alertas(self.usuario_verificador), [])
+        self.assertEqual([a['responsable'] for a in self._alertas(self.usuario_verificador)], ['Delegación Centro'])
 
     def test_sin_indicadores_no_hay_alertas_de_avance(self):
         """CU-16 Semáforo de cumplimiento (RF-037). Sin cálculos no se inventa nada."""

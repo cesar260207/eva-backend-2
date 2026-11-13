@@ -1,11 +1,9 @@
 """Permisos por rol y por perfil.
 
-Perfil = nivel de permisos; rol = función y alcance. Los roles salen del Funcionario del usuario y
-definen su función en el flujo de trabajo (quién registra, quién verifica, qué delegación ve). Los
-perfiles son los grupos de Django y siguen la jerarquía Administrador > Coordinador > Delegado >
-Funcionario (migraciones 0015 y 0018): sus permisos deciden el acceso a los mantenedores, la revisión
-de evidencias, la auditoría y los perfiles. En la pauta de la evaluación, Coordinador y Delegado son
-los perfiles intermedios («Supervisor») y Funcionario el mínimo («Administrativo»).
+Perfil = nivel de permisos; rol = función y alcance. Los roles vigentes salen del Funcionario del usuario
+y definen si administra, coordina, trabaja como delegado o registra actividades como funcionario. Los
+perfiles son los grupos de Django Administrador, Coordinador, Delegado y Profesional; sus permisos
+deciden el acceso a los mantenedores, la revisión de evidencias, la auditoría y la gestión de perfiles.
 """
 from functools import wraps
 
@@ -23,6 +21,9 @@ DELEGADO = 'delegado'
 FUNCIONARIO = 'funcionario'
 # Los permisos consultan estos nombres: no se renombran ni se eliminan desde el mantenedor de roles.
 ROLES_DEL_SISTEMA = (ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO)
+# Roles retirados del flujo, pero conservados como nombres reservados para impedir su borrado manual
+# antes de que se aplique la migración que traslada sus asignaciones.
+ROLES_RETIRADOS = ('verificador', 'consulta')
 
 MENSAJE_SIN_PERMISO = 'No tienes permiso para acceder a esta sección.'
 
@@ -123,14 +124,16 @@ def puede_eliminar_actividad(user):
 
 
 def puede_revisar(user):
-    """Aprueba, rechaza o anula evidencias: un rol revisor con el permiso de su perfil. El perfil Funcionario
+    """Aprueba, rechaza o anula evidencias: un rol revisor con el permiso de su perfil. El perfil Profesional
     no tiene ese permiso, así que nunca revisa aunque tenga asignado un rol revisor."""
     return tiene_rol(user, *ROLES_REVISORES) and user.has_perm(PERMISO_REVISAR)
 
 
 def delegacion_propia(user):
-    """Delegación a la que se limita lo que ve el usuario: la suya si no tiene alcance global
-    (un delegado de Centro ve solo Centro). None si ve todas o si no tiene delegación asignada."""
+    """Delegación del usuario local; None si es global o carece de asignación.
+
+    Quien use este resultado debe comprobar `puede_ver_todo` antes de interpretar None como alcance global.
+    """
     if puede_ver_todo(user):
         return None
     funcionario = funcionario_de(user)

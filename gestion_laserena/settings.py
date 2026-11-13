@@ -60,6 +60,12 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# Cabeceras para reducir MIME sniffing, filtraciÃ³n de URLs y carga en iframes.
+# HSTS y cookies Secure dependen de HTTPS y se configuran en el despliegue TLS.
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = 'same-origin'
+X_FRAME_OPTIONS = 'DENY'
+
 ROOT_URLCONF = 'gestion_laserena.urls'
 
 TEMPLATES = [

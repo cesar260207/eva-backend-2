@@ -45,7 +45,7 @@ class EscenarioBase:
         self.item = ItemMedible.objects.create(cargo=self.cargo, periodo=self.periodo, nombre='Atención territorial', ponderacion=100)
         self.catalogo = Catalogo.objects.create(codigo='AT-BASE', nombre='Operativo en terreno', tipo='atencion')
         self.usuario_autor = crear_funcionario('autor-base', 'funcionario', cargo=self.cargo, delegacion=self.centro)
-        self.usuario_verificador = crear_funcionario('verificador-base', 'verificador', cargo=self.cargo)
+        self.usuario_verificador = crear_funcionario('delegado-base', 'delegado', cargo=self.cargo, delegacion=self.centro)
         self.autor = self.usuario_autor.funcionario
         self.verificador = self.usuario_verificador.funcionario
         self.fecha_valida = timezone.make_aware(datetime(2026, 9, 10, 10, 0))

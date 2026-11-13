@@ -269,6 +269,8 @@ class Actividad(VersionOptimistaMixin, models.Model):
 
 	def clean(self):
 		super().clean()
+		if self.organizacion_id and self.delegacion_id and self.organizacion.delegacion_id != self.delegacion_id:
+			raise ValidationError({'organizacion': 'La organización debe pertenecer a la delegación de la actividad.'})
 		from .reglas import validar_fecha_actividad, validar_limite_diario, evaluar_puntaje
 
 		if self.compromiso_id:
@@ -284,7 +286,7 @@ class Actividad(VersionOptimistaMixin, models.Model):
 			if self.fecha:
 				fecha = timezone.localtime(self.fecha).date()
 				validar_fecha_actividad(fecha, periodo)
-				if self._state.adding:
+				if self._state.adding and self.funcionario_autor_id:
 					validar_limite_diario(self.funcionario_autor, fecha, periodo)
 		self.cuenta_puntaje, self.motivo_sin_puntaje = evaluar_puntaje(self)
 
@@ -488,6 +490,8 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 	def clean(self):
 		super().clean()
 		self.gestion_interna = self.origen == 'interno'
+		if self.organizacion_id and self.delegacion_id and self.organizacion.delegacion_id != self.delegacion_id:
+			raise ValidationError({'organizacion': 'La organización debe pertenecer a la delegación de la tarea.'})
 
 	@property
 	def vencido(self):
@@ -948,7 +952,7 @@ class HistorialCompromiso(models.Model):
 		verbose_name_plural = 'historial de tareas'
 
 	def __str__(self):
-		return f'{self.compromiso} - {self.estado_anterior} -> {self.estado_nuevo}'
+		return f'{self.compromiso.folio}: {self.estado_anterior or "inicio"} -> {self.estado_nuevo}'
 
 
 class Ajuste(ControlPeriodoCerradoMixin, models.Model):
@@ -962,7 +966,10 @@ class Ajuste(ControlPeriodoCerradoMixin, models.Model):
 	delegacion = models.ForeignKey(Delegacion, on_delete=models.PROTECT, null=True, blank=True, related_name='ajustes')
 	periodo = models.ForeignKey(Periodo, on_delete=models.PROTECT, related_name='ajustes')
 	fecha = models.DateField(default=timezone.localdate)
-	respaldo = models.FileField(upload_to='ajustes/%Y/%m/', null=True, blank=True)
+	respaldo = models.FileField(
+		upload_to='ajustes/%Y/%m/', null=True, blank=True,
+		validators=[FileExtensionValidator(EXTENSIONES_EVIDENCIA), validar_tamano_evidencia],
+	)
 	observacion = models.TextField(blank=True)
 	estado = models.CharField(max_length=20, choices=ESTADOS, default='informado')
 	informado_por = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='ajustes_informados')
@@ -1042,7 +1049,6 @@ class Comentario(models.Model):
 		super().clean()
 		if bool(self.actividad_id) == bool(self.compromiso_id):
 			raise ValidationError('El comentario debe asociarse a una actividad o a una tarea.')
-		return f'{self.compromiso.folio}: {self.estado_anterior or "inicio"} -> {self.estado_nuevo}'
 
 
 MENSAJE_AUDITORIA_SOLO_LECTURA = 'La auditoría es de solo lectura: sus registros no se modifican ni se eliminan.'

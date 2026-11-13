@@ -6,13 +6,14 @@ from types import SimpleNamespace
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.test import SimpleTestCase, TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
 from .crud import datos_relacionados, texto_relacionados
-from .forms import CatalogoForm, FuncionarioForm, PeriodoForm
+from .forms import AjusteForm, CatalogoForm, FuncionarioForm, PeriodoForm
 from .models import (
-    Actividad, Auditoria, Cargo, Catalogo, Delegacion, Funcionario, FuncionarioRol, ItemMedible, Meta, ParametroVersionado, Periodo, Rol,
+    Actividad, Ajuste, Auditoria, Cargo, Catalogo, Delegacion, Funcionario, FuncionarioRol, ItemMedible, Meta, ParametroVersionado, Periodo, Rol,
 )
 from .pruebas_base import EscenarioBase, crear_funcionario
 
@@ -602,7 +603,7 @@ class EliminarEnMantenedoresTests(EscenarioBase, TestCase):
         self.assertEqual(datos_relacionados(self.verificador), [])
         self.nueva_actividad()
         self.assertEqual(datos_relacionados(self.autor), [('actividad', 1)])
-        self.assertEqual(texto_relacionados(datos_relacionados(self.centro)), '1 funcionario, 1 actividad')
+        self.assertEqual(texto_relacionados(datos_relacionados(self.centro)), '2 funcionarios, 1 actividad')
 
     def test_la_lista_ofrece_eliminar_en_activos_y_activar_en_inactivos(self):
         """CU-25 Mantener tablas maestras (RF-001). La fila activa dice «Eliminar» y la inactiva «Activar»."""
@@ -611,3 +612,20 @@ class EliminarEnMantenedoresTests(EscenarioBase, TestCase):
         self.assertContains(lista, '>Eliminar</a>')
         self.assertContains(lista, '>Activar</a>')
         self.assertNotContains(lista, '>Desactivar</a>')
+
+
+class ValidacionRespaldoAjusteTests(SimpleTestCase):
+    """CU-25 Validar archivo de respaldo (RNF-017): formato y tamaño máximo."""
+
+    def test_el_respaldo_rechaza_extensiones_no_permitidas(self):
+        archivo = SimpleUploadedFile('respaldo.html', b'<script>alert(1)</script>')
+        with self.assertRaises(ValidationError):
+            for validar in Ajuste._meta.get_field('respaldo').validators:
+                validar(archivo)
+
+    @override_settings(EVIDENCIA_TAMANO_MAXIMO_MB=1)
+    def test_el_respaldo_rechaza_archivos_mayores_al_limite(self):
+        archivo = SimpleUploadedFile('respaldo.pdf', b'x' * (1024 * 1024 + 1))
+        with self.assertRaises(ValidationError):
+            for validar in Ajuste._meta.get_field('respaldo').validators:
+                validar(archivo)

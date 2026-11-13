@@ -96,9 +96,9 @@ class CumplimientoUnitTests(MedicionBase):
         """CU-07.1 Aplicar fórmulas de medición (RF-023). RN-004: 1 de 4 es 25 %."""
         self.assertEqual(self._indicador(1).cumplimiento, Decimal('25.00'))
 
-    def test_el_cumplimiento_se_topa_en_150_por_defecto(self):
+    def test_el_cumplimiento_se_topa_en_120_por_defecto(self):
         """CU-07.1 Aplicar fórmulas de medición (RF-024). RN-005: no pasa del máximo computable."""
-        self.assertEqual(self._indicador(100).cumplimiento, Decimal('150'))
+        self.assertEqual(self._indicador(100).cumplimiento, Decimal('120'))
 
     def test_el_tope_lo_define_el_parametro_del_periodo(self):
         """CU-25 Modificar parámetros (RF-024, RF-038). El máximo computable es configurable por período."""
@@ -286,7 +286,7 @@ class FichaPersonalUnitTests(MedicionBase):
         Indicador.generar(self.meta, MITAD_DEL_PERIODO)
         formula = self._fila()['formula']
         self.assertIn('1 / 4 × 100 = 25 %', formula[0])
-        self.assertIn('Máximo computable: 150 %', formula[1])
+        self.assertIn('Máximo computable: 120 %', formula[1])
         self.assertIn('100 % × 25 % = 25', formula[2])
 
     def test_el_detalle_avisa_cuando_se_aplica_el_tope(self):
@@ -296,7 +296,7 @@ class FichaPersonalUnitTests(MedicionBase):
         for numero in range(2):
             self.aprobar(self.nueva_actividad(solicitud_problema=f'Extra {numero}'))
         Indicador.generar(self.meta, MITAD_DEL_PERIODO)
-        self.assertIn('se aplica el tope y queda en 150 %', self._fila()['formula'][1])
+        self.assertIn('se aplica el tope y queda en 120 %', self._fila()['formula'][1])
 
     def test_lista_las_actividades_que_aportan(self):
         """CU-07.3 Mostrar detalle en reporte (RF-022). Cada cifra enlaza a su origen."""

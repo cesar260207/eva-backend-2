@@ -28,7 +28,7 @@ from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 from .auditoria import cambios_de_formulario
 from .forms import AjusteForm, AusenciaForm, CargoForm, CatalogoForm, DelegacionForm, FuncionarioForm, ItemMedibleForm, MetaForm, OrganizacionForm, ParametroVersionadoForm, PeriodoForm, RolForm
 from .models import Ajuste, Auditoria, Ausencia, Cargo, Catalogo, Delegacion, Funcionario, Indicador, ItemMedible, Meta, Organizacion, ParametroVersionado, Periodo, Rol
-from .permisos import PERFILES, ROLES_DEL_SISTEMA, PermisoRequeridoMixin, funcionario_de, permiso_requerido
+from .permisos import PERFIL_DELEGADO, PERFILES, ROLES_DEL_SISTEMA, ROLES_RETIRADOS, PermisoRequeridoMixin, funcionario_de, permiso_requerido, puede_ver_todo, registrar_acceso_denegado
 
 
 @dataclass
@@ -106,6 +106,17 @@ def _eliminar_funcionario(funcionario):
 def _bloqueo_rol(rol, request):
     if rol.nombre_rol in ROLES_DEL_SISTEMA:
         return f'«{rol}» es un rol del sistema: los permisos lo consultan por su nombre y no se elimina.'
+    if rol.nombre_rol in ROLES_RETIRADOS:
+        return f'«{rol}» está reservado para la migración de datos y no se elimina manualmente.'
+
+
+def _organizaciones_visibles(user, registros):
+    if puede_ver_todo(user):
+        return registros
+    funcionario = funcionario_de(user)
+    if funcionario and funcionario.delegacion_id:
+        return registros.filter(delegacion_id=funcionario.delegacion_id)
+    return registros.none()
 
 
 def _advertencia_meta(meta):
@@ -145,7 +156,7 @@ MANTENEDORES = {mantenedor.slug: mantenedor for mantenedor in (
         baja='vigencia',
     ),
     Mantenedor(
-        'roles', 'Roles', 'rol', 'Funciones de los funcionarios en el flujo de trabajo (delegado, verificador, consulta...).',
+        'roles', 'Roles', 'rol', 'Funciones de los funcionarios en el flujo de trabajo (administrador, coordinador, delegado, funcionario).',
         Rol, RolForm,
         [('Rol', 'nombre_rol'), ('Funcionarios', lambda r: r.funcionarios.count())],
         ('nombre_rol__icontains',),
@@ -240,8 +251,9 @@ MANTENEDORES = {mantenedor.slug: mantenedor for mantenedor in (
 
 def exportar_organizaciones(request):
     if not request.user.has_perm('delegaciones_app.view_organizacion'):
+        registrar_acceso_denegado(request, 'Organizacion', request.path, 'permiso insuficiente')
         raise Http404('Mantenedor no encontrado.')
-    registros = Organizacion.objects.select_related('delegacion').order_by('nombre')
+    registros = _organizaciones_visibles(request.user, Organizacion.objects.select_related('delegacion')).order_by('nombre')
     query = request.GET.get('q', '').strip()
     if query:
         filtros = Q()
@@ -332,8 +344,19 @@ class MantenedorMixin(PermisoRequeridoMixin):
     def get_permiso_requerido(self):
         return self.config.permiso(self.accion)
 
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and not request.user.has_perm(self.get_permiso_requerido()):
+            registrar_acceso_denegado(request, self.config.modelo.__name__, self.config.slug, 'permiso insuficiente')
+            raise Http404('Mantenedor no encontrado.')
+        return super().dispatch(request, *args, **kwargs)
+
     def get_queryset(self):
-        return self.config.consulta()
+        registros = self.config.consulta()
+        if not registros.ordered:
+            registros = registros.order_by('pk')
+        if self.config.slug == 'organizaciones':
+            registros = _organizaciones_visibles(self.request.user, registros)
+        return registros
 
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)
@@ -422,6 +445,10 @@ class MantenedorFormularioMixin(MantenedorMixin):
         kwargs = super().get_form_kwargs()
         if self.config.con_actor:
             kwargs['actor'] = self.request.user
+        if self.config.slug == 'organizaciones':
+            kwargs['user'] = self.request.user
+        if self.config.slug in ('ajustes', 'ausencias'):
+            kwargs['user'] = self.request.user
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -458,6 +485,16 @@ class MantenedorNuevo(MantenedorFormularioMixin, CreateView):
 class MantenedorEditar(MantenedorFormularioMixin, UpdateView):
     accion = 'change'
     accion_titulo = 'Modificar'
+
+    def get_object(self, queryset=None):
+        if self.config.slug == 'organizaciones':
+            pk = self.kwargs.get(self.pk_url_kwarg)
+            registro = get_object_or_404(self.config.consulta(), pk=pk)
+            if not _organizaciones_visibles(self.request.user, self.config.consulta()).filter(pk=registro.pk).exists():
+                registrar_acceso_denegado(self.request, 'Organizacion', str(pk), 'fuera del ámbito')
+                raise Http404('Organización no encontrada.')
+            return registro
+        return super().get_object(queryset)
 
 
 class MantenedorEliminar(MantenedorMixin, DeleteView):

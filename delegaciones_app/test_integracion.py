@@ -11,7 +11,7 @@ from django.core.management import call_command
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.test import RequestFactory, TestCase, TransactionTestCase, override_settings
-from django.urls import reverse
+from django.urls import resolve, reverse
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
@@ -25,7 +25,7 @@ from .models import validar_tamano_evidencia
 from .pruebas_base import crear_funcionario
 from .permisos import RolRequeridoMixin, asignar_perfil, roles_de, rol_requerido, tiene_rol
 from .models import (
-	Actividad, Auditoria, Cargo, Catalogo, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
+	Actividad, Auditoria, Cargo, Catalogo, Comentario, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
 	HistorialCompromiso, Indicador, ItemMedible, MedicionDelegacion, Meta, ParametroVersionado, Periodo,
 	Rol, UsuarioMaestro, Validacion,
 )
@@ -549,6 +549,71 @@ class MigracionPerfilesPorJerarquiaTests(TransactionTestCase):
 		self.assertEqual(set(revertido.get_model('auth', 'User').objects.get(pk=delegado).groups.values_list('name', flat=True)), {'Administrativo'})
 
 
+class MigracionPerfilesOperativosTests(TransactionTestCase):
+	"""CU-26 Migrar perfiles y permisos (RF-002). Los roles obsoletos se trasladan de forma segura."""
+
+	antes = [('delegaciones_app', '0023_ajuste_emisor_ajuste_origen_and_more')]
+	despues = [('delegaciones_app', '0025_permisos_perfiles_operativos')]
+
+	def _migrar(self, destino):
+		executor = MigrationExecutor(connection)
+		executor.migrate(destino)
+		return executor.loader.project_state(destino).apps
+
+	def tearDown(self):
+		self._migrar(MigrationExecutor(connection).loader.graph.leaf_nodes())
+
+	def test_traslada_roles_y_asigna_permisos_sin_perder_usuarios(self):
+		"""CU-26 Migrar roles retirados y perfiles (RF-002). Verificador pasa a Delegado y consulta a Profesional."""
+		apps = self._migrar(self.antes)
+		Rol = apps.get_model('delegaciones_app', 'Rol')
+		Funcionario = apps.get_model('delegaciones_app', 'Funcionario')
+		Cargo = apps.get_model('delegaciones_app', 'Cargo')
+		User = apps.get_model('auth', 'User')
+		Group = apps.get_model('auth', 'Group')
+		rol_delegado = Rol.objects.get_or_create(nombre_rol='delegado')[0]
+		rol_verificador = Rol.objects.get_or_create(nombre_rol='verificador')[0]
+		rol_consulta = Rol.objects.get_or_create(nombre_rol='consulta')[0]
+		cargo = Cargo.objects.create(nombre='Migración de prueba')
+		usuarios = {}
+		for username, rol in (('legado-verificador', rol_verificador), ('legado-consulta', rol_consulta)):
+			usuario = User.objects.create(username=username)
+			funcionario = Funcionario.objects.create(usuario=usuario, identificador_institucional=username, nombre=username, cargo=cargo)
+			funcionario.roles.add(rol)
+			usuarios[username] = (usuario.pk, funcionario.pk)
+		Group.objects.get_or_create(name='Profesional')[0].user_set.add(User.objects.get(pk=usuarios['legado-consulta'][0]))
+
+		nuevo = self._migrar(self.despues)
+		RolNuevo = nuevo.get_model('delegaciones_app', 'Rol')
+		FuncionarioNuevo = nuevo.get_model('delegaciones_app', 'Funcionario')
+		UserNuevo = nuevo.get_model('auth', 'User')
+		self.assertFalse(RolNuevo.objects.filter(nombre_rol__in=('verificador', 'consulta')).exists())
+		roles_verificador = set(FuncionarioNuevo.objects.get(pk=usuarios['legado-verificador'][1]).roles.values_list('nombre_rol', flat=True))
+		roles_consulta = set(FuncionarioNuevo.objects.get(pk=usuarios['legado-consulta'][1]).roles.values_list('nombre_rol', flat=True))
+		self.assertEqual(roles_verificador, {'delegado'})
+		self.assertEqual(roles_consulta, {'funcionario'})
+		self.assertIn('Delegado', set(UserNuevo.objects.get(pk=usuarios['legado-verificador'][0]).groups.values_list('name', flat=True)))
+		self.assertEqual(set(UserNuevo.objects.get(pk=usuarios['legado-consulta'][0]).groups.values_list('name', flat=True)), {'Profesional'})
+		permisos = dict((nombre, set(nuevo.get_model('auth', 'Group').objects.get(name=nombre).permissions.values_list('codename', flat=True))) for nombre in ('Coordinador', 'Delegado', 'Profesional'))
+		self.assertTrue({'view_organizacion', 'change_organizacion', 'view_ajuste', 'change_ajuste', 'view_ausencia', 'change_ausencia', 'view_parametroversionado', 'change_parametroversionado'} <= permisos['Coordinador'])
+		self.assertTrue({'view_organizacion', 'change_organizacion', 'add_ajuste', 'add_ausencia', 'add_comentario'} <= permisos['Delegado'])
+		self.assertTrue({'view_organizacion', 'add_casosocial', 'add_comentario'} <= permisos['Profesional'])
+
+	def test_migra_aunque_los_roles_obsoletos_no_existan(self):
+		"""CU-26 Migrar roles ausentes (RF-002). Las filas antiguas son opcionales."""
+		apps = self._migrar(self.antes)
+		Rol = apps.get_model('delegaciones_app', 'Rol')
+		Funcionario = apps.get_model('delegaciones_app', 'Funcionario')
+		for nombre in ('verificador', 'consulta'):
+			rol = Rol.objects.filter(nombre_rol=nombre).first()
+			if rol:
+				for funcionario in list(Funcionario.objects.filter(roles=rol)):
+					funcionario.roles.remove(rol)
+				rol.delete()
+		nuevo = self._migrar(self.despues)
+		self.assertFalse(nuevo.get_model('delegaciones_app', 'Rol').objects.filter(nombre_rol__in=('verificador', 'consulta')).exists())
+
+
 class PermisosTests(TestCase):
 	"""CU-26, CU-26.1 (RF-002). tiene_rol y control de acceso por rol."""
 
@@ -576,8 +641,8 @@ class PermisosTests(TestCase):
 		self.assertFalse(tiene_rol(coordinador))
 
 	def test_funcionario_con_varios_roles(self):
-		usuario = self._usuario('doble', 'funcionario', 'verificador')
-		self.assertEqual(roles_de(usuario), {'funcionario', 'verificador'})
+		usuario = self._usuario('doble', 'funcionario', 'delegado')
+		self.assertEqual(roles_de(usuario), {'funcionario', 'delegado'})
 
 	def test_funcionario_inactivo_no_aporta_roles(self):
 		self.assertEqual(roles_de(self._usuario('baja', 'coordinador', estado=False)), frozenset())
@@ -615,11 +680,11 @@ class PermisosTests(TestCase):
 		self.assertEqual((anonimo.status_code, anonimo.url), (302, f"{reverse('login')}?next=/prueba/"))
 
 	def test_decorador_deja_pasar_al_rol_permitido_y_redirige_a_los_demas(self):
-		@rol_requerido('verificador')
+		@rol_requerido('delegado')
 		def vista(request):
 			return HttpResponse('ok')
 
-		self.assertEqual(self._llamar(vista, self._usuario('verif', 'verificador')).status_code, 200)
+		self.assertEqual(self._llamar(vista, self._usuario('delegado-test', 'delegado')).status_code, 200)
 		sin_permiso = self._llamar(vista, self._usuario('func3', 'funcionario'))
 		self.assertEqual((sin_permiso.status_code, sin_permiso.url), (302, reverse('inicio')))
 		anonimo = self._llamar(vista, AnonymousUser())
@@ -657,15 +722,15 @@ class MantenedoresTests(TestCase):
 
 	def test_indice_deshabilita_los_mantenedores_exclusivos_del_administrador(self):
 		respuesta = self.client.get(reverse('mantenedores'))
-		self.assertContains(respuesta, 'Ver registros', count=8)
+		self.assertContains(respuesta, 'Abrir sección', count=12)
 		self.assertNotContains(respuesta, 'No disponible para tu perfil')
 		self.client.force_login(self.coordinador)
 		respuesta = self.client.get(reverse('mantenedores'))
-		self.assertContains(respuesta, 'Ver registros', count=6)
+		self.assertContains(respuesta, 'Abrir sección', count=10)
 		self.assertContains(respuesta, 'No disponible para tu perfil', count=2)
 
-	def test_las_ocho_listas_tienen_agregar_y_buscar(self):
-		self.assertEqual(len(MANTENEDORES), 8)
+	def test_las_doce_listas_tienen_agregar_y_buscar(self):
+		self.assertEqual(len(MANTENEDORES), 12)
 		for slug in MANTENEDORES:
 			respuesta = self.client.get(reverse('mantenedor_lista', args=[slug]))
 			self.assertEqual(respuesta.status_code, 200, slug)
@@ -673,13 +738,14 @@ class MantenedoresTests(TestCase):
 			self.assertContains(respuesta, 'Buscar')
 
 	def test_acceso_segun_el_rol(self):
-		for slug in ('funcionarios', 'roles'):
-			self.client.force_login(self.coordinador)
-			self.assertRedirects(self.client.get(reverse('mantenedor_lista', args=[slug])), reverse('inicio'))
+		self.client.force_login(self.coordinador)
+		self.assertEqual(self.client.get(reverse('mantenedor_lista', args=['funcionarios'])).status_code, 404)
+		self.assertEqual(self.client.get(reverse('mantenedor_lista', args=['roles'])).status_code, 404)
 		self.assertEqual(self.client.get(reverse('mantenedor_lista', args=['delegaciones'])).status_code, 200)
 		self.client.force_login(self.funcionario)
-		self.assertRedirects(self.client.get(reverse('mantenedores')), reverse('inicio'))
-		self.assertRedirects(self.client.get(reverse('mantenedor_lista', args=['catalogo'])), reverse('inicio'))
+		self.assertEqual(self.client.get(reverse('mantenedores')).status_code, 200)
+		self.assertEqual(self.client.get(reverse('mantenedor_lista', args=['organizaciones'])).status_code, 200)
+		self.assertEqual(self.client.get(reverse('mantenedor_lista', args=['catalogo'])).status_code, 404)
 		self.client.logout()
 		url = reverse('mantenedor_lista', args=['catalogo'])
 		self.assertRedirects(self.client.get(url), f"{reverse('login')}?next={url}")
@@ -728,12 +794,15 @@ class MantenedoresTests(TestCase):
 		self.assertTrue(self._auditoria('activar', 'Catalogo').exists())
 
 	def test_roles_del_sistema_no_se_renombran_ni_se_eliminan(self):
-		consulta = Rol.objects.get(nombre_rol='consulta')
-		self.assertContains(self.client.get(self._url('mantenedor_eliminar', 'roles', consulta.pk)), 'rol del sistema')
+		consulta = Rol.objects.create(nombre_rol='consulta')
+		self.assertContains(self.client.get(self._url('mantenedor_eliminar', 'roles', consulta.pk)), 'reservado')
 		self.client.post(self._url('mantenedor_eliminar', 'roles', consulta.pk))
 		self.client.post(self._url('mantenedor_editar', 'roles', consulta.pk), {'nombre_rol': 'otro'})
 		self.assertTrue(Rol.objects.filter(nombre_rol='consulta').exists())
 		self.assertFalse(Rol.objects.filter(nombre_rol='otro').exists())
+		respuesta = self.client.post(self._url('mantenedor_nuevo', 'roles'), {'nombre_rol': 'verificador'})
+		self.assertFormError(respuesta.context['form'], 'nombre_rol', 'Este rol fue retirado y no se puede crear ni restaurar manualmente.')
+		self.assertFalse(Rol.objects.filter(nombre_rol='verificador').exists())
 
 	def test_rol_nuevo_sin_uso_se_elimina_con_auditoria(self):
 		rol = Rol.objects.create(nombre_rol='pasante')
@@ -762,7 +831,7 @@ class MantenedoresTests(TestCase):
 		self.assertNotIn('Clave-segura-2026', self._auditoria('crear', 'Funcionario').get().valor_nuevo)
 
 	def test_funcionario_rechaza_usuario_repetido_y_contrasena_distinta(self):
-		datos = {'username': 'func.crud', 'nombre': 'Repetido', 'cargo': self.cargo.pk, 'roles': [Rol.objects.get(nombre_rol='consulta').pk], 'estado': 'on', 'password': 'Clave-segura-2026', 'password_confirm': 'Otra-clave-2026'}
+		datos = {'username': 'func.crud', 'nombre': 'Repetido', 'cargo': self.cargo.pk, 'roles': [Rol.objects.get(nombre_rol='funcionario').pk], 'estado': 'on', 'password': 'Clave-segura-2026', 'password_confirm': 'Otra-clave-2026'}
 		formulario = self.client.post(self._url('mantenedor_nuevo', 'funcionarios'), datos).context['form']
 		self.assertIn('username', formulario.errors)
 		self.assertIn('password_confirm', formulario.errors)
@@ -780,7 +849,7 @@ class MantenedoresTests(TestCase):
 		propio = self.admin.funcionario
 		self.client.post(self._url('mantenedor_eliminar', 'funcionarios', propio.pk))
 		self.assertTrue(Funcionario.objects.get(pk=propio.pk).estado)
-		datos = {'username': 'admin.crud', 'nombre': 'admin.crud', 'cargo': self.cargo.pk, 'roles': [Rol.objects.get(nombre_rol='consulta').pk], 'estado': 'on'}
+		datos = {'username': 'admin.crud', 'nombre': 'admin.crud', 'cargo': self.cargo.pk, 'roles': [Rol.objects.get(nombre_rol='funcionario').pk], 'estado': 'on'}
 		formulario = self.client.post(self._url('mantenedor_editar', 'funcionarios', propio.pk), datos).context['form']
 		self.assertIn('roles', formulario.errors)
 		self.assertTrue(propio.roles.filter(nombre_rol='administrador').exists())
@@ -856,7 +925,7 @@ class MantenedoresTests(TestCase):
 		periodo, item = self._periodo_con_item()
 		meta = Meta.objects.create(item=item, funcionario=self.funcionario.funcionario, valor_objetivo=10)
 		existentes = {
-			'delegaciones': self.centro, 'cargos': self.cargo, 'roles': Rol.objects.get(nombre_rol='consulta'),
+			'delegaciones': self.centro, 'cargos': self.cargo, 'roles': Rol.objects.get(nombre_rol='funcionario'),
 			'funcionarios': self.funcionario.funcionario, 'catalogo': Catalogo.objects.create(codigo='C-1', nombre='Elemento', tipo='servicio'),
 			'periodos': periodo, 'items': item, 'metas': meta,
 		}
@@ -888,7 +957,7 @@ class BaseOperacion(TestCase):
 		self.catalogo = Catalogo.objects.create(codigo='AT-OPER', nombre='Operativo en terreno', tipo='atencion')
 		# Los atributos son usuarios de Django; su Funcionario es usuario.funcionario.
 		self.coordinador = crear_funcionario('coordinador-op', 'coordinador', cargo=self.cargo)
-		self.verificador = crear_funcionario('verificador-op', 'verificador', cargo=self.cargo)
+		self.verificador = crear_funcionario('delegado-op', 'delegado', cargo=self.cargo, delegacion=self.centro)
 		self.funcionario = crear_funcionario('funcionario-op', 'funcionario', cargo=self.cargo, delegacion=self.centro)
 
 	def _actividad(self, autor=None, delegacion=None, estado='pendiente', **cambios):
@@ -919,6 +988,35 @@ class BaseOperacion(TestCase):
 			folio=folio, delegacion=delegacion or self.centro, funcionario_responsable=(responsable or self.funcionario).funcionario,
 			solicitante='Junta de vecinos', territorio='Centro', descripcion='Poda de arboles', fecha_comprometida=timezone.localdate() + timedelta(days=60), origen='externo',
 		)
+
+
+class ComentarioAccesoTests(BaseOperacion):
+	"""CU-30 Auditoría de acceso (RF-036). El comentario exige funcionario y resuelve su ruta sin colisión."""
+
+	def test_la_url_de_comentario_resuelve_a_su_vista(self):
+		url = reverse('comentario_nuevo', args=['EVD-PRUEBA'])
+		self.assertEqual(resolve(url).func.__name__, 'comentario_nuevo')
+
+	def test_la_validacion_de_comentario_no_devuelve_el_texto_del_historial(self):
+		comentario = Comentario(actividad=self._actividad(), autor=self.funcionario.funcionario, contenido='Seguimiento')
+		self.assertIsNone(comentario.clean())
+		historial = HistorialCompromiso(
+			compromiso=Compromiso(folio='LS-HIST'), estado_anterior='', estado_nuevo='pendiente', autor=self.verificador.funcionario,
+		)
+		self.assertEqual(str(historial), 'LS-HIST: inicio -> pendiente')
+
+	def test_usuario_sin_funcionario_recibe_404_y_se_audita(self):
+		actividad = self._actividad()
+		usuario = User.objects.create_user('sin-funcionario-comentario', password='clave-segura')
+		usuario.groups.add(*self.verificador.groups.all())
+		self.client.force_login(usuario)
+
+		respuesta = self.client.get(reverse('comentario_nuevo', args=[actividad.codigo_verificador]))
+
+		self.assertEqual(respuesta.status_code, 404)
+		evento = Auditoria.objects.get(evento='acceso_denegado', entidad='Comentario')
+		self.assertEqual(evento.identificador_registro, actividad.codigo_verificador)
+		self.assertEqual(json.loads(evento.valor_nuevo)['motivo'], 'funcionario no asociado')
 
 
 class ActividadVistasTests(BaseOperacion):
@@ -2043,6 +2141,14 @@ class FiltrosYInformesTests(BaseOperacion):
 		lineas = contenido.strip().splitlines()
 		self.assertEqual(len(lineas), 2)
 		self.assertIn('Operativo aprobado', lineas[1])
+		registro = Auditoria.objects.get(evento='exportar')
+		self.assertEqual((registro.entidad, registro.identificador_registro), ('Informe', 'actividades'))
+		self.assertEqual(json.loads(registro.valor_nuevo)['filas'], 1)
+
+	def test_el_excel_deja_el_mismo_evento_de_auditoria_que_el_csv(self):
+		self.client.force_login(self.coordinador)
+		respuesta = self.client.get(reverse('informe'), {'tipo': 'actividades', 'estado': 'aprobada', 'formato': 'excel'})
+		self.assertEqual(respuesta['Content-Type'], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 		registro = Auditoria.objects.get(evento='exportar')
 		self.assertEqual((registro.entidad, registro.identificador_registro), ('Informe', 'actividades'))
 		self.assertEqual(json.loads(registro.valor_nuevo)['filas'], 1)

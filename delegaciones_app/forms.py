@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from .models import Actividad, Ajuste, Ausencia, Cargo, CasoSocial, Catalogo, Comentario, Compromiso, Delegacion, Evidencia, Funcionario, ItemMedible, Meta, Organizacion, ParametroVersionado, Periodo, Rol, VersionOptimistaMixin
 from .permisos import (
-    ADMINISTRADOR, COORDINADOR, DELEGADO, PERFIL_ADMINISTRADOR, PERFIL_FUNCIONARIO, PERFILES, ROLES_DEL_SISTEMA, asignar_perfil,
+    ADMINISTRADOR, COORDINADOR, DELEGADO, PERFIL_ADMINISTRADOR, PERFIL_DELEGADO, PERFIL_FUNCIONARIO, PERFILES, ROLES_DEL_SISTEMA, ROLES_RETIRADOS, asignar_perfil,
     funcionario_de, perfil_sugerido, puede_ver_todo,
 )
 
@@ -56,9 +56,15 @@ class RolForm(FormularioBootstrap, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.instance.pk and self.instance.nombre_rol in ROLES_DEL_SISTEMA:
+        if self.instance.pk and (self.instance.nombre_rol in ROLES_DEL_SISTEMA or self.instance.nombre_rol in ROLES_RETIRADOS):
             self.fields['nombre_rol'].disabled = True
-            self.fields['nombre_rol'].help_text = 'Es un rol del sistema: los permisos lo consultan por su nombre y no se renombra.'
+            self.fields['nombre_rol'].help_text = 'Es un rol reservado y no se puede renombrar desde aquí.'
+
+    def clean_nombre_rol(self):
+        nombre = self.cleaned_data['nombre_rol']
+        if nombre in ROLES_RETIRADOS:
+            raise forms.ValidationError('Este rol fue retirado y no se puede crear ni restaurar manualmente.')
+        return nombre
 
 
 class FuncionarioForm(FormularioBootstrap, forms.ModelForm):
@@ -72,7 +78,7 @@ class FuncionarioForm(FormularioBootstrap, forms.ModelForm):
         queryset=Group.objects.filter(name__in=PERFILES).order_by('name'), required=False, label='Perfil de acceso',
         empty_label='Según sus roles',
         help_text='Administrador: acceso total y gestión de usuarios. Coordinador: mantenedores operativos, transacciones y '
-                  'revisión en todas las delegaciones. Delegado: revisa evidencias y trabaja su delegación. Funcionario: '
+                  'revisión en todas las delegaciones. Delegado: revisa evidencias y trabaja su delegación. Profesional: '
                   'solo sus actividades, evidencias y tareas. Si lo dejas vacío, se deduce de los roles.',
     )
     roles = forms.ModelMultipleChoiceField(queryset=Rol.objects.all(), label='Roles', help_text='Mantén Ctrl presionado para elegir más de uno.')
@@ -139,7 +145,7 @@ class FuncionarioForm(FormularioBootstrap, forms.ModelForm):
 
     def _validar_perfil_y_roles(self, cleaned_data):
         """El perfil no puede dar menos alcance que los roles: un administrador o coordinador
-        con perfil Funcionario tendría el alcance de su rol sin los permisos para usarlo."""
+        con perfil Profesional tendría el alcance de su rol sin los permisos para usarlo."""
         perfil, roles = cleaned_data.get('perfil'), cleaned_data.get('roles')
         if not perfil or roles is None:
             return
@@ -150,6 +156,8 @@ class FuncionarioForm(FormularioBootstrap, forms.ModelForm):
             self.add_error('perfil', 'El rol coordinador requiere el perfil Coordinador o Administrador.')
         elif DELEGADO in nombres and perfil.name == PERFIL_FUNCIONARIO:
             self.add_error('perfil', 'El rol delegado revisa evidencias: requiere el perfil Delegado o uno superior.')
+        elif perfil.name == PERFIL_DELEGADO and DELEGADO not in nombres:
+            self.add_error('roles', 'El perfil Delegado requiere el rol delegado para revisar evidencias.')
 
     @transaction.atomic
     def save(self, commit=True):
@@ -180,6 +188,14 @@ class CatalogoForm(FormularioBootstrap, forms.ModelForm):
 
 
 class OrganizacionForm(FormularioBootstrap, forms.ModelForm):
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if user and user.groups.filter(name=PERFIL_DELEGADO).exists() and not user.is_superuser:
+            # Delegados verifican los registros de su ámbito; el resto de los datos los mantiene coordinación.
+            for nombre in tuple(self.fields):
+                if nombre != 'verificada':
+                    self.fields.pop(nombre)
+
     class Meta:
         model = Organizacion
         fields = ['nombre', 'tipo', 'personalidad_juridica', 'domicilio', 'territorio', 'delegacion', 'verificada', 'observaciones', 'activa']
@@ -293,18 +309,22 @@ class ActividadForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm):
         funcionario = funcionario_de(user) if user else None
         ve_todo = bool(user) and puede_ver_todo(user)
         delegaciones, items = Q(estado=True), Q(periodo__estado='abierto')
-        if funcionario and not ve_todo:
-            # Quien tiene delegación registra en la suya, y solo sobre los ítems de su cargo.
-            if funcionario.delegacion_id:
-                delegaciones &= Q(pk=funcionario.delegacion_id)
-            items &= Q(cargo_id=funcionario.cargo_id)
+        if not ve_todo:
+            # Un perfil local sin delegación no puede escoger una delegación ni sus ítems.
+            delegaciones &= Q(pk=funcionario.delegacion_id) if funcionario and funcionario.delegacion_id else Q(pk__in=[])
+            items &= Q(cargo_id=funcionario.cargo_id) if funcionario else Q(pk__in=[])
         # Al editar se conservan los valores actuales aunque luego dejen de estar disponibles.
         self.fields['delegacion'].queryset = Delegacion.objects.filter(delegaciones | Q(pk=self.instance.delegacion_id))
         self.fields['item'].queryset = ItemMedible.objects.filter(items | Q(pk=self.instance.item_id)).select_related('cargo', 'periodo')
         self.fields['catalogo'].queryset = Catalogo.objects.filter(Q(tipo='atencion', activo=True) | Q(pk=self.instance.catalogo_id))
         self.fields['catalogo'].label_from_instance = lambda elemento: elemento.nombre
         self.fields['compromiso'].queryset = (compromisos if compromisos is not None else Compromiso.objects.all()).select_related('delegacion')
-        self.fields['organizacion'].queryset = Organizacion.objects.filter(activa=True).order_by('nombre')
+        organizaciones = Q(activa=True)
+        if not ve_todo:
+            organizaciones &= Q(delegacion_id=funcionario.delegacion_id) if funcionario and funcionario.delegacion_id else Q(pk__in=[])
+        self.fields['organizacion'].queryset = Organizacion.objects.filter(
+            organizaciones | Q(pk=self.instance.organizacion_id)
+        ).order_by('nombre')
         self.fields['tipo_accion'].required = False
         self.fields['tipo_accion'].initial = 'ejecucion'
         for campo in ('item', 'catalogo', 'fecha'):
@@ -312,6 +332,14 @@ class ActividadForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm):
         self.fields['fecha'].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M']
         if not self.instance.pk:
             self.fields['fecha'].initial = timezone.localtime().replace(second=0, microsecond=0)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        delegacion = cleaned_data.get('delegacion')
+        organizacion = cleaned_data.get('organizacion')
+        if organizacion and delegacion and organizacion.delegacion_id != delegacion.pk:
+            self.add_error('organizacion', 'La organización debe pertenecer a la delegación de la actividad.')
+        return cleaned_data
 
     class Meta:
         model = Actividad
@@ -369,9 +397,13 @@ class CompromisoForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm)
         funcionario = funcionario_de(user) if user else None
         ve_todo = bool(user) and puede_ver_todo(user)
         delegaciones, responsables = Q(estado=True), Q(estado=True)
-        if funcionario and funcionario.delegacion_id and not ve_todo:
-            delegaciones &= Q(pk=funcionario.delegacion_id)
-            responsables = Q(pk=funcionario.pk)
+        if not ve_todo:
+            if funcionario:
+                delegaciones &= Q(pk=funcionario.delegacion_id) if funcionario.delegacion_id else Q(pk__in=[])
+                responsables = Q(pk=funcionario.pk)
+            else:
+                delegaciones &= Q(pk__in=[])
+                responsables = Q(pk__in=[])
         self.fields['delegacion'].queryset = Delegacion.objects.filter(delegaciones | Q(pk=self.instance.delegacion_id))
         self.fields['funcionario_responsable'].queryset = Funcionario.objects.filter(responsables | Q(pk=self.instance.funcionario_responsable_id)).select_related('delegacion')
         self.fields['funcionario_responsable'].label_from_instance = lambda f: f'{f.nombre} · {f.delegacion or "sin delegación"}'
@@ -379,6 +411,12 @@ class CompromisoForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm)
             self.fields['funcionario_responsable'].label = 'Delegado responsable'
             self.fields['funcionario_responsable'].help_text = 'La coordinación asigna la tarea a un delegado de la delegación elegida.'
         self.fields['item'].queryset = ItemMedible.objects.exclude(periodo__estado='cerrado').select_related('cargo', 'periodo')
+        organizaciones = Q(activa=True)
+        if not ve_todo:
+            organizaciones &= Q(delegacion_id=funcionario.delegacion_id) if funcionario and funcionario.delegacion_id else Q(pk__in=[])
+        self.fields['organizacion'].queryset = Organizacion.objects.filter(
+            organizaciones | Q(pk=self.instance.organizacion_id)
+        ).order_by('nombre')
         for campo in ('funcionario_responsable', 'origen'):
             self.fields[campo].required = True
         self.fields['origen'].initial = 'externo'
@@ -389,8 +427,11 @@ class CompromisoForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm)
     def clean(self):
         cleaned_data = super().clean()
         delegacion, responsable = cleaned_data.get('delegacion'), cleaned_data.get('funcionario_responsable')
+        organizacion = cleaned_data.get('organizacion')
         if delegacion and responsable and responsable.delegacion_id and responsable.delegacion_id != delegacion.pk:
             self.add_error('funcionario_responsable', f'{responsable.nombre} pertenece a la delegación {responsable.delegacion}, no a {delegacion}.')
+        if organizacion and delegacion and organizacion.delegacion_id != delegacion.pk:
+            self.add_error('organizacion', 'La organización debe pertenecer a la delegación de la tarea.')
         return cleaned_data
 
     class Meta:
@@ -398,10 +439,27 @@ class CompromisoForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm)
         fields = ['delegacion', 'funcionario_responsable', 'origen', 'solicitante', 'solicitante_telefono', 'territorio', 'organizacion', 'eje', 'descripcion', 'fecha_comprometida', 'area_apoyo', 'item', 'estado', 'observacion']
 
 
+def _limitar_a_delegacion_propia(campos, user):
+    if not user or puede_ver_todo(user):
+        return
+    funcionario = funcionario_de(user)
+    if not funcionario or not funcionario.delegacion_id:
+        if 'funcionario' in campos:
+            campos['funcionario'].queryset = Funcionario.objects.none()
+        if 'delegacion' in campos:
+            campos['delegacion'].queryset = Delegacion.objects.none()
+        return
+    if 'funcionario' in campos:
+        campos['funcionario'].queryset = Funcionario.objects.filter(delegacion_id=funcionario.delegacion_id)
+    if 'delegacion' in campos:
+        campos['delegacion'].queryset = Delegacion.objects.filter(pk=funcionario.delegacion_id)
+
+
 class AjusteForm(FormularioBootstrap, forms.ModelForm):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['respaldo'].required = True
+        _limitar_a_delegacion_propia(self.fields, user)
 
     class Meta:
         model = Ajuste
@@ -410,6 +468,15 @@ class AjusteForm(FormularioBootstrap, forms.ModelForm):
 
 
 class AusenciaForm(FormularioBootstrap, forms.ModelForm):
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if user and not puede_ver_todo(user):
+            funcionario = funcionario_de(user)
+            if funcionario and funcionario.delegacion_id:
+                self.fields['funcionario'].queryset = Funcionario.objects.filter(delegacion_id=funcionario.delegacion_id)
+            else:
+                self.fields['funcionario'].queryset = Funcionario.objects.none()
+
     class Meta:
         model = Ausencia
         fields = ['funcionario', 'periodo', 'tipo', 'desde', 'hasta', 'observacion']

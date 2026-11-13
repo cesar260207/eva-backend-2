@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from .forms import ActividadForm, EvidenciaForm
 from .informes import filtrar_actividades
-from .models import Actividad, Cargo, Catalogo, Evidencia, Indicador, ItemMedible, Meta, Validacion, validar_tamano_evidencia
+from .models import Actividad, Cargo, Catalogo, Evidencia, Indicador, ItemMedible, Meta, Organizacion, Validacion, validar_tamano_evidencia
 from .pruebas_base import EscenarioBase, crear_funcionario
 
 
@@ -171,7 +171,8 @@ class ActividadEstadoUnitTests(EscenarioBase, TestCase):
         actividad = self.nueva_actividad()
         usuario = self.usuario_autor
         datos = {
-            'delegacion': self.centro.pk, 'item': self.item.pk, 'catalogo': self.catalogo.pk, 'fecha': '2026-09-10T10:00',
+            'delegacion': self.centro.pk, 'item': self.item.pk, 'catalogo': self.catalogo.pk,
+            'fecha': self.fecha_valida.strftime('%Y-%m-%dT%H:%M'),
             'solicitud_problema': 'Editada', 'accion': 'Acción', 'version': actividad.version,
         }
         Actividad.objects.filter(pk=actividad.pk).update(version=actividad.version + 1)
@@ -187,10 +188,16 @@ class ActividadFormUnitTests(EscenarioBase, TestCase):
 
     def setUp(self):
         self.crear_escenario()
+        hoy = timezone.localdate()
+        self.periodo.fecha_inicio = hoy - timezone.timedelta(days=30)
+        self.periodo.fecha_termino = hoy + timezone.timedelta(days=30)
+        self.periodo.save()
+        self.fecha_valida = timezone.localtime().replace(second=0, microsecond=0)
 
     def _datos(self, **cambios):
         datos = {
-            'delegacion': self.centro.pk, 'item': self.item.pk, 'catalogo': self.catalogo.pk, 'fecha': '2026-09-10T10:00',
+            'delegacion': self.centro.pk, 'item': self.item.pk, 'catalogo': self.catalogo.pk,
+            'fecha': self.fecha_valida.strftime('%Y-%m-%dT%H:%M'),
             'solicitud_problema': 'Consulta', 'accion': 'Orientación',
         }
         datos.update(cambios)
@@ -242,6 +249,27 @@ class ActividadFormUnitTests(EscenarioBase, TestCase):
         formulario = ActividadForm(user=self.usuario_autor)
         self.assertEqual(list(formulario.fields['delegacion'].queryset), [self.centro])
         rechazada = ActividadForm(self._datos(delegacion=self.rural.pk), user=self.usuario_autor)
+        self.assertFalse(rechazada.is_valid())
+        self.assertIn('delegacion', rechazada.errors)
+
+    def test_organizacion_de_otra_delegacion_no_se_puede_asociar(self):
+        """CU-26.1 Denegar acceso por ámbito (RF-002). Una actividad no expone ni acepta organizaciones ajenas."""
+        propia = Organizacion.objects.create(nombre='JJVV Centro', delegacion=self.centro)
+        ajena = Organizacion.objects.create(nombre='JJVV Rural', delegacion=self.rural)
+        formulario = ActividadForm(user=self.usuario_autor)
+        self.assertIn(propia, formulario.fields['organizacion'].queryset)
+        self.assertNotIn(ajena, formulario.fields['organizacion'].queryset)
+        rechazada = ActividadForm(self._datos(organizacion=ajena.pk), user=self.usuario_autor)
+        self.assertFalse(rechazada.is_valid())
+        self.assertIn('organizacion', rechazada.errors)
+
+    def test_profesional_sin_delegacion_no_puede_elegir_una_delegacion(self):
+        """CU-26.1 Denegar acceso por ámbito (RF-002). Sin delegación asignada no hay selección global."""
+        sin_delegacion = crear_funcionario('profesional-sin-delegacion', 'funcionario', cargo=self.cargo)
+        formulario = ActividadForm(user=sin_delegacion)
+        self.assertFalse(formulario.fields['delegacion'].queryset.exists())
+        self.assertFalse(formulario.fields['organizacion'].queryset.exists())
+        rechazada = ActividadForm(self._datos(), user=sin_delegacion)
         self.assertFalse(rechazada.is_valid())
         self.assertIn('delegacion', rechazada.errors)
 

@@ -33,7 +33,9 @@ MENSAJE_REVISION_PROPIA = 'No puedes revisar una actividad que registraste tú: 
 def _delegaciones_visibles(user):
     """Delegaciones que el usuario puede elegir en los filtros: solo la suya si su ámbito es una delegación."""
     propia = delegacion_propia(user)
-    return Delegacion.objects.filter(pk=propia.pk) if propia else Delegacion.objects.filter(estado=True)
+    if puede_ver_todo(user):
+        return Delegacion.objects.filter(estado=True)
+    return Delegacion.objects.filter(pk=propia.pk) if propia else Delegacion.objects.none()
 
 
 def _funcionario_requerido(request):
@@ -69,7 +71,7 @@ def _compromisos_autorizados(user):
         return compromisos.none()
     if funcionario.delegacion_id:
         return compromisos.filter(delegacion_id=funcionario.delegacion_id)
-    return compromisos
+    return compromisos.none()
 
 
 def _obtener_autorizado(request, autorizados, entidad, **filtro):
@@ -154,7 +156,10 @@ def index(request):
     compromisos = Compromiso.objects.select_related('delegacion')
     resultados = resultados_por_delegacion(periodo_vigente())
     propia = delegacion_propia(request.user)
-    if propia:
+    if request.user.is_authenticated and not puede_ver_todo(request.user) and propia is None:
+        compromisos = compromisos.none()
+        resultados = []
+    elif propia:
         compromisos = compromisos.filter(delegacion=propia)
         resultados = [fila for fila in resultados if fila['nombre'] == propia.nombre]
     compromisos = list(compromisos)
@@ -195,7 +200,7 @@ def solicitudes(request):
 @login_required
 def delegacion_detalle(request, nombre):
     propia = delegacion_propia(request.user)
-    if propia and propia.nombre != nombre:
+    if not puede_ver_todo(request.user) and (propia is None or propia.nombre != nombre):
         # Como los demás registros fuera del ámbito: no existe para el usuario, y el intento queda auditado.
         registrar_acceso_denegado(request, 'Delegacion', nombre, 'fuera del ámbito')
         raise Http404('Delegación no encontrada.')
@@ -673,10 +678,13 @@ def institucional(request):
 
 @login_required
 def ajuste_nuevo(request):
+    if not request.user.has_perm('delegaciones_app.add_ajuste'):
+        registrar_acceso_denegado(request, 'Ajuste', request.path, 'permiso insuficiente')
+        raise Http404('Recurso no encontrado.')
     funcionario = _funcionario_requerido(request)
-    if not funcionario or not tiene_rol(request.user, DELEGADO):
+    if not funcionario:
         return redirect('inicio')
-    form = AjusteForm(request.POST or None, request.FILES or None)
+    form = AjusteForm(request.POST or None, request.FILES or None, user=request.user)
     if request.method == 'POST' and form.is_valid():
         ajuste = form.save(commit=False)
         ajuste.informado_por = funcionario
@@ -689,8 +697,11 @@ def ajuste_nuevo(request):
 
 @login_required
 def ajuste_decidir(request, pk, decision):
+    if not request.user.has_perm('delegaciones_app.change_ajuste'):
+        registrar_acceso_denegado(request, 'Ajuste', str(pk), 'permiso insuficiente')
+        raise Http404('Recurso no encontrado.')
     funcionario = _funcionario_requerido(request)
-    if not funcionario or not tiene_rol(request.user, COORDINADOR, ADMINISTRADOR):
+    if not funcionario:
         return redirect('inicio')
     ajuste = get_object_or_404(Ajuste, pk=pk, estado='informado')
     if request.method != 'POST' or decision not in ('aplicar', 'rechazar'):
@@ -706,14 +717,18 @@ def ajuste_decidir(request, pk, decision):
 
 @login_required
 def ausencia_nueva(request):
+    if not request.user.has_perm('delegaciones_app.add_ausencia'):
+        registrar_acceso_denegado(request, 'Ausencia', request.path, 'permiso insuficiente')
+        raise Http404('Recurso no encontrado.')
     funcionario = _funcionario_requerido(request)
-    if not funcionario or not tiene_rol(request.user, DELEGADO, COORDINADOR):
+    if not funcionario:
         return redirect('inicio')
-    form = AusenciaForm(request.POST or None)
+    form = AusenciaForm(request.POST or None, user=request.user)
     if request.method == 'POST' and form.is_valid():
         ausencia = form.save(commit=False)
         ausencia.registrada_por = funcionario
         ausencia.save()
+        Auditoria.registrar_evento(request.user, 'crear', 'Ausencia', ausencia.pk, None, {'funcionario': ausencia.funcionario_id, 'tipo': ausencia.tipo})
         messages.success(request, 'La ausencia fue registrada.')
         return redirect('semaforo')
     return render(request, 'delegaciones_app/formulario_nuevo.html', {'form': form, 'titulo': 'Registrar ausencia'})
@@ -721,8 +736,11 @@ def ausencia_nueva(request):
 
 @login_required
 def caso_social_nuevo(request):
+    if not request.user.has_perm('delegaciones_app.add_casosocial'):
+        registrar_acceso_denegado(request, 'CasoSocial', request.path, 'permiso insuficiente')
+        raise Http404('Recurso no encontrado.')
     funcionario = _funcionario_requerido(request)
-    if not funcionario or funcionario.cargo.nombre != 'Gestor Social':
+    if not funcionario:
         return redirect('inicio')
     form = CasoSocialForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
@@ -732,6 +750,7 @@ def caso_social_nuevo(request):
             form.add_error('nombre_usuario', 'Este usuario ya tiene el máximo de tres gestiones.')
         else:
             caso.save()
+            Auditoria.registrar_evento(request.user, 'crear', 'CasoSocial', caso.pk, None, {'tipo': caso.tipo, 'etapa': caso.etapa})
             messages.success(request, 'La gestión social fue registrada.')
             return redirect('inicio')
     return render(request, 'delegaciones_app/formulario_nuevo.html', {'form': form, 'titulo': 'Registrar atención social'})
@@ -739,13 +758,20 @@ def caso_social_nuevo(request):
 
 @login_required
 def comentario_nuevo(request, codigo):
+    if not request.user.has_perm('delegaciones_app.add_comentario'):
+        registrar_acceso_denegado(request, 'Comentario', codigo, 'permiso insuficiente')
+        raise Http404('Recurso no encontrado.')
     funcionario = _funcionario_requerido(request)
-    actividad = get_object_or_404(_actividades_autorizadas(request.user), codigo_verificador=codigo)
+    if not funcionario:
+        registrar_acceso_denegado(request, 'Comentario', codigo, 'funcionario no asociado')
+        raise Http404('Recurso no encontrado.')
+    actividad = _obtener_autorizado(request, _actividades_autorizadas(request.user), 'Actividad', codigo_verificador=codigo)
     form = ComentarioForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         comentario = form.save(commit=False)
         comentario.actividad = actividad
         comentario.autor = funcionario
         comentario.save()
+        Auditoria.registrar_evento(request.user, 'crear', 'Comentario', comentario.pk, None, {'actividad': codigo})
         return redirect('actividad_detalle', codigo=codigo)
     return render(request, 'delegaciones_app/formulario_nuevo.html', {'form': form, 'titulo': 'Comentar actividad'})

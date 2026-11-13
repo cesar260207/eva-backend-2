@@ -16,7 +16,7 @@ from delegaciones_app.crud import mantenedores_visibles
 from delegaciones_app.models import Actividad, Auditoria, Compromiso, Delegacion, Evidencia, Funcionario, MedicionDelegacion, Periodo
 from delegaciones_app.permisos import (
     DELEGADO, PERFIL_ADMINISTRADOR, PERFIL_COORDINADOR, PERFIL_DELEGADO, PERFILES, delegacion_propia, funcionario_de, perfil_de, puede_revisar,
-    roles_de,
+    puede_ver_todo, roles_de,
 )
 from delegaciones_app.views import _delegaciones_visibles
 from delegaciones_app.views import _actividades_autorizadas, _compromisos_autorizados
@@ -24,8 +24,10 @@ from delegaciones_app.views import _actividades_autorizadas, _compromisos_autori
 
 def _solo_su_delegacion(user, resultados):
     """Resultados por delegación que el usuario puede ver: un delegado ve solo los de su delegación."""
+    if puede_ver_todo(user):
+        return resultados
     propia = delegacion_propia(user)
-    return [fila for fila in resultados if fila['nombre'] == propia.nombre] if propia else resultados
+    return [fila for fila in resultados if fila['nombre'] == propia.nombre] if propia else []
 
 
 def _contexto_medicion(request):
@@ -143,7 +145,12 @@ def dashboard(request):
 @login_required
 def semaforo(request):
     contexto = _contexto_medicion(request)
-    contexto['personas'] = resultados_por_persona(contexto['periodo'], contexto['delegacion_propia'])
+    if puede_ver_todo(request.user):
+        contexto['personas'] = resultados_por_persona(contexto['periodo'])
+    elif contexto['delegacion_propia']:
+        contexto['personas'] = resultados_por_persona(contexto['periodo'], contexto['delegacion_propia'])
+    else:
+        contexto['personas'] = []
     return render(request, 'gestion_app/semaforo.html', contexto)
 
 
@@ -158,8 +165,10 @@ def resumen(request):
         'critico': min(delegaciones, key=lambda fila: fila['cumplimiento'], default={}),
         'alcanza_umbral': periodo.alcanza_umbral(promedio) if periodo else None,
         'mediciones_historicas': (
+            MedicionDelegacion.objects.select_related('delegacion')
+            if puede_ver_todo(request.user) else
             MedicionDelegacion.objects.select_related('delegacion').filter(delegacion=contexto['delegacion_propia'])
-            if contexto['delegacion_propia'] else MedicionDelegacion.objects.select_related('delegacion')
+            if contexto['delegacion_propia'] else MedicionDelegacion.objects.none()
         )[:12],
     })
     return render(request, 'gestion_app/resumen.html', contexto)
@@ -217,6 +226,7 @@ def informe(request):
         Auditoria.registrar_evento(request.user, 'exportar', 'Informe', tipo, None, {'filtros': request.GET.urlencode(), 'filas': len(filas)})
         return respuesta_csv(f'informe_{tipo}_{timezone.localdate():%Y%m%d}.csv', columnas, filas)
     if formato == 'excel':
+        Auditoria.registrar_evento(request.user, 'exportar', 'Informe', tipo, None, {'filtros': request.GET.urlencode(), 'filas': len(filas)})
         return respuesta_excel(f'informe_{tipo}_{timezone.localdate():%Y%m%d}.xlsx', columnas, filas)
     parametros = request.GET.copy()
     parametros.pop('formato', None)

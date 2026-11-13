@@ -17,8 +17,8 @@ urlpatterns = [
     path('actividad/<str:codigo>/evidencia/', views.evidencia_subir, name='evidencia_subir'),
     path('actividad/<str:codigo>/eliminar/', views.actividad_eliminar, name='actividad_eliminar'),
     path('actividad/<str:codigo>/anular/', views.anular_actividad, name='anular_actividad'),
-    path('actividad/<str:codigo>/<str:decision>/', views.revisar_actividad, name='revisar_actividad'),
     path('actividad/<str:codigo>/comentario/', views.comentario_nuevo, name='comentario_nuevo'),
+    path('actividad/<str:codigo>/<str:decision>/', views.revisar_actividad, name='revisar_actividad'),
     path('evidencia/<str:codigo>/archivo/', views.evidencia_archivo, name='evidencia_archivo'),
     # Mantenedores de las tablas maestras (ver crud.py).
     path('administracion/', crud.indice, name='mantenedores'),
