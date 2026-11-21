@@ -246,6 +246,60 @@
         });
     }
 
+    /* Territorio: el esquema, los botones de delegación y las tarjetas comparten «data-delegacion».
+       Al pasar el mouse o enfocar uno se resaltan los otros; al hacer clic se baja a la tarjeta y queda
+       seleccionada. Sin JavaScript los enlaces llevan igual a cada tarjeta (#delegacion-…). */
+    function iniciarTerritorio() {
+        var territorio = document.querySelector('[data-territorio]');
+        if (!territorio) { return; }
+        var enlaces = territorio.querySelectorAll('a[data-delegacion]');
+        var tarjetas = territorio.querySelectorAll('article[data-delegacion]');
+
+        function delMismo(slug) {
+            return territorio.querySelectorAll('[data-delegacion="' + slug + '"]');
+        }
+        function resaltar(slug, activo) {
+            delMismo(slug).forEach(function (elemento) { elemento.classList.toggle('is-activa', activo); });
+        }
+        function seleccionar(slug, desplazar) {
+            var tarjeta = null;
+            tarjetas.forEach(function (actual) {
+                var es = actual.getAttribute('data-delegacion') === slug;
+                actual.classList.toggle('is-seleccionada', es);
+                if (es) { tarjeta = actual; }
+            });
+            if (!tarjeta) { return; }
+            enlaces.forEach(function (enlace) {
+                if (enlace.getAttribute('data-delegacion') === slug) {
+                    enlace.setAttribute('aria-current', 'true');
+                } else {
+                    enlace.removeAttribute('aria-current');
+                }
+            });
+            if (desplazar) {
+                tarjeta.scrollIntoView({ block: 'center', behavior: movimientoReducido ? 'auto' : 'smooth' });
+                tarjeta.focus({ preventScroll: true });
+                try { window.history.replaceState(null, '', '#' + tarjeta.id); } catch (error) { /* sin historial: igual queda marcada */ }
+            }
+        }
+
+        territorio.querySelectorAll('[data-delegacion]').forEach(function (elemento) {
+            var slug = elemento.getAttribute('data-delegacion');
+            elemento.addEventListener('mouseenter', function () { resaltar(slug, true); });
+            elemento.addEventListener('mouseleave', function () { resaltar(slug, false); });
+            elemento.addEventListener('focusin', function () { resaltar(slug, true); });
+            elemento.addEventListener('focusout', function () { resaltar(slug, false); });
+        });
+        enlaces.forEach(function (enlace) {
+            enlace.addEventListener('click', function (evento) {
+                evento.preventDefault();
+                seleccionar(enlace.getAttribute('data-delegacion'), true);
+            });
+        });
+        var inicial = window.location.hash.replace('#delegacion-', '');
+        if (inicial && inicial !== window.location.hash) { seleccionar(inicial, false); }
+    }
+
     function iniciar() {
         iniciarPlegables();
         iniciarAccesibilidad();
@@ -256,6 +310,7 @@
         iniciarFocoEnError();
         iniciarArchivos();
         iniciarVerClave();
+        iniciarTerritorio();
     }
 
     if (document.readyState === 'loading') {

@@ -47,6 +47,25 @@ def campos(form, nombres):
 
 
 @register.filter
+def partes_cifra(texto):
+    """Separa una cifra escrita en español para el conteo animado: '250.141' o '88,0 %'.
+
+    Devuelve el número sin formato para «data-contar» («250141», «88.0»), la cantidad de decimales,
+    el texto sin el signo de porcentaje y el sufijo. Uso: {% with c=urbano|partes_cifra %}.
+    """
+    texto = str(texto).strip()
+    sufijo = '%' if texto.endswith('%') else ''
+    numero = texto.rstrip('%').strip()
+    entero, _, decimales = numero.partition(',')
+    return {
+        'plano': entero.replace('.', '') + ('.' + decimales if decimales else ''),
+        'decimales': len(decimales),
+        'texto': numero,
+        'sufijo': sufijo,
+    }
+
+
+@register.filter
 def campos_restantes(form, nombres):
     """Campos visibles que no están en la lista: así ningún campo queda fuera de un formulario agrupado a mano."""
     excluidos = set(str(nombres).split())
