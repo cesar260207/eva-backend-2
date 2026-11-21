@@ -112,20 +112,20 @@ El RNF-002 del informe pide responder en 2 segundos como máximo en registro y c
 
 `git shortlog -sn --all` en los dos repositorios ([aportes_commits.csv](resultados/aportes_commits.csv)):
 
-| Repositorio | Nombre en Git | Correo | Commits |
-| --- | --- | --- | --- |
-| eva-backend-2 | conejobinario | milkybunny579@gmail.com | 75 |
-| eva-backend-2 | Tu Nombre (firma genérica) | tu@email.com | 9 |
-| eva-backend-2 | Faride Luna | faride.luna@inacapmail.cl | 8 |
-| eva-backend-2 | Vinzenz Lafferte, vinzenz, Vinzenz | exequielvinzenz@gmail.com | 7 |
-| eva-backend-2 | kimbo | cesar.aranda03@inacapmail.cl | 4 |
-| eva-backend-2 | Dante, DanteObsolette | dante.fredes@inacapmail.cl | 2 |
-| proyecto-de-titulo-en-local | Tu Nombre (firma genérica) | tu@email.com | 2 |
-| proyecto-de-titulo-en-local | kimbo | cesar.aranda03@inacapmail.cl | 1 |
+| Repositorio | Nombre en Git | Commits |
+| --- | --- | --- |
+| eva-backend-2 | conejobinario | 75 |
+| eva-backend-2 | Tu Nombre (firma genérica) | 9 |
+| eva-backend-2 | Faride Luna | 8 |
+| eva-backend-2 | Vinzenz Lafferte, vinzenz, Vinzenz | 7 |
+| eva-backend-2 | kimbo | 4 |
+| eva-backend-2 | Dante, DanteObsolette | 2 |
+| proyecto-de-titulo-en-local | Tu Nombre (firma genérica) | 2 |
+| proyecto-de-titulo-en-local | kimbo | 1 |
 
 Notas para leer la tabla:
 
-- Un integrante puede aparecer con varios nombres; se agrupan por correo.
+- Un integrante puede aparecer con varios nombres en Git; se agruparon por la cuenta de correo de cada commit.
 - «conejobinario» corresponde a [COMPLETAR POR EL GRUPO]. Sus commits incluyen los de la rama `feat/requerimientos-octubre`, hechos con apoyo de IA (registrado en `evidencias_ia.md`, prompt 14).
 - Los commits con la firma «Tu Nombre» se asignan a su autor en el README, sección «Autoría de los commits».
 - El número de commits no mide el aporte: el PR #16 trajo buena parte del trabajo de octubre en solo dos commits, y la documentación y las pruebas también son aporte.
