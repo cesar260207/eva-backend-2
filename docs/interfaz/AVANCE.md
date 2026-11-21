@@ -109,3 +109,19 @@ Registro de cada fase del rediseño (rama `feat/interfaz-terracota`). Se agrega 
 5. **Comprobado con capturas:** los 4 paneles, «Actividades» y «Administración» como Profesional a 1280 px; el panel del Delegado en alto contraste con texto al 125 % y al 150 %.
 6. **Límites:** las condiciones de cada mosaico y de cada enlace del pie son las mismas del menú o del panel original. No se tocó ninguna vista.
 7. **Commits:** `feat: paneles con mosaicos de acceso rápido`; `feat: pie en bloques y barra de accesibilidad con las clases del kit`; `feat: tablas con encabezado fijo, filtros en tarjeta y estados vacíos`; `test: pruebas del pie, la barra de accesibilidad y el menú activo`; `docs: avance de la fase 4 de la interfaz`.
+
+## Fase 5. Verificación y documentación (21-11-2026)
+
+1. **Qué hicimos**
+   - `check` sin problemas; `makemigrations --check --dry-run`: «No changes detected»; 703 pruebas aprobadas.
+   - `probe.py` con la base local de demostración: 200 de 200 combinaciones iguales a la línea base (el script actual recorre 50 pantallas con 4 perfiles; el encargo mencionaba 164).
+   - Recorrimos los textos de los 3 flujos de `docs/DEMO_EXPOSICION.md` en la base local. Para ver «Subir evidencia» y la revisión con «Aprobar» y «Rechazar», hicimos el flujo 1 en la base local, sacamos las capturas y después restauramos el respaldo de la base y borramos el archivo subido.
+   - Revisamos 375, 768 y 1280 px con capturas (para 375 y 768 usamos un marco, porque Chrome sin ventana no baja de 504 px).
+   - Ajustes finales: el texto de ejemplo de los campos subió de 3,99:1 a 5,30:1, y las cifras de la portada muestran su valor final aunque el navegador pause la animación.
+   - Escribimos `GUIA_DE_ESTILO.md` y `CAMBIOS_INTERFAZ.md` (con la sección «Para desplegar») y guardamos 16 capturas en `docs/interfaz/capturas/`.
+2. **Archivos:** `static/js/sgr.js`, `static/css/sgr.css`, `docs/interfaz/GUIA_DE_ESTILO.md`, `docs/interfaz/CAMBIOS_INTERFAZ.md`, `docs/interfaz/capturas/` (16 PNG).
+3. **Pruebas:** 703 en total, 703 aprobadas, 0 fallidas (línea base 681).
+4. **Qué mirar:** las capturas de `docs/interfaz/capturas/` y, en local, los 3 flujos de la demo.
+5. **Para desplegar:** correr `python manage.py collectstatic --noinput` en el servidor después del `git pull` (detalle en `CAMBIOS_INTERFAZ.md`). No lo ejecutamos.
+6. **No verificado:** capturas «antes» (se sacan desde `main`); el movimiento en un navegador real y el modo de movimiento reducido del sistema operativo; la revisión de las páginas de referencia con navegador.
+7. **Commits:** `fix: cifras de la portada con respaldo y texto de ejemplo con contraste suficiente`; `docs: guía de estilo de la interfaz`; `docs: cambios de la interfaz con capturas y pasos para desplegar`; `docs: avance de la fase 5 de la interfaz`.
