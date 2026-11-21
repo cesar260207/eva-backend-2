@@ -1,10 +1,213 @@
 {% extends 'base.html' %}
+{% load l10n %}
 
 {% block title %}Inicio | Municipalidad de La Serena{% endblock %}
+{% block main_clase %}app-shell app-shell-portada{% endblock %}
 
 {% block content %}
-<div class="hero-sgr mb-4"><div class="page-kicker text-white">Sistema de Gestión de Resultados</div><h1 class="display-5 mb-3">De la necesidad territorial al resultado verificable.</h1><p class="mb-4">Una base operativa para registrar actividades, coordinar el tubo de trabajo, validar evidencias y medir el avance de las delegaciones municipales.</p><div class="d-flex flex-wrap gap-2"><a class="btn btn-light" href="{% url 'actividad_nueva' %}">Registrar actividad</a><a class="btn btn-outline-light" href="{% url 'dashboard' %}">Ver medición</a></div></div>
-<div class="row g-3 mb-4"><div class="col-md-4"><div class="metric"><strong>{{ total_solicitudes }}</strong><small>Tareas en el tubo de trabajo</small></div></div><div class="col-md-4"><div class="metric coral"><strong>{{ alertas }}</strong><small>Tareas que requieren atención</small></div></div><div class="col-md-4"><div class="metric navy"><strong>{{ promedio }}%</strong><small>Cumplimiento promedio de delegaciones</small></div></div></div>
-<div class="panel mb-4"><div class="d-flex justify-content-between align-items-center mb-3"><div><div class="page-kicker">Flujo de valor SGR</div><h2 class="h4 mb-0">Registrar, clasificar, verificar, calcular y decidir</h2></div><span class="badge badge-soft">De la solicitud a la evidencia</span></div><div class="workflow"><div class="workflow-step"><strong>01 · Registrar</strong><span>Actividad o tarea</span></div><div class="workflow-step"><strong>02 · Clasificar</strong><span>Ítem, servicio y responsable</span></div><div class="workflow-step"><strong>03 · Verificar</strong><span>Evidencia y validación</span></div><div class="workflow-step"><strong>04 · Calcular</strong><span>Avance y ponderación</span></div><div class="workflow-step"><strong>05 · Decidir</strong><span>Semáforo e informe</span></div></div></div>
-<div class="row g-4"><div class="col-lg-5"><div class="panel h-100"><div class="section-label mb-3">Ejes de gestión territorial</div>{% for eje in ejes %}<div class="d-flex justify-content-between border-bottom py-3"><span>{{ eje }}</span><span class="badge badge-soft">Activo</span></div>{% endfor %}</div></div><div class="col-lg-7"><div class="panel h-100"><div class="d-flex justify-content-between align-items-center mb-3"><div><div class="section-label">Cobertura municipal</div><h2 class="h4 mb-0">Delegaciones operativas</h2></div><a href="{% url 'institucional' %}" class="btn btn-sm btn-outline-sgr">Ver contexto</a></div><div class="row g-2">{% for delegacion in delegaciones %}<div class="col-sm-6"><a class="text-decoration-none" href="{% url 'delegacion_detalle' delegacion %}"><div class="border rounded p-3 h-100"><strong class="text-dark">{{ delegacion }}</strong><small class="d-block text-muted mt-1">Seguimiento territorial →</small></div></a></div>{% endfor %}</div></div></div></div>
+<div class="portada">
+
+    <section class="hero" aria-labelledby="titulo-portada">
+        <div class="contenedor hero-grid">
+            <div>
+                <div class="page-kicker">Sistema de Gestión de Resultados</div>
+                <h1 class="hero-titulo" id="titulo-portada">De la necesidad territorial al resultado verificable.</h1>
+                <p class="hero-texto">Una base operativa para registrar actividades, coordinar el tubo de trabajo, validar evidencias y medir el avance de las delegaciones municipales.</p>
+                <div class="hero-acciones">
+                    {% if user.is_authenticated %}
+                    <a class="btn btn-sgr" href="{% url 'actividad_nueva' %}">Registrar actividad</a>
+                    <a class="btn btn-outline-sgr" href="{% url 'dashboard' %}">Ver medición</a>
+                    {% else %}
+                    <a class="btn btn-sgr" href="{% url 'login' %}">Ingresar</a>
+                    <a class="btn btn-outline-sgr" href="{% url 'institucional' %}">Territorio</a>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="hero-ilustracion">
+                <svg viewBox="0 0 480 480" role="img" aria-labelledby="ilustracion-titulo" focusable="false">
+                    <title id="ilustracion-titulo">El SGR al centro y las seis delegaciones municipales en órbita</title>
+                    <defs>
+                        <linearGradient id="gradiente-centro" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0" stop-color="#a83224"/>
+                            <stop offset="1" stop-color="#762018"/>
+                        </linearGradient>
+                    </defs>
+                    <circle class="orbita-anillo-solido" cx="240" cy="240" r="120"/>
+                    <circle class="orbita-anillo" cx="240" cy="240" r="190"/>
+                    <g class="orbita-giro-inverso">
+                        <rect class="orbita-cuadro" x="232" y="112" width="16" height="16" rx="3"/>
+                        <rect class="orbita-cuadro" x="232" y="352" width="16" height="16" rx="3"/>
+                    </g>
+                    <g class="orbita-giro">
+                        <circle class="orbita-punto" cx="240" cy="50" r="13"/>
+                        <circle class="orbita-punto" cx="404.5" cy="145" r="13"/>
+                        <circle class="orbita-punto" cx="404.5" cy="335" r="13"/>
+                        <circle class="orbita-punto orbita-punto-relleno" cx="240" cy="430" r="13"/>
+                        <circle class="orbita-punto" cx="75.5" cy="335" r="13"/>
+                        <circle class="orbita-punto" cx="75.5" cy="145" r="13"/>
+                    </g>
+                    <circle class="orbita-centro" cx="240" cy="240" r="84"/>
+                    <text class="orbita-sigla" x="240" y="250" text-anchor="middle">SGR</text>
+                    <text class="orbita-subtitulo" x="240" y="276" text-anchor="middle">LA SERENA</text>
+                    <g class="flotar">
+                        <path class="forma-teja" d="M372 40 q22 -14 44 0 v20 q-22 -14 -44 0 z"/>
+                    </g>
+                    <g class="flotar-2">
+                        <path class="forma-arco" d="M50 452 v-22 a26 26 0 0 1 52 0 v22"/>
+                    </g>
+                    <g class="flotar-3">
+                        <circle class="forma-punto" cx="436" cy="440" r="9"/>
+                        <circle class="forma-punto" cx="30" cy="80" r="6"/>
+                    </g>
+                </svg>
+            </div>
+        </div>
+    </section>
+
+    <nav class="accesos-rapidos" aria-label="Accesos rápidos">
+        <div class="contenedor">
+            <div class="mosaicos">
+                {% if user.is_authenticated %}
+                <a class="mosaico reveal" href="{% url 'panel' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='casa' %}</span><span class="mosaico-texto">Ir a mi panel{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+                <a class="mosaico reveal" href="{% url 'actividades' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='lista' %}</span><span class="mosaico-texto">Ver actividades{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+                <a class="mosaico reveal" href="{% url 'agenda' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='tubo' %}</span><span class="mosaico-texto">Ver tareas{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+                {% if es_coordinacion %}<a class="mosaico reveal" href="{% url 'delegados' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='equipo' %}</span><span class="mosaico-texto">Coordinar delegados{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+                {% elif mi_delegacion %}<a class="mosaico reveal" href="{% url 'delegacion_detalle' mi_delegacion.nombre %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='edificio' %}</span><span class="mosaico-texto">Ver mi delegación{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>{% endif %}
+                <a class="mosaico reveal" href="{% url 'dashboard' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='grafico' %}</span><span class="mosaico-texto">Ver resultados{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+                {% if puede_administrar %}<a class="mosaico reveal" href="{% url 'mantenedores' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='ajustes' %}</span><span class="mosaico-texto">Administrar datos{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>{% endif %}
+                {% else %}
+                <a class="mosaico mosaico-principal reveal" href="{% url 'login' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='entrar' %}</span><span class="mosaico-texto">Ingresar{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+                <a class="mosaico reveal" href="{% url 'institucional' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='mapa' %}</span><span class="mosaico-texto">Territorio{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+                <a class="mosaico reveal" href="#como-funciona"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='revisar' %}</span><span class="mosaico-texto">Cómo funciona{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+                <a class="mosaico reveal" href="#delegaciones"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='edificio' %}</span><span class="mosaico-texto">Delegaciones{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+                <a class="mosaico reveal" href="#preguntas"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='pregunta' %}</span><span class="mosaico-texto">Preguntas frecuentes{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <section class="portada-seccion" aria-labelledby="titulo-cifras">
+        <div class="contenedor">
+            <div class="page-kicker">Avance en cifras</div>
+            <h2 class="portada-titulo-seccion" id="titulo-cifras">{% if user.is_authenticated and mi_delegacion %}Tu delegación hoy{% else %}Las delegaciones hoy{% endif %}</h2>
+            <div class="cifras">
+                <div class="cifra reveal">
+                    <span class="cifra-valor"><span class="visually-hidden">{{ total_solicitudes }}</span><span aria-hidden="true" data-contar="{{ total_solicitudes|unlocalize }}">{{ total_solicitudes }}</span></span>
+                    <span class="cifra-texto">Tareas en el tubo de trabajo</span>
+                </div>
+                <div class="cifra reveal">
+                    <span class="cifra-valor"><span class="visually-hidden">{{ alertas }}</span><span aria-hidden="true" data-contar="{{ alertas|unlocalize }}">{{ alertas }}</span></span>
+                    <span class="cifra-texto">Tareas que requieren atención</span>
+                </div>
+                <div class="cifra reveal">
+                    <span class="cifra-valor"><span class="visually-hidden">{{ promedio }} %</span><span aria-hidden="true"><span data-contar="{{ promedio|unlocalize }}" data-decimales="2">{{ promedio }}</span> %</span></span>
+                    <span class="cifra-texto">Cumplimiento promedio de delegaciones</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="portada-seccion portada-seccion-alterna" id="como-funciona" aria-labelledby="titulo-flujo">
+        <div class="contenedor">
+            <div class="page-kicker">Flujo de valor SGR</div>
+            <h2 class="portada-titulo-seccion" id="titulo-flujo">Registrar, clasificar, verificar, calcular y decidir</h2>
+            <p class="portada-intro">De la solicitud a la evidencia: cada gestión en terreno sigue los mismos cinco pasos hasta llegar al semáforo.</p>
+            <div class="pasos-marco" data-linea-pasos>
+            <div class="pasos-linea" aria-hidden="true"></div>
+            <ol class="pasos">
+                <li class="paso reveal">
+                    <svg class="paso-motivo" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><circle class="relleno" cx="24" cy="24" r="20"/><circle cx="24" cy="24" r="13"/><circle cx="24" cy="24" r="4"/></svg>
+                    <span class="paso-numero">Paso 01</span>
+                    <h3>Registrar</h3>
+                    <p>Actividad o tarea</p>
+                </li>
+                <li class="paso reveal">
+                    <svg class="paso-motivo" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect class="relleno" x="4" y="4" width="40" height="40" rx="6"/><rect x="9" y="9" width="12" height="12" rx="2"/><rect x="27" y="9" width="12" height="12" rx="2"/><rect x="9" y="27" width="12" height="12" rx="2"/><rect x="27" y="27" width="12" height="12" rx="2"/></svg>
+                    <span class="paso-numero">Paso 02</span>
+                    <h3>Clasificar</h3>
+                    <p>Ítem, servicio y responsable</p>
+                </li>
+                <li class="paso reveal">
+                    <svg class="paso-motivo" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path class="relleno" d="M24 3l18 10.5v21L24 45 6 34.5v-21z"/><path d="M24 11l11 6.5v13L24 37l-11-6.5v-13z"/><path d="M19 24l4 4 7-8"/></svg>
+                    <span class="paso-numero">Paso 03</span>
+                    <h3>Verificar</h3>
+                    <p>Evidencia y validación</p>
+                </li>
+                <li class="paso reveal">
+                    <svg class="paso-motivo" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path class="relleno" d="M24 4l21 38H3z"/><path d="M12 38V28M20 38V22M28 38V16M36 38V26"/></svg>
+                    <span class="paso-numero">Paso 04</span>
+                    <h3>Calcular</h3>
+                    <p>Avance y ponderación</p>
+                </li>
+                <li class="paso reveal">
+                    <svg class="paso-motivo" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><rect class="relleno" x="12" y="2" width="24" height="44" rx="12"/><circle cx="24" cy="12" r="5"/><circle cx="24" cy="24" r="5"/><circle cx="24" cy="36" r="5"/></svg>
+                    <span class="paso-numero">Paso 05</span>
+                    <h3>Decidir</h3>
+                    <p>Semáforo e informe</p>
+                </li>
+            </ol>
+            </div>
+        </div>
+    </section>
+
+    <section class="portada-seccion" id="delegaciones" aria-labelledby="titulo-delegaciones">
+        <div class="contenedor">
+            <div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+                <div>
+                    <div class="page-kicker">Cobertura municipal</div>
+                    <h2 class="portada-titulo-seccion mb-0" id="titulo-delegaciones">Delegaciones operativas</h2>
+                </div>
+                <a href="{% url 'institucional' %}" class="btn btn-outline-sgr">Ver contexto</a>
+            </div>
+            <div class="delegaciones-grid">
+                {% for delegacion in delegaciones %}
+                <a class="delegacion-tarjeta reveal" href="{% url 'delegacion_detalle' delegacion %}">
+                    <strong>{{ delegacion }}</strong>
+                    <small>Seguimiento territorial {% include 'includes/_icono.html' with nombre='flecha' clase='flecha icono-sm' %}</small>
+                </a>
+                {% endfor %}
+            </div>
+            {% if ejes %}
+            <h3 class="section-label mt-5 mb-0">Ejes de gestión territorial</h3>
+            <ul class="ejes">
+                {% for eje in ejes %}<li>{{ eje }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="portada-seccion portada-seccion-alterna" id="preguntas" aria-labelledby="titulo-preguntas">
+        <div class="contenedor">
+            <div class="page-kicker">Ayuda</div>
+            <h2 class="portada-titulo-seccion" id="titulo-preguntas">Preguntas frecuentes</h2>
+            <p class="portada-intro">Lo esencial para registrar y entender el avance.</p>
+            <div class="preguntas">
+                <div class="pregunta reveal">
+                    <h3><button class="pregunta-boton" type="button" data-bs-toggle="collapse" data-bs-target="#respuesta-1" aria-expanded="true" aria-controls="respuesta-1">¿Quién registra las actividades?<span class="pregunta-simbolo" aria-hidden="true"></span></button></h3>
+                    <div class="pregunta-panel" id="respuesta-1" data-plegable><div class="pregunta-respuesta"><p>Cada funcionario registra las actividades que realiza en terreno. El registro queda asociado a su usuario y a la delegación elegida, con un código único.</p></div></div>
+                </div>
+                <div class="pregunta reveal">
+                    <h3><button class="pregunta-boton" type="button" data-bs-toggle="collapse" data-bs-target="#respuesta-2" aria-expanded="true" aria-controls="respuesta-2">¿Cuándo suma una actividad al avance?<span class="pregunta-simbolo" aria-hidden="true"></span></button></h3>
+                    <div class="pregunta-panel" id="respuesta-2" data-plegable><div class="pregunta-respuesta"><p>Solo cuando está aprobada. Además debe llevar el nombre y el teléfono del contacto, y no ser una gestión interna ni una gestión previa: en esos casos queda en el historial, pero no suma puntaje.</p></div></div>
+                </div>
+                <div class="pregunta reveal">
+                    <h3><button class="pregunta-boton" type="button" data-bs-toggle="collapse" data-bs-target="#respuesta-3" aria-expanded="true" aria-controls="respuesta-3">¿Quién revisa la evidencia?<span class="pregunta-simbolo" aria-hidden="true"></span></button></h3>
+                    <div class="pregunta-panel" id="respuesta-3" data-plegable><div class="pregunta-respuesta"><p>Otra persona: un delegado o la coordinación. Nadie revisa una actividad que registró. Si la evidencia se rechaza, se indica el motivo para que quien la registró pueda corregirla.</p></div></div>
+                </div>
+                <div class="pregunta reveal">
+                    <h3><button class="pregunta-boton" type="button" data-bs-toggle="collapse" data-bs-target="#respuesta-4" aria-expanded="true" aria-controls="respuesta-4">¿Qué evidencia se acepta?<span class="pregunta-simbolo" aria-hidden="true"></span></button></h3>
+                    <div class="pregunta-panel" id="respuesta-4" data-plegable><div class="pregunta-respuesta"><p>Una foto en JPG o PNG, o un documento PDF. La pantalla «Subir evidencia» indica el tamaño máximo permitido.</p></div></div>
+                </div>
+                <div class="pregunta reveal">
+                    <h3><button class="pregunta-boton" type="button" data-bs-toggle="collapse" data-bs-target="#respuesta-5" aria-expanded="true" aria-controls="respuesta-5">¿Cómo se calcula el semáforo?<span class="pregunta-simbolo" aria-hidden="true"></span></button></h3>
+                    <div class="pregunta-panel" id="respuesta-5" data-plegable><div class="pregunta-respuesta"><p>Se compara el cumplimiento con lo esperado al día. Es verde si alcanza lo esperado, ámbar desde el 60 % de lo esperado y rojo bajo eso.</p></div></div>
+                </div>
+                <div class="pregunta reveal">
+                    <h3><button class="pregunta-boton" type="button" data-bs-toggle="collapse" data-bs-target="#respuesta-6" aria-expanded="true" aria-controls="respuesta-6">¿Hasta cuándo puedo registrar una actividad?<span class="pregunta-simbolo" aria-hidden="true"></span></button></h3>
+                    <div class="pregunta-panel" id="respuesta-6" data-plegable><div class="pregunta-respuesta"><p>Durante la semana en curso. El lunes también se aceptan fechas de la semana anterior; desde el martes esa semana queda cerrada. No se registran fechas futuras.</p></div></div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
 {% endblock %}
