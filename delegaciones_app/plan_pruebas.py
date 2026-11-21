@@ -42,6 +42,7 @@ CATALOGO_CU = {
     'CU-29': 'Búsqueda y filtros', 'CU-29.1': 'Restricción de búsqueda por ámbito',
     'CU-30': 'Auditoría de cambios', 'CU-30.1': 'Bloqueo por alteración no autorizada',
     'CU-64': 'Informar felicitación o reclamo',
+    'CU-65': 'Consultar ajustes', 'CU-67': 'Aplicar o rechazar ajuste',
 }
 
 CATALOGO_RF = {

@@ -106,7 +106,7 @@
                         <div class="d-flex flex-wrap gap-2">
                             {% if puede.change %}<a class="btn btn-sm btn-outline-sgr" href="{% url 'mantenedor_editar' config.slug fila.pk %}">Modificar</a>
                             {% for accion in fila.acciones %}
-                            <form method="post" action="{{ accion.url }}" class="d-flex gap-1 m-0">
+                            <form method="post" action="{{ accion.url }}" class="d-flex gap-1 m-0"{% if accion.confirmar %} onsubmit="return confirm('{{ accion.confirmar|escapejs }}');"{% endif %}>
                                 {% csrf_token %}
                                 {% if accion.motivo %}<input class="form-control form-control-sm" name="motivo" placeholder="Motivo" required>{% endif %}
                                 <button class="btn btn-sm btn-outline-sgr" type="submit">{{ accion.etiqueta }}</button>

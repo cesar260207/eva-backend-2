@@ -39,7 +39,9 @@ class PerfilesTests(TestCase):
         self.assertFalse({'add_ajuste', 'add_ausencia', 'add_casosocial', 'add_comentario'} & permisos[PERFIL_COORDINADOR])
         self.assertIn('add_validacion', permisos[PERFIL_DELEGADO])
         self.assertTrue({'view_organizacion', 'change_organizacion', 'add_ajuste', 'add_ausencia', 'add_comentario'} <= permisos[PERFIL_DELEGADO])
-        self.assertFalse({'delete_organizacion', 'view_ajuste', 'view_ausencia', 'add_casosocial', 'delete_actividad'} & permisos[PERFIL_DELEGADO])
+        # Regla 8 (migración 0027): el delegado consulta los ajustes de su delegación, pero no los decide.
+        self.assertIn('view_ajuste', permisos[PERFIL_DELEGADO])
+        self.assertFalse({'delete_organizacion', 'change_ajuste', 'view_ausencia', 'add_casosocial', 'delete_actividad'} & permisos[PERFIL_DELEGADO])
         self.assertTrue({'view_organizacion', 'add_casosocial', 'add_comentario'} <= permisos[PERFIL_FUNCIONARIO])
         self.assertFalse({'change_organizacion', 'view_ajuste', 'view_ausencia', 'view_parametroversionado', 'add_ajuste', 'add_ausencia', 'add_validacion'} & permisos[PERFIL_FUNCIONARIO])
         self.assertTrue({'view_organizacion', 'change_organizacion', 'view_ajuste', 'change_ajuste', 'view_ausencia', 'change_ausencia', 'view_parametroversionado', 'change_parametroversionado', 'view_casosocial', 'change_casosocial', 'view_comentario', 'change_comentario'} <= permisos[PERFIL_COORDINADOR])
@@ -170,13 +172,16 @@ class PermisosMantenedoresTests(TestCase):
         lista = self.client.get(reverse('mantenedor_lista', args=['organizaciones']))
         self.assertContains(lista, propia.nombre)
         self.assertNotContains(lista, 'Organización Rural')
-        for slug in ('delegaciones', 'cargos', 'roles', 'funcionarios', 'catalogo', 'periodos', 'parametros', 'items', 'metas', 'ajustes', 'ausencias'):
+        for slug in ('delegaciones', 'cargos', 'roles', 'funcionarios', 'catalogo', 'periodos', 'parametros', 'items', 'metas', 'ausencias'):
             self.assertEqual(self.client.get(reverse('mantenedor_lista', args=[slug])).status_code, 404, slug)
+        self.assertEqual(self.client.get(reverse('mantenedor_lista', args=['ajustes'])).status_code, 200)
         editar = reverse('mantenedor_editar', args=['organizaciones', propia.pk])
         self.assertEqual(self.client.get(editar).status_code, 200)
         self.assertContains(self.client.get(editar), 'name="verificada"')
         indice = self.client.get(reverse('mantenedores'))
-        self.assertContains(indice, reverse('mantenedor_nuevo', args=['ajustes']))
+        # Con view_ajuste la tarjeta abre la lista de ajustes, y la lista ofrece «Agregar».
+        self.assertContains(indice, reverse('mantenedor_lista', args=['ajustes']))
+        self.assertContains(self.client.get(reverse('mantenedor_lista', args=['ajustes'])), reverse('mantenedor_nuevo', args=['ajustes']))
         self.assertContains(indice, reverse('mantenedor_nuevo', args=['ausencias']))
         alta_ajuste = self.client.get(reverse('mantenedor_nuevo', args=['ajustes']))
         alta_ausencia = self.client.get(reverse('mantenedor_nuevo', args=['ausencias']))

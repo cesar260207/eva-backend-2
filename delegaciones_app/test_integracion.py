@@ -25,7 +25,7 @@ from .models import validar_tamano_evidencia
 from .pruebas_base import crear_funcionario, fijar_hoy
 from .permisos import RolRequeridoMixin, asignar_perfil, roles_de, rol_requerido, tiene_rol
 from .models import (
-	Actividad, Auditoria, Cargo, Catalogo, Comentario, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
+	Actividad, Ajuste, Auditoria, Cargo, Catalogo, Comentario, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
 	HistorialCompromiso, Indicador, ItemMedible, MedicionDelegacion, Meta, ParametroVersionado, Periodo,
 	Rol, UsuarioMaestro, Validacion,
 )
@@ -1070,6 +1070,96 @@ class AccesosOctubreTests(BaseOperacion):
 		self.assertRedirects(respuesta, detalle)
 		self.assertContains(self.client.get(detalle), 'Revisar con la junta de vecinos')
 		self.assertTrue(self._ve(self.coordinador, detalle, 'Revisar con la junta de vecinos'))
+
+
+class DecidirAjusteTests(BaseOperacion):
+	"""CU-67 Aplicar o rechazar ajuste y CU-65 Consultar ajustes (RF-025, RF-036). Regla 8: la coordinación decide desde la lista."""
+
+	def setUp(self):
+		super().setUp()
+		self.lista = reverse('mantenedor_lista', args=['ajustes'])
+
+	def _ajuste(self, funcionario=None, **cambios):
+		datos = {'tipo': 'felicitacion', 'emisor': 'Junta de vecinos', 'periodo': self.periodo, 'informado_por': self.verificador.funcionario}
+		datos.update(cambios)
+		return Ajuste.objects.create(funcionario=(funcionario or self.funcionario).funcionario, **datos)
+
+	def _decidir(self, ajuste, decision, usuario=None):
+		self.client.force_login(usuario or self.coordinador)
+		return self.client.post(reverse('ajuste_decidir', args=[ajuste.pk, decision]))
+
+	def test_la_lista_muestra_aplicar_y_rechazar_con_confirmacion_a_la_coordinacion(self):
+		"""CU-67 Aplicar o rechazar ajuste (RF-025). Los botones son POST y piden confirmación."""
+		ajuste = self._ajuste()
+		self.client.force_login(self.coordinador)
+		respuesta = self.client.get(self.lista)
+		for decision in ('aplicar', 'rechazar'):
+			self.assertContains(respuesta, f'action="{reverse("ajuste_decidir", args=[ajuste.pk, decision])}"')
+		self.assertContains(respuesta, 'return confirm(', count=2)
+
+	def test_aplicar_cambia_el_estado_y_queda_en_la_auditoria(self):
+		"""CU-67 Aplicar o rechazar ajuste (RF-025, RF-036). Guarda quién y cuándo, y vuelve a la lista."""
+		ajuste = self._ajuste()
+		self.assertRedirects(self._decidir(ajuste, 'aplicar'), self.lista)
+		ajuste.refresh_from_db()
+		self.assertEqual((ajuste.estado, ajuste.aplicado_por), ('aplicado', self.coordinador.funcionario))
+		self.assertIsNotNone(ajuste.aplicado_en)
+		self.assertTrue(Auditoria.objects.filter(evento='aplicar_ajuste', entidad='Ajuste', identificador_registro=str(ajuste.pk)).exists())
+
+	def test_rechazar_cambia_el_estado_y_queda_en_la_auditoria(self):
+		"""CU-67 Aplicar o rechazar ajuste (RF-025, RF-036). El ajuste rechazado no cuenta en el cumplimiento."""
+		ajuste = self._ajuste(tipo='reclamo')
+		self.assertRedirects(self._decidir(ajuste, 'rechazar'), self.lista)
+		ajuste.refresh_from_db()
+		self.assertEqual(ajuste.estado, 'rechazado')
+		self.assertTrue(Auditoria.objects.filter(evento='rechazar_ajuste', entidad='Ajuste', identificador_registro=str(ajuste.pk)).exists())
+
+	def test_un_ajuste_ya_decidido_no_muestra_botones_ni_se_vuelve_a_decidir(self):
+		"""CU-67 Aplicar o rechazar ajuste (RF-025). Solo se decide un ajuste «informado»."""
+		ajuste = self._ajuste(estado='aplicado')
+		self.client.force_login(self.coordinador)
+		self.assertNotContains(self.client.get(self.lista), reverse('ajuste_decidir', args=[ajuste.pk, 'rechazar']))
+		self.assertEqual(self._decidir(ajuste, 'rechazar').status_code, 404)
+		ajuste.refresh_from_db()
+		self.assertEqual(ajuste.estado, 'aplicado')
+
+	def test_por_get_no_se_decide(self):
+		"""CU-67 Aplicar o rechazar ajuste (RF-025). Un enlace (GET) no cambia el estado."""
+		ajuste = self._ajuste()
+		self.client.force_login(self.coordinador)
+		self.assertRedirects(self.client.get(reverse('ajuste_decidir', args=[ajuste.pk, 'aplicar'])), self.lista)
+		ajuste.refresh_from_db()
+		self.assertEqual(ajuste.estado, 'informado')
+
+	def test_con_el_periodo_cerrado_no_se_decide(self):
+		"""CU-67 Aplicar o rechazar ajuste (RF-025, RN-013). Sin botones y, por POST, un mensaje en vez de un error."""
+		ajuste = self._ajuste()
+		Periodo.objects.filter(pk=self.periodo.pk).update(estado='cerrado')
+		self.client.force_login(self.coordinador)
+		self.assertNotContains(self.client.get(self.lista), reverse('ajuste_decidir', args=[ajuste.pk, 'aplicar']))
+		# Sin abrir la lista al comprobar la redirección, para que el mensaje quede para la siguiente página.
+		self.assertRedirects(self._decidir(ajuste, 'aplicar'), self.lista, fetch_redirect_response=False)
+		self.assertContains(self.client.get(self.lista), 'está cerrado')
+		ajuste.refresh_from_db()
+		self.assertEqual(ajuste.estado, 'informado')
+
+	def test_el_delegado_ve_los_ajustes_de_su_delegacion_pero_no_los_decide(self):
+		"""CU-65 Consultar ajustes (RF-025, RF-002). Sin botones; la decisión le responde 404 y queda auditada."""
+		propio = self._ajuste(emisor='Vecino Centro')
+		rural = crear_funcionario('rural-op', 'funcionario', cargo=self.cargo, delegacion=self.rural)
+		self._ajuste(funcionario=rural, emisor='Vecino Rural', informado_por=self.coordinador.funcionario)
+		self.client.force_login(self.verificador)
+		respuesta = self.client.get(self.lista)
+		self.assertContains(respuesta, 'Vecino Centro')
+		self.assertNotContains(respuesta, 'Vecino Rural')
+		self.assertNotContains(respuesta, reverse('ajuste_decidir', args=[propio.pk, 'aplicar']))
+		self.assertEqual(self._decidir(propio, 'aplicar', usuario=self.verificador).status_code, 404)
+		self.assertTrue(Auditoria.objects.filter(evento='acceso_denegado', entidad='Ajuste', identificador_registro=str(propio.pk)).exists())
+
+	def test_el_profesional_no_ve_la_lista_de_ajustes(self):
+		"""CU-65 Consultar ajustes (RF-002). El Profesional no tiene view_ajuste."""
+		self.client.force_login(self.funcionario)
+		self.assertEqual(self.client.get(self.lista).status_code, 404)
 
 
 class ActividadVistasTests(BaseOperacion):

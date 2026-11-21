@@ -708,16 +708,23 @@ def ajuste_decidir(request, pk, decision):
     funcionario = _funcionario_requerido(request)
     if not funcionario:
         return redirect('inicio')
+    lista = reverse('mantenedor_lista', args=['ajustes'])
     ajuste = get_object_or_404(Ajuste, pk=pk, estado='informado')
     if request.method != 'POST' or decision not in ('aplicar', 'rechazar'):
-        return redirect('inicio')
+        return redirect(lista)
     ajuste.estado = 'aplicado' if decision == 'aplicar' else 'rechazado'
     ajuste.aplicado_por = funcionario
     ajuste.aplicado_en = timezone.now()
-    ajuste.save(update_fields=['estado', 'aplicado_por', 'aplicado_en'])
-    Auditoria.registrar_evento(request.user, f'{decision}_ajuste', 'Ajuste', ajuste.pk, {'estado': 'informado'}, {'estado': ajuste.estado})
+    try:
+        with transaction.atomic():
+            ajuste.save(update_fields=['estado', 'aplicado_por', 'aplicado_en'])
+            Auditoria.registrar_evento(request.user, f'{decision}_ajuste', 'Ajuste', ajuste.pk, {'estado': 'informado'}, {'estado': ajuste.estado})
+    except ValidationError as error:
+        # RN-013: el ajuste de un período cerrado no se decide.
+        messages.error(request, ' '.join(error.messages))
+        return redirect(lista)
     messages.success(request, f'El ajuste fue {ajuste.get_estado_display().lower()}.')
-    return redirect('inicio')
+    return redirect(lista)
 
 
 @login_required

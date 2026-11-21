@@ -72,7 +72,7 @@ class ArmadoDelPlanTests(SimpleTestCase):
         self.assertEqual(len(CATALOGO_RF), 38)
         self.assertEqual(sorted(CATALOGO_RF), list(range(1, 39)))
         self.assertIn('CU-27.1', CATALOGO_CU)
-        self.assertEqual(len([cu for cu in CATALOGO_CU if '.' not in cu]), 26)
+        self.assertEqual(len([cu for cu in CATALOGO_CU if '.' not in cu]), 28)
 
     def test_cobertura_distingue_prueba_propia_subcasos_y_sin_prueba(self):
         """Sin CU (herramienta de apoyo). Aprobado, reprobado, cubierto por subcasos y sin prueba."""
