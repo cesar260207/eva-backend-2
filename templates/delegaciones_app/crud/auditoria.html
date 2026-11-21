@@ -12,13 +12,13 @@
         <div class="col-md-2">
             <select class="form-select" name="evento" aria-label="Evento">
                 <option value="">Todos los eventos</option>
-                {% for evento in eventos_disponibles %}<option value="{{ evento }}" {% if filtros.evento == evento %}selected{% endif %}>{{ evento }}</option>{% endfor %}
+                {% for valor, etiqueta in eventos_disponibles %}<option value="{{ valor }}" {% if filtros.evento == valor %}selected{% endif %}>{{ etiqueta }}</option>{% endfor %}
             </select>
         </div>
         <div class="col-md-2">
             <select class="form-select" name="entidad" aria-label="Entidad">
                 <option value="">Todas las entidades</option>
-                {% for entidad in entidades_disponibles %}<option value="{{ entidad }}" {% if filtros.entidad == entidad %}selected{% endif %}>{{ entidad }}</option>{% endfor %}
+                {% for valor, etiqueta in entidades_disponibles %}<option value="{{ valor }}" {% if filtros.entidad == valor %}selected{% endif %}>{{ etiqueta }}</option>{% endfor %}
             </select>
         </div>
         <div class="col-md-2"><input class="form-control" type="date" name="desde" value="{{ filtros.desde }}" aria-label="Desde"></div>
@@ -33,11 +33,11 @@
                 <tr>
                     <td class="text-nowrap">{{ evento.fecha|date:'d-m-Y H:i' }}</td>
                     <td>{{ evento.funcionario|default:evento.usuario_maestro|default:'-' }}</td>
-                    <td>{{ evento.evento }}</td>
-                    <td>{{ evento.entidad }}</td>
-                    <td>{{ evento.identificador_registro }}</td>
-                    <td class="small">{{ evento.valor_anterior|default:'-'|truncatechars:60 }}</td>
-                    <td class="small">{{ evento.valor_nuevo|default:'-'|truncatechars:60 }}</td>
+                    <td>{{ evento.evento_legible }}</td>
+                    <td>{{ evento.entidad_legible }}</td>
+                    <td class="text-break">{{ evento.identificador_registro }}</td>
+                    <td class="small text-break">{% for campo, valor in evento.detalle_anterior %}<div>{% if campo %}<span class="text-muted">{{ campo }}:</span> {% endif %}{{ valor }}</div>{% empty %}-{% endfor %}</td>
+                    <td class="small text-break">{% for campo, valor in evento.detalle_nuevo %}<div>{% if campo %}<span class="text-muted">{{ campo }}:</span> {% endif %}{{ valor }}</div>{% empty %}-{% endfor %}</td>
                 </tr>
             {% empty %}
                 <tr><td colspan="7" class="text-center py-4">No hay eventos para este criterio de búsqueda.</td></tr>
