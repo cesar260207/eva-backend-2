@@ -10,19 +10,8 @@
             <p class="form-guidance">Completa los datos solicitados y revisa la información antes de guardar. Los campos marcados con <span aria-hidden="true">*</span> son obligatorios.</p>
             <form method="post" novalidate>
                 {% csrf_token %}
-                {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
-                {% for field in form %}
-                <div class="mb-3 {% if field.field.widget.input_type == 'checkbox' %}form-check{% endif %}">
-                    {% if field.field.widget.input_type == 'checkbox' %}
-                        {{ field }}<label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {% else %}
-                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="required-mark" aria-hidden="true">*</span>{% endif %}</label>{{ field }}
-                    {% endif %}
-                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                    {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
-                </div>
-                {% endfor %}
-                <div class="d-flex justify-content-end gap-2"><a href="{{ volver_url }}" class="btn btn-light">Cancelar</a><button class="btn btn-sgr" type="submit">Guardar</button></div>
+                {% include 'includes/_formulario.html' %}
+                <div class="form-acciones"><a href="{{ volver_url }}" class="btn btn-light">Cancelar</a><button class="btn btn-sgr" type="submit">Guardar</button></div>
             </form>
         </div>
     </div>

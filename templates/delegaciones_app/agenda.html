@@ -33,7 +33,7 @@
         <div class="acciones"><button class="btn btn-outline-sgr" type="submit">Buscar / filtrar</button><a class="btn btn-link" href="{% url 'agenda' %}">Limpiar</a></div>
         <div class="acciones"><a class="btn btn-link" href="{% url 'informe' %}?tipo=compromisos&{{ filtros.urlencode }}">Generar informe</a></div>
     </form>
-    <div class="table-responsive">
+    <div class="table-responsive tabla-fija">
         <table class="table align-middle">
             <thead><tr><th>Folio</th><th>Tarea</th><th>Delegación</th><th>Plazo</th><th>Responsable</th><th>Estado</th><th>Acciones</th></tr></thead>
             <tbody>
@@ -44,7 +44,7 @@
                     <td>{{ compromiso.delegacion }}</td>
                     <td class="col-fecha">{{ compromiso.fecha_comprometida|date:'d-m-Y' }}</td>
                     <td>{{ compromiso.funcionario_responsable.nombre|default:'Sin responsable' }}</td>
-                    <td><span class="badge {% if compromiso.estado_class == 'danger' %}badge-danger-soft{% elif compromiso.estado_class == 'success' %}badge-success-soft{% else %}badge-warning-soft{% endif %}">{{ compromiso.estado_display }}</span></td>
+                    <td>{% include 'includes/_semaforo_insignia.html' with estado=compromiso.estado_display estado_class=compromiso.estado_class %}</td>
                     <td>
                         <div class="acciones-tarea">
                             {% if compromiso.puede_modificar %}
@@ -62,7 +62,7 @@
                     </td>
                 </tr>
             {% empty %}
-                <tr><td colspan="7" class="text-center py-4">No hay tareas en este filtro.</td></tr>
+                <tr><td colspan="7">{% include 'includes/_estado_vacio.html' with titulo='No hay tareas en este filtro.' %}</td></tr>
             {% endfor %}
             </tbody>
         </table>

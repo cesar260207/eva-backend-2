@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}Panel Administrador | SGR{% endblock %}
 {% block content %}
-{% include 'gestion_app/_panel_encabezado.html' with descripcion='Acceso total: todos los mantenedores, todas las transacciones, gestión de usuarios y visión global del sistema.' %}
+{% include 'gestion_app/_panel_encabezado.html' %}
 
 <div class="section-label mb-2">Visión global</div>
 <div class="row g-3 mb-4">
@@ -20,20 +20,20 @@
             <thead><tr><th>Perfil</th><th class="text-end">Usuarios activos</th></tr></thead>
             <tbody>{% for nombre, total in perfiles %}<tr><td>{{ nombre }}</td><td class="text-end">{{ total }}</td></tr>{% endfor %}</tbody>
         </table>
-        <div class="d-grid gap-2">
-            <a class="btn btn-sgr" href="{% url 'mantenedor_nuevo' 'funcionarios' %}">Crear usuario</a>
-            <a class="btn btn-outline-sgr" href="{% url 'mantenedor_lista' 'funcionarios' %}">Usuarios y asignación de perfil</a>
-            <a class="btn btn-outline-sgr" href="{% url 'perfiles' %}">Perfiles y permisos</a>
+        <div class="mosaicos mosaicos-panel">
+            <a class="mosaico mosaico-principal" href="{% url 'mantenedor_nuevo' 'funcionarios' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='mas' %}</span><span class="mosaico-texto">Crear usuario{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+            <a class="mosaico" href="{% url 'mantenedor_lista' 'funcionarios' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='equipo' %}</span><span class="mosaico-texto">Usuarios y asignación de perfil{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+            <a class="mosaico" href="{% url 'perfiles' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='escudo' %}</span><span class="mosaico-texto">Perfiles y permisos{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
         </div>
     </div></div>
     <div class="col-lg-4"><div class="panel h-100">
         <div class="section-label">Transacciones</div>
-        <div class="d-grid gap-2">
-            <a class="btn btn-outline-sgr" href="{% url 'actividad_nueva' %}">Registrar actividad con evidencia</a>
-            <a class="btn btn-outline-sgr" href="{% url 'actividades' %}?estado=pendiente">Revisar evidencias pendientes</a>
-            <a class="btn btn-outline-sgr" href="{% url 'delegados' %}">Delegados y asignaciones</a>
-            <a class="btn btn-outline-sgr" href="{% url 'agenda' %}">Ver tubo de trabajo</a>
-            <a class="btn btn-outline-sgr" href="{% url 'mantenedor_lista' 'periodos' %}">Abrir, cerrar o reabrir períodos</a>
+        <div class="mosaicos mosaicos-panel">
+            <a class="mosaico" href="{% url 'actividad_nueva' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='subir' %}</span><span class="mosaico-texto">Registrar actividad con evidencia{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+            <a class="mosaico" href="{% url 'actividades' %}?estado=pendiente"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='revisar' %}</span><span class="mosaico-texto">Revisar evidencias pendientes{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+            <a class="mosaico" href="{% url 'delegados' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='equipo' %}</span><span class="mosaico-texto">Delegados y asignaciones{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+            <a class="mosaico" href="{% url 'agenda' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='tubo' %}</span><span class="mosaico-texto">Ver tubo de trabajo{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+            <a class="mosaico" href="{% url 'mantenedor_lista' 'periodos' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='calendario' %}</span><span class="mosaico-texto">Abrir, cerrar o reabrir períodos{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
         </div>
     </div></div>
     <div class="col-lg-4">{% include 'gestion_app/_panel_alertas.html' %}</div>
@@ -55,7 +55,7 @@
         <table class="table table-sm align-middle">
             <thead><tr><th>Delegación</th><th class="text-end">Cumplimiento</th><th>Estado</th></tr></thead>
             <tbody>
-            {% for fila in delegaciones %}<tr><td>{{ fila.nombre }}</td><td class="text-end">{{ fila.cumplimiento }} %</td><td><span class="badge bg-{{ fila.estado_class }}">{{ fila.estado }}</span></td></tr>
+            {% for fila in delegaciones %}<tr><td>{{ fila.nombre }}</td><td class="text-end">{{ fila.cumplimiento }} %</td><td>{% include 'includes/_semaforo_insignia.html' with estado=fila.estado estado_class=fila.estado_class %}</td></tr>
             {% empty %}<tr><td colspan="3" class="text-muted">Sin indicadores para el período vigente.</td></tr>{% endfor %}
             </tbody>
         </table>

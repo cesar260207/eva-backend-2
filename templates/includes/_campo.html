@@ -1,0 +1,15 @@
+{% load sgr_interfaz %}{% comment %}
+Un campo de formulario: etiqueta arriba, marca de obligatorio, campo, ayuda y error debajo.
+Django 5.2 agrega solo «aria-invalid» y «aria-describedby» (apunta a «<id>_helptext» y «<id>_error»).
+{% endcomment %}{% if campo.is_hidden %}{{ campo }}{% else %}{% with tipo=campo.field.widget.input_type %}
+<div class="campo{% if tipo == 'checkbox' %} form-check form-switch campo-ancho{% elif campo.widget_type == 'textarea' %} campo-ancho{% endif %}">
+    {% if tipo == 'checkbox' %}
+    {{ campo|campo_sgr }}
+    <label class="form-check-label" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+    {% else %}
+    <label class="form-label" for="{{ campo.id_for_label }}">{{ campo.label }}{% if campo.field.required %} <span class="required-mark" aria-hidden="true">*</span><span class="visually-hidden"> (obligatorio)</span>{% endif %}</label>
+    {% with clases=clases_campo|default:'' %}{{ campo|campo_sgr:clases }}{% endwith %}
+    {% endif %}
+    {% if campo.help_text %}<div class="form-text" id="{{ campo.auto_id }}_helptext">{{ campo.help_text }}</div>{% endif %}
+    {% if campo.errors %}<div class="invalid-feedback d-block" id="{{ campo.auto_id }}_error">{% for error in campo.errors %}<span class="d-block">{{ error }}</span>{% endfor %}</div>{% endif %}
+</div>{% endwith %}{% endif %}

@@ -1,0 +1,7 @@
+{% comment %}Encabezado de página uniforme: kicker, título (h1), una línea de introducción y, si se entrega, un bloque de acciones ya dibujado en la plantilla que lo incluye.{% endcomment %}<div class="page-header">
+    <div>
+        {% if kicker %}<div class="page-kicker">{{ kicker }}</div>{% endif %}
+        <h1 class="page-title mb-2">{{ titulo }}</h1>
+        {% if intro %}<p class="page-intro mb-0">{{ intro }}</p>{% endif %}
+    </div>
+</div>

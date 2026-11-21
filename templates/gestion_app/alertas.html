@@ -3,13 +3,7 @@
 {% block title %}Alertas | Municipalidad de La Serena{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div>
-        <div class="page-kicker">Medición</div>
-        <h1 class="page-title mb-2">Alertas</h1>
-        <p class="page-intro mb-0">Vencimientos, evidencias pendientes, ausencia de registros y avance bajo lo esperado, dentro de tu ámbito.</p>
-    </div>
-</div>
+{% include 'includes/_encabezado_pagina.html' with kicker='Medición' titulo='Alertas' intro='Vencimientos, evidencias pendientes, ausencia de registros y avance bajo lo esperado, dentro de tu ámbito.' %}
 
 <div class="row g-3 mb-4">
     <div class="col-md-4"><div class="metric coral h-100"><div class="card-body"><div class="text-muted">Urgentes</div><h3>{{ peligro }}</h3></div></div></div>
@@ -24,7 +18,7 @@
             <tbody>
             {% for alerta in alertas %}
                 <tr>
-                    <td><span class="badge bg-{{ alerta.nivel }}">{{ alerta.etiqueta }}</span></td>
+                    <td>{% include 'includes/_semaforo_insignia.html' with estado=alerta.etiqueta estado_class=alerta.nivel %}</td>
                     <td>{{ alerta.motivo }}</td>
                     <td>{{ alerta.responsable }}</td>
                     <td>{{ alerta.fecha|date:'d-m-Y'|default:'-' }}</td>

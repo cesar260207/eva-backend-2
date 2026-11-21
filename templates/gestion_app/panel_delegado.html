@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
 {% block title %}Panel Delegado | SGR{% endblock %}
 {% block content %}
-{% include 'gestion_app/_panel_encabezado.html' with descripcion='Permisos intermedios: trabajas tu delegación, revisas sus evidencias y sigues su tubo de trabajo y sus métricas.' %}
+{% include 'gestion_app/_panel_encabezado.html' %}
 
 <div class="row g-3 mb-4">
     {% for fila in resultado_delegacion %}
-    <div class="col-6 col-lg-3"><div class="metric amber h-100"><small>Cumplimiento de {{ fila.nombre }}</small><strong>{{ fila.cumplimiento }} %</strong><small><span class="badge bg-{{ fila.estado_class }}">{{ fila.estado }}</span> {{ periodo }}</small></div></div>
+    <div class="col-6 col-lg-3"><div class="metric amber h-100"><small>Cumplimiento de {{ fila.nombre }}</small><strong>{{ fila.cumplimiento }} %</strong><small>{% include 'includes/_semaforo_insignia.html' with estado=fila.estado estado_class=fila.estado_class %} {{ periodo }}</small></div></div>
     {% empty %}
     <div class="col-6 col-lg-3"><div class="metric amber h-100"><small>Cumplimiento</small><strong>-</strong><small>Sin período vigente o sin metas</small></div></div>
     {% endfor %}
@@ -15,29 +15,19 @@
 </div>
 
 <div class="row g-3 mb-4">
-    <div class="col-lg-4"><div class="panel h-100">
+    <div class="col-lg-6"><div class="panel h-100">
         <div class="section-label">Tu delegación{% if delegacion_propia %}: {{ delegacion_propia.nombre }}{% endif %}</div>
-        <div class="d-grid gap-2">
-            <a class="btn btn-sgr" href="{% url 'actividades' %}?estado=pendiente">Revisar evidencias pendientes</a>
-            <a class="btn btn-outline-sgr" href="{% url 'agenda' %}">Ver tubo de trabajo</a>
-            {% if delegacion_propia %}<a class="btn btn-outline-sgr" href="{% url 'delegacion_detalle' delegacion_propia.nombre %}">Ver mi delegación</a>{% endif %}
-            <a class="btn btn-outline-sgr" href="{% url 'actividades' %}">Actividades de la delegación</a>
-            <a class="btn btn-outline-sgr" href="{% url 'actividad_nueva' %}">Registrar actividad</a>
-            <a class="btn btn-outline-sgr" href="{% url 'dashboard' %}">Medición y semáforo</a>
-            <a class="btn btn-outline-sgr" href="{% url 'informe' %}">Informes</a>
+        <div class="mosaicos mosaicos-panel">
+            <a class="mosaico mosaico-principal" href="{% url 'actividades' %}?estado=pendiente"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='revisar' %}</span><span class="mosaico-texto">Revisar evidencias pendientes{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+            <a class="mosaico" href="{% url 'agenda' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='tubo' %}</span><span class="mosaico-texto">Ver tubo de trabajo{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+            {% if delegacion_propia %}<a class="mosaico" href="{% url 'delegacion_detalle' delegacion_propia.nombre %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='edificio' %}</span><span class="mosaico-texto">Ver mi delegación{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>{% endif %}
+            <a class="mosaico" href="{% url 'actividades' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='lista' %}</span><span class="mosaico-texto">Actividades de la delegación{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+            <a class="mosaico" href="{% url 'actividad_nueva' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='subir' %}</span><span class="mosaico-texto">Registrar actividad{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+            <a class="mosaico" href="{% url 'dashboard' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='grafico' %}</span><span class="mosaico-texto">Medición y semáforo{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+            <a class="mosaico" href="{% url 'informe' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='documento' %}</span><span class="mosaico-texto">Informes{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
         </div>
     </div></div>
-    <div class="col-lg-4"><div class="panel h-100">
-        <div class="section-label">Restringido para tu perfil</div>
-        <ul class="small mb-0">
-            <li>Mantenedores, usuarios, perfiles y auditoría.</li>
-            <li>Ver, revisar o modificar registros de otras delegaciones.</li>
-            <li>Revisar las actividades que registraste tú.</li>
-            <li>Eliminar actividades o tareas del tubo de trabajo, y abrir o cerrar períodos.</li>
-            <li>Asignar delegados (lo hace la coordinación).</li>
-        </ul>
-    </div></div>
-    <div class="col-lg-4">{% include 'gestion_app/_panel_alertas.html' %}</div>
+    <div class="col-lg-6">{% include 'gestion_app/_panel_alertas.html' %}</div>
 </div>
 
 <div class="row g-3">
@@ -59,7 +49,7 @@
             <table class="table table-sm align-middle">
                 <thead><tr><th>Folio</th><th>Responsable</th><th>Plazo</th><th>Estado</th></tr></thead>
                 <tbody>
-                {% for compromiso in tareas_abiertas %}<tr><td>{{ compromiso.folio }}</td><td>{{ compromiso.funcionario_responsable.nombre }}</td><td>{{ compromiso.fecha_comprometida|date:'d-m-Y' }}</td><td>{{ compromiso.get_estado_display }}{% if compromiso.vencido %} <span class="badge bg-danger">Vencida</span>{% endif %}</td></tr>
+                {% for compromiso in tareas_abiertas %}<tr><td>{{ compromiso.folio }}</td><td>{{ compromiso.funcionario_responsable.nombre }}</td><td>{{ compromiso.fecha_comprometida|date:'d-m-Y' }}</td><td>{{ compromiso.get_estado_display }}{% if compromiso.vencido %} {% include 'includes/_semaforo_insignia.html' with estado='Vencida' estado_class='danger' %}{% endif %}</td></tr>
                 {% empty %}<tr><td colspan="4" class="text-muted">No hay tareas abiertas.</td></tr>{% endfor %}
                 </tbody>
             </table>

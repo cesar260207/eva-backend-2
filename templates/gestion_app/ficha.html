@@ -4,13 +4,7 @@
 {% block title %}Mi ficha | Municipalidad de La Serena{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div>
-        <div class="page-kicker">Mi cuenta</div>
-        <h1 class="page-title mb-2">Mi ficha personal</h1>
-        <p class="page-intro mb-0">Tus metas, tu avance y el estado de tus evidencias y de tus tareas del tubo de trabajo.</p>
-    </div>
-</div>
+{% include 'includes/_encabezado_pagina.html' with kicker='Mi cuenta' titulo='Mi ficha personal' intro='Tus metas, tu avance y el estado de tus evidencias y de tus tareas del tubo de trabajo.' %}
 
 <div class="panel mb-4">
     <div class="row g-3">
@@ -40,7 +34,7 @@
         <div class="metric h-100"><div class="card-body">
             <div class="text-muted">Cumplimiento ponderado</div>
             <h3>{{ cumplimiento_total }}%</h3>
-            <span class="badge bg-{{ estado_total_class }}">{{ estado_total }}</span>
+            {% include 'includes/_semaforo_insignia.html' with estado=estado_total estado_class=estado_total_class %}
         </div></div>
     </div>
     <div class="col-md-4">
@@ -66,14 +60,14 @@
             <thead><tr><th>Ítem</th><th>Meta</th><th>Avance</th><th>% de cumplimiento</th><th>Ponderación</th><th>Diferencia</th><th>Estado</th></tr></thead>
             <tbody>
             {% for fila in filas %}
-                <tr class="{% if fila.desviacion %}table-{{ fila.estado_class }}{% endif %}">
-                    <td><strong>{{ fila.item }}</strong>{% if fila.cumplida %} <span class="badge bg-success">Cumplida</span>{% endif %}</td>
+                <tr class="{% if fila.desviacion %}fila-{{ fila.estado_class }}{% endif %}">
+                    <td><strong>{{ fila.item }}</strong>{% if fila.cumplida %} {% include 'includes/_semaforo_insignia.html' with estado='Cumplida' estado_class='success' %}{% endif %}</td>
                     <td>{{ fila.objetivo|floatformat:'-2' }} {{ fila.unidad }}</td>
                     <td>{{ fila.avance|floatformat:'-2' }}</td>
                     <td>{{ fila.cumplimiento }}%</td>
                     <td>{{ fila.ponderacion }}</td>
                     <td>{% if fila.diferencia != None %}{{ fila.diferencia }} puntos{% else %}-{% endif %}</td>
-                    <td><span class="badge bg-{{ fila.estado_class }} rounded-pill">{{ fila.estado }}</span></td>
+                    <td>{% include 'includes/_semaforo_insignia.html' with estado=fila.estado estado_class=fila.estado_class %}</td>
                 </tr>
                 <tr>
                     <td colspan="7" class="border-top-0 pt-0">

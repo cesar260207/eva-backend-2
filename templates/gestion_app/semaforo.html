@@ -5,24 +5,27 @@
 {% block content %}
 <div class="page-header">
     <div>
-        <h2 class="mb-2">Semáforo de desempeño territorial</h2>
-        <p class="text-muted mb-0">{% if periodo %}Período {{ periodo.nombre }}: verde si alcanza lo esperado al día ({{ esperado }} %), ámbar desde el 60 % de lo esperado y rojo bajo eso.{% else %}Indicadores visuales de cumplimiento por delegación.{% endif %}</p>
+        <div class="page-kicker">Medición</div>
+        <h1 class="page-title mb-2">Semáforo de desempeño territorial</h1>
+        <p class="page-intro mb-0">{% if periodo %}Período {{ periodo.nombre }}: verde si alcanza lo esperado al día ({{ esperado }} %), ámbar desde el 60 % de lo esperado y rojo bajo eso.{% else %}Indicadores visuales de cumplimiento por delegación.{% endif %}</p>
     </div>
-    {% if perms.delegaciones_app.add_meta %}<a href="{% url 'mantenedor_nuevo' 'metas' %}" class="btn btn-sgr">+ Agregar meta</a>{% endif %}
-    {% if puede_registrar_ausencia %}<a href="{% url 'ausencia_nueva' %}" class="btn btn-outline-sgr">Registrar ausencia</a>{% endif %}
+    <div class="acciones">
+        {% if perms.delegaciones_app.add_meta %}<a href="{% url 'mantenedor_nuevo' 'metas' %}" class="btn btn-sgr">+ Agregar meta</a>{% endif %}
+        {% if puede_registrar_ausencia %}<a href="{% url 'ausencia_nueva' %}" class="btn btn-outline-sgr">Registrar ausencia</a>{% endif %}
+    </div>
 </div>
 {% include 'gestion_app/_filtros.html' %}
 
 <div class="row g-4">
     {% for delegacion in delegaciones %}
     <div class="col-md-6 col-xl-4">
-        <div class="card shadow-sm border-0 h-100">
+        <div class="card h-100 borde-{{ delegacion.estado_class }}">
             <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5>{{ delegacion.nombre }}</h5>
-                    <span class="badge bg-{{ delegacion.estado_class }} rounded-pill">{{ delegacion.estado }}</span>
+                <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                    <h2 class="h5 mb-0">{{ delegacion.nombre }}</h2>
+                    {% include 'includes/_semaforo_insignia.html' with estado=delegacion.estado estado_class=delegacion.estado_class %}
                 </div>
-                <div class="alert alert-{{ delegacion.estado_class }} mb-3">
+                <div class="semaforo-caja semaforo-caja-{{ delegacion.estado_class }} mb-3">
                     Cumplimiento: {{ delegacion.cumplimiento }}%<br>
                     {% if delegacion.diferencia != None %}Diferencia con lo esperado: {{ delegacion.diferencia }} puntos{% if delegacion.desviacion %} · <strong>desviación</strong>{% endif %}<br>{% endif %}
                     Último cálculo: {{ delegacion.ultimos_datos|date:'d-m-Y'|default:'Sin cálculo' }}
@@ -33,13 +36,13 @@
         </div>
     </div>
     {% empty %}
-    {% if periodo %}<div class="col-12"><div class="panel text-center py-4">No hay delegaciones con metas para este criterio de búsqueda.</div></div>{% endif %}
+    {% if periodo %}<div class="col-12"><div class="panel">{% include 'includes/_estado_vacio.html' with titulo='No hay delegaciones con metas para este criterio de búsqueda.' %}</div></div>{% endif %}
     {% endfor %}
 </div>
 
 {% if personas %}
 <div class="panel mt-4">
-    <h3 class="h5 mb-3">Semáforo por profesional</h3>
+    <h2 class="h5 mb-3">Semáforo por profesional</h2>
     <div class="table-responsive">
         <table class="table table-sm align-middle">
             <thead><tr><th>Profesional</th><th>Delegación</th><th>Cumplimiento</th><th>Estado</th><th>Diferencia</th></tr></thead>
@@ -49,7 +52,7 @@
                 <td>{{ persona.funcionario.nombre }}</td>
                 <td>{{ persona.funcionario.delegacion|default:'-' }}</td>
                 <td>{{ persona.cumplimiento }}%</td>
-                <td><span class="badge bg-{{ persona.estado_class }}">{{ persona.estado }}</span></td>
+                <td>{% include 'includes/_semaforo_insignia.html' with estado=persona.estado estado_class=persona.estado_class %}</td>
                 <td>{{ persona.diferencia|default:'-' }}</td>
             </tr>
             {% endfor %}

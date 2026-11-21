@@ -1,3 +1,72 @@
 {% extends 'base.html' %}
+{% load sgr_interfaz %}
 {% block title %}{{ titulo }} | SGR{% endblock %}
-{% block content %}<div class="d-flex justify-content-between align-items-end mb-4"><div><div class="page-kicker">Operación principal</div><h1 class="page-title">{{ titulo }}</h1><p class="page-intro">{% if actividad %}Se conservan el código {{ actividad.codigo_verificador }} y el funcionario que la registró.{% if actividad.estado == 'rechazada' %} Al guardar, la actividad rechazada vuelve a revisión.{% endif %}{% else %}El registro quedará asociado a tu usuario y a la delegación seleccionada.{% endif %}</p></div></div><div class="row"><div class="col-xl-8"><div class="panel"><form method="post">{% csrf_token %}{{ form.as_p }}<div class="d-flex justify-content-end gap-2"><a href="{% url 'actividades' %}" class="btn btn-light">Cancelar</a><button class="btn btn-sgr" type="submit">Guardar actividad</button></div></form></div></div><div class="col-xl-4"><div class="panel"><div class="section-label">Reglas del registro</div><ul class="text-muted mt-3"><li>Se genera un código único.</li><li>La evidencia requiere revisión.</li><li>Solo una actividad aprobada aporta al avance.</li><li>Una actividad aprobada ya no se modifica ni se elimina.</li><li>El evento queda auditado.</li></ul></div></div></div>{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="page-kicker">Operación principal</div>
+        <h1 class="page-title mb-2">{{ titulo }}</h1>
+        <p class="page-intro mb-0">{% if actividad %}Se conservan el código {{ actividad.codigo_verificador }} y el funcionario que la registró.{% if actividad.estado == 'rechazada' %} Al guardar, la actividad rechazada vuelve a revisión.{% endif %}{% else %}El registro quedará asociado a tu usuario y a la delegación seleccionada.{% endif %}</p>
+    </div>
+</div>
+<div class="row g-4">
+    <div class="col-xl-8">
+        <div class="panel">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                {% include 'includes/_errores_formulario.html' %}
+                {% for campo in form.hidden_fields %}{{ campo }}{% endfor %}
+
+                <fieldset class="form-seccion">
+                    <legend><span class="numero" aria-hidden="true">1</span>Dónde y cuándo</legend>
+                    <div class="form-seccion-campos">
+                        {% for campo in form|campos:"delegacion fecha" %}{% include 'includes/_campo.html' %}{% endfor %}
+                    </div>
+                </fieldset>
+
+                <fieldset class="form-seccion">
+                    <legend><span class="numero" aria-hidden="true">2</span>Qué se hizo</legend>
+                    <div class="form-seccion-campos">
+                        {% for campo in form|campos:"item catalogo solicitud_problema accion tipo_accion" %}{% include 'includes/_campo.html' %}{% endfor %}
+                    </div>
+                </fieldset>
+
+                <fieldset class="form-seccion">
+                    <legend><span class="numero" aria-hidden="true">3</span>Contacto</legend>
+                    <p class="nota-campo">Sin el nombre y el teléfono del contacto, la actividad queda en el historial pero no suma puntaje.</p>
+                    <div class="form-seccion-campos">
+                        {% for campo in form|campos:"contacto_nombre contacto_telefono organizacion" %}{% include 'includes/_campo.html' %}{% endfor %}
+                    </div>
+                </fieldset>
+
+                <fieldset class="form-seccion">
+                    <legend><span class="numero" aria-hidden="true">4</span>Vinculación</legend>
+                    <div class="form-seccion-campos">
+                        {% for campo in form|campos:"compromiso gestion_interna" %}{% include 'includes/_campo.html' %}{% endfor %}
+                    </div>
+                </fieldset>
+
+                {% with restantes=form|campos_restantes:"delegacion fecha item catalogo solicitud_problema accion tipo_accion contacto_nombre contacto_telefono organizacion compromiso gestion_interna" %}{% if restantes %}
+                <fieldset class="form-seccion">
+                    <legend><span class="numero" aria-hidden="true">5</span>Otros datos</legend>
+                    <div class="form-seccion-campos">
+                        {% for campo in restantes %}{% include 'includes/_campo.html' %}{% endfor %}
+                    </div>
+                </fieldset>
+                {% endif %}{% endwith %}
+
+                <div class="form-acciones">
+                    <a href="{% url 'actividades' %}" class="btn btn-light">Cancelar</a>
+                    <button class="btn btn-sgr" type="submit">Guardar actividad</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="panel panel-info">
+            <div class="section-label">Reglas del registro</div>
+            <ul class="text-muted mt-3 mb-0"><li>Se genera un código único.</li><li>La evidencia requiere revisión.</li><li>Solo una actividad aprobada aporta al avance.</li><li>Una actividad aprobada ya no se modifica ni se elimina.</li><li>El evento queda auditado.</li></ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

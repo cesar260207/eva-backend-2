@@ -5,7 +5,7 @@
     <div>
         <div class="page-kicker">Actividades</div>
         <h1 class="page-title">Actividades y evidencias</h1>
-        <p class="page-intro mb-0">Registros autorizados por tu rol y ámbito territorial. La columna Evidencia indica si cada actividad ya tiene su respaldo cargado.</p>
+        <p class="page-intro mb-0">Actividades registradas, con su estado y su evidencia.</p>
     </div>
     <a href="{% url 'actividad_nueva' %}" class="btn btn-sgr">+ Nueva actividad</a>
 </div>
@@ -21,13 +21,13 @@
         <div class="acciones"><button class="btn btn-outline-sgr" type="submit">Filtrar</button>{% if filtrado %}<a class="btn btn-link" href="{% url 'actividades' %}">Limpiar filtros</a>{% endif %}</div>
         <div class="acciones"><a class="btn btn-link" href="{% url 'informe' %}?tipo=actividades&{{ filtros.urlencode }}">Generar informe</a></div>
     </form>
-    <div class="table-responsive">
+    <div class="table-responsive tabla-fija">
         <table class="table align-middle">
             <thead><tr><th>Código</th><th>Fecha</th><th>Descripción</th><th>Funcionario</th><th>Delegación</th><th>Estado</th><th>Evidencia</th><th>Acciones</th></tr></thead>
             <tbody>
             {% for actividad in actividades %}
                 <tr>
-                    <td><a href="{% url 'actividad_detalle' actividad.codigo_verificador %}"><strong>{{ actividad.codigo_verificador }}</strong></a></td>
+                    <td class="col-fecha"><a href="{% url 'actividad_detalle' actividad.codigo_verificador %}"><strong>{{ actividad.codigo_verificador }}</strong></a></td>
                     <td class="col-fecha">{{ actividad.fecha|date:'d-m-Y H:i' }}</td>
                     <td class="col-texto">{{ actividad.solicitud_problema|truncatechars:70 }}</td>
                     <td>{{ actividad.funcionario_autor.nombre }}</td>
@@ -52,7 +52,7 @@
                     </td>
                 </tr>
             {% empty %}
-                <tr><td colspan="8" class="text-center py-4">{% if filtrado %}Ninguna actividad coincide con los filtros.{% else %}Todavía no hay actividades registradas.{% endif %}</td></tr>
+                <tr><td colspan="8">{% if filtrado %}{% include 'includes/_estado_vacio.html' with titulo='Ninguna actividad coincide con los filtros.' texto='Prueba con otros filtros o límpialos.' %}{% else %}{% include 'includes/_estado_vacio.html' with titulo='Todavía no hay actividades registradas.' %}{% endif %}</td></tr>
             {% endfor %}
             </tbody>
         </table>
