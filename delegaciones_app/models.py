@@ -1039,6 +1039,7 @@ class Ausencia(ControlPeriodoCerradoMixin, models.Model):
 		('administrativo', 'Administrativo'),
 		('compensatorio', 'Compensatorio'),
 		('dia_libre', 'Día libre'),
+		('emergencia', 'Emergencia'),
 	]
 	funcionario = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='ausencias')
 	periodo = models.ForeignKey(Periodo, on_delete=models.PROTECT, related_name='ausencias')

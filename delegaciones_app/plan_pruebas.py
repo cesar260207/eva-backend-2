@@ -43,6 +43,7 @@ CATALOGO_CU = {
     'CU-30': 'Auditoría de cambios', 'CU-30.1': 'Bloqueo por alteración no autorizada',
     'CU-64': 'Informar felicitación o reclamo',
     'CU-65': 'Consultar ajustes', 'CU-67': 'Aplicar o rechazar ajuste',
+    'CU-71': 'Registrar ausencia', 'CU-72': 'Consultar ausencias',
 }
 
 CATALOGO_RF = {

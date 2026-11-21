@@ -227,9 +227,9 @@ inc('aj_valid', 'Validar datos de ajuste', None, 'Verificar que el ajuste esté 
 # ---------------------------------------------------------------- G07 Gestionar ausencias (octubre 2026)
 base('au_reg', 'Registrar ausencia', None, [D, A], 'Anotar los días que un funcionario no trabajó para que no le bajen el cumplimiento.',
      'El Delegado solo elige funcionarios de su delegación.', 'Ausencia guardada y descontada del porcentaje esperado.',
-     'Elegir funcionario, período, tipo (licencia, vacaciones, administrativo, compensatorio o día libre) y fechas; validar y guardar.',
-     ['au_valid', 'auditar'], '/ausencias/nuevo/', nota='La pantalla existe, pero hoy no hay enlace en el menú: lo agrega la FASE 2 del prompt.', hu='Requerimientos de octubre')
-base('au_con', 'Consultar ausencias', None, [C, A], 'Ver las ausencias registradas.', 'Sesión iniciada.', 'Lista mostrada.',
+     'Elegir «Registrar ausencia» en el semáforo, luego funcionario, período, tipo (licencia, vacaciones, administrativo, compensatorio, día libre o emergencia) y fechas; validar y guardar.',
+     ['au_valid', 'auditar'], '/ausencias/nuevo/', hu='Requerimientos de octubre')
+base('au_con', 'Consultar ausencias', None, [D, C, A], 'Ver las ausencias registradas.', 'Sesión iniciada.', 'Lista mostrada; el Delegado ve solo las de su equipo.',
      'Abrir el mantenedor de ausencias y filtrar.', ['buscar'], '/administracion/ausencias/', hu='Requerimientos de octubre')
 base('au_mod', 'Modificar ausencia', None, [C, A], 'Corregir las fechas o el tipo de una ausencia.', 'La ausencia existe.', 'Ausencia actualizada.',
      'Buscar la ausencia, cambiar los datos y guardar.', ['buscar', 'au_valid', 'auditar'], '/administracion/ausencias/<id>/editar/', hu='Requerimientos de octubre')

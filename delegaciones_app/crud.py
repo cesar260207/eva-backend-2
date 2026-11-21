@@ -165,6 +165,16 @@ def _ajustes_visibles(user, registros):
     return registros.filter(propios)
 
 
+def _ausencias_visibles(user, registros):
+    """Regla 9: el delegado ve las ausencias de los funcionarios de su delegación."""
+    if puede_ver_todo(user):
+        return registros
+    funcionario = funcionario_de(user)
+    if funcionario is None or not funcionario.delegacion_id:
+        return registros.none()
+    return registros.filter(funcionario__delegacion_id=funcionario.delegacion_id)
+
+
 MANTENEDORES = {mantenedor.slug: mantenedor for mantenedor in (
     Mantenedor(
         'delegaciones', 'Delegaciones', 'delegación', 'Unidades territoriales y su estado operativo.',
@@ -384,6 +394,8 @@ class MantenedorMixin(PermisoRequeridoMixin):
             registros = _organizaciones_visibles(self.request.user, registros)
         elif self.config.slug == 'ajustes':
             registros = _ajustes_visibles(self.request.user, registros)
+        elif self.config.slug == 'ausencias':
+            registros = _ausencias_visibles(self.request.user, registros)
         return registros
 
     def get_context_data(self, **kwargs):

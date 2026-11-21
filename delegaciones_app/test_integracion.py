@@ -25,7 +25,7 @@ from .models import validar_tamano_evidencia
 from .pruebas_base import crear_funcionario, fijar_hoy
 from .permisos import RolRequeridoMixin, asignar_perfil, roles_de, rol_requerido, tiene_rol
 from .models import (
-	Actividad, Ajuste, Auditoria, Cargo, Catalogo, Comentario, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
+	Actividad, Ajuste, Auditoria, Ausencia, Cargo, Catalogo, Comentario, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
 	HistorialCompromiso, Indicador, ItemMedible, MedicionDelegacion, Meta, ParametroVersionado, Periodo,
 	Rol, UsuarioMaestro, Validacion,
 )
@@ -1160,6 +1160,49 @@ class DecidirAjusteTests(BaseOperacion):
 		"""CU-65 Consultar ajustes (RF-002). El Profesional no tiene view_ajuste."""
 		self.client.force_login(self.funcionario)
 		self.assertEqual(self.client.get(self.lista).status_code, 404)
+
+
+class AusenciaDesdeSemaforoTests(BaseOperacion):
+	"""CU-71 Registrar ausencia y CU-72 Consultar ausencias (RF-026, RF-027). Regla 9: el delegado ingresa las ausencias desde el semáforo."""
+
+	def setUp(self):
+		super().setUp()
+		fijar_hoy(self, date(2026, 9, 15))
+		self.de_rural = crear_funcionario('rural-ausencia', 'funcionario', cargo=self.cargo, delegacion=self.rural)
+
+	def _ausencia(self, funcionario, tipo='licencia', desde=date(2026, 9, 7), hasta=date(2026, 9, 8)):
+		return Ausencia.objects.create(funcionario=funcionario.funcionario, periodo=self.periodo, tipo=tipo, desde=desde, hasta=hasta, registrada_por=self.verificador.funcionario)
+
+	def test_el_boton_del_semaforo_es_solo_del_delegado(self):
+		"""CU-71 Registrar ausencia (RF-027). Regla 9: el botón aparece al Delegado y no a los demás perfiles."""
+		administrador = crear_funcionario('admin-ausencia', 'administrador', cargo=self.cargo)
+		esperados = {self.verificador: True, self.coordinador: False, self.funcionario: False, administrador: False}
+		for usuario, esperado in esperados.items():
+			with self.subTest(usuario=usuario.username):
+				self.client.force_login(usuario)
+				self.assertEqual(reverse('ausencia_nueva') in self.client.get(reverse('semaforo')).content.decode(), esperado)
+
+	def test_el_delegado_registra_una_emergencia_y_vuelve_al_semaforo(self):
+		"""CU-71 Registrar ausencia (RF-026). El tipo «Emergencia» de la matriz se acepta y queda auditado."""
+		self.client.force_login(self.verificador)
+		respuesta = self.client.post(reverse('ausencia_nueva'), {
+			'funcionario': self.funcionario.funcionario.pk, 'periodo': self.periodo.pk, 'tipo': 'emergencia',
+			'desde': '2026-09-14', 'hasta': '2026-09-15', 'observacion': 'Emergencia familiar',
+		})
+		self.assertRedirects(respuesta, reverse('semaforo'))
+		ausencia = Ausencia.objects.get(funcionario=self.funcionario.funcionario)
+		self.assertEqual((ausencia.tipo, ausencia.get_tipo_display(), ausencia.registrada_por), ('emergencia', 'Emergencia', self.verificador.funcionario))
+		self.assertTrue(Auditoria.objects.filter(entidad='Ausencia', evento='crear', identificador_registro=str(ausencia.pk)).exists())
+
+	def test_el_delegado_ve_solo_las_ausencias_de_su_equipo(self):
+		"""CU-72 Consultar ausencias (RF-002, RF-026). La lista del Delegado se limita a su delegación y no permite editar."""
+		self._ausencia(self.funcionario)
+		self._ausencia(self.de_rural, tipo='vacaciones')
+		self.client.force_login(self.verificador)
+		respuesta = self.client.get(reverse('mantenedor_lista', args=['ausencias']))
+		self.assertContains(respuesta, self.funcionario.funcionario.nombre)
+		self.assertNotContains(respuesta, self.de_rural.funcionario.nombre)
+		self.assertNotContains(respuesta, 'Modificar')
 
 
 class ActividadVistasTests(BaseOperacion):

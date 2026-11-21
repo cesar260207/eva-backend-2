@@ -151,6 +151,10 @@ def semaforo(request):
         contexto['personas'] = resultados_por_persona(contexto['periodo'], contexto['delegacion_propia'])
     else:
         contexto['personas'] = []
+    # Regla 9: el delegado ingresa las ausencias de su equipo desde el semáforo.
+    contexto['puede_registrar_ausencia'] = (
+        perfil_de(request.user) == PERFIL_DELEGADO and request.user.has_perm('delegaciones_app.add_ausencia')
+    )
     return render(request, 'gestion_app/semaforo.html', contexto)
 
 
