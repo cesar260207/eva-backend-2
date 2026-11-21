@@ -5,7 +5,7 @@ las tablas al ejecutar las migraciones (`python manage.py migrate`); no se crean
 manualmente desde phpMyAdmin. El ORM usa estas mismas tablas en las vistas propias del
 sistema; desde la Evaluación Sumativa 3 no se usa Django Admin.
 
-Los perfiles de acceso (Administrador, Coordinador, Delegado y Funcionario) son las tablas de grupos y
+Los perfiles de acceso (Administrador, Coordinador, Delegado y Profesional) son las tablas de grupos y
 permisos de `django.contrib.auth` (`auth_group`, `auth_group_permissions`, `auth_user_groups`).
 La migración `0015_perfiles_de_acceso` creó los tres perfiles de la pauta (Administrador, Supervisor y
 Administrativo) y la `0018_perfiles_por_jerarquia` los dejó según la jerarquía de la Municipalidad:
@@ -34,7 +34,10 @@ los estados; no ejecuta SQL ni modifica datos.
 El modelo implementa las 17 clases del diseño (diagrama de clases del informe),
 más dos tablas adicionales: `FuncionarioRol`, que resuelve la relación
 muchos a muchos entre funcionarios y roles, y `MedicionDelegacion`, que conserva
-el histórico importado de la Matriz SGR. En total son 19 tablas propias.
+el histórico importado de la Matriz SGR. Los requerimientos de octubre 2026 agregaron cinco modelos
+(`Organizacion`, `Ajuste`, `Ausencia`, `CasoSocial` y `Comentario`, sección «Modelos de los requerimientos
+de octubre 2026»). En total son 24 tablas propias. El diagrama de clases actualizado está en
+[docs/DIAGRAMA_CLASES.md](docs/DIAGRAMA_CLASES.md).
 
 ## Las 17 clases y las dos tablas adicionales
 
@@ -44,7 +47,7 @@ el histórico importado de la Matriz SGR. En total son 19 tablas propias.
 |---|---|---|
 | `Delegacion` | Unidad territorial municipal. | Tiene funcionarios, actividades y compromisos. Calcula su cumplimiento ponderado. |
 | `Cargo` | Cargo de los funcionarios y su vigencia. | Tiene funcionarios e ítems medibles. |
-| `Rol` | Rol que define la función y el alcance: administrador, coordinador, delegado (también verifica en su delegación), funcionario, verificador y consulta. | Se asigna a funcionarios mediante `FuncionarioRol`. |
+| `Rol` | Rol que define la función y el alcance: administrador, coordinador, delegado (también verifica en su delegación) y funcionario. La migración `0024` trasladó y eliminó los roles retirados `verificador` y `consulta`. | Se asigna a funcionarios mediante `FuncionarioRol`. |
 | `Funcionario` | Persona con cuenta de acceso, cargo, delegación opcional y uno o más roles. | `usuario` uno a uno con el usuario de Django; autor de actividades y compromisos. |
 | `UsuarioMaestro` | Superusuario con alcance total. | `usuario` uno a uno opcional con el usuario de Django. |
 | `FuncionarioRol` (adicional) | Asigna un rol a un funcionario. | Único por funcionario y rol. |
@@ -96,6 +99,11 @@ Funcionario    1 ── N Compromiso (responsable)
 Compromiso     1 ── N Actividad (opcional)
 Delegacion     1 ── N MedicionDelegacion
 Funcionario    1 ── N Auditoria
+Delegacion     1 ── N Organizacion (opcional) ── N Actividad / Compromiso (opcional)
+Periodo        1 ── N Ajuste ── 0..1 Funcionario o 0..1 Delegacion (destinatario)
+Funcionario    1 ── N Ausencia ── 1 Periodo
+Funcionario    1 ── N CasoSocial
+Actividad      1 ── N Comentario (o Compromiso 1 ── N Comentario)
 ```
 
 `1 ── N` indica que una fila del lado izquierdo puede relacionarse con varias
@@ -116,12 +124,106 @@ modo que valen igual desde la aplicación, el admin y los comandos.
 | RN-002: el valor objetivo de una meta es mayor que cero. | Validador de `Meta.valor_objetivo` |
 | RN-003 y RN-009: el avance cuenta las actividades aprobadas del ítem, dentro del período, con una validación aprobada; si el funcionario de la meta tiene delegación, solo las de esa delegación. | `Meta.actividades_que_aportan()` e `Indicador.calcular_avance()` |
 | RN-004: cumplimiento = avance / meta × 100. | `Meta.evaluar_progreso()` |
-| RN-005: cumplimiento ponderado, con tope (150 % por defecto, configurable por período). | `Indicador.calcular_cumplimiento()` |
+| RN-005: cumplimiento ponderado, con tope (120 % por defecto desde la regla 7 de octubre, configurable por período con `maximo_cumplimiento`). | `Indicador.calcular_cumplimiento()` |
 | RN-006: el cumplimiento colectivo debe alcanzar el umbral del período. | `Periodo.alcanza_umbral()` |
 | RN-007: meta esperada al día = días transcurridos / días totales × 100. | `Periodo.porcentaje_esperado()` |
 | RN-008: semáforo verde si alcanza lo esperado, ámbar si llega al 60 % de lo esperado, rojo si no. | `Periodo.calcular_semaforo()` |
 | RN-010: el código verificador de una actividad es único e inmutable. | `Actividad.generar_codigo_verificador()` y `save()` |
 | RN-013: un período cerrado no se modifica, ni sus ítems, metas, parámetros e indicadores; solo se reabre con motivo y queda auditado. | `Periodo.verificar_editable()` y `ControlPeriodoCerradoMixin` |
+
+## Modelos de los requerimientos de octubre 2026
+
+La reunión de octubre de 2026 agregó cinco modelos (migraciones `0021` a `0028`) y campos en `Actividad`,
+`Compromiso` e `ItemMedible`. Con ellos el sistema tiene 24 tablas propias. Cada modelo se justifica por el
+problema del municipio que resuelve y por la alternativa de diseño que se descartó.
+
+### `Organizacion` (tabla `delegaciones_app_organizacion`)
+
+- **Por qué existe.** La matriz registra a qué organización comunitaria se atendió y el municipio entregó su
+  base de juntas de vecinos y organizaciones (2.709). Sin un modelo propio, el nombre de la organización se
+  escribiría a mano en cada actividad, con variantes que impiden contar por organización o por tipo.
+- **Relaciones.** `Delegacion` 1 a 0..N `Organizacion` (opcional: hay organizaciones sin territorio
+  verificable); `Organizacion` 0..1 a 0..N `Actividad` y 0..1 a 0..N `Compromiso`. Todas con `PROTECT`: una
+  organización con actividades no se borra, se desactiva (`activa`).
+- **Restricciones.** Única por nombre y territorio (`organizacion_nombre_territorio_unico`); el tipo es uno de
+  los del documento de octubre (junta de vecinos, funcional, adulto mayor, deportiva, cultural, comité) o
+  «sin clasificar»; la actividad y la tarea solo aceptan organizaciones de su misma delegación
+  (`Actividad.clean`, `Compromiso.clean`).
+- **Decisión.** Se prefirió un catálogo propio a reutilizar `Catalogo`, porque la organización tiene datos
+  legales (personalidad jurídica, registro, socios, fecha de constitución) y una verificación propia
+  (`verificada`) que el catálogo genérico no tiene.
+
+### `Ajuste` (tabla `delegaciones_app_ajuste`)
+
+- **Por qué existe.** Regla 8: las felicitaciones suman y los reclamos restan al cumplimiento, pero solo con
+  respaldo formal, informados por el delegado y aceptados por la coordinación. Hace falta guardar quién
+  informó, quién decidió, cuándo y con qué documento.
+- **Relaciones.** `Periodo` 1 a 0..N `Ajuste`; destinatario `Funcionario` 0..1 a 0..N o `Delegacion` 0..1 a
+  0..N (exactamente uno de los dos); `informado_por` y `aplicado_por` a `Funcionario` 1 a 0..N.
+- **Restricciones.** `clean` exige un solo destinatario, respaldo y emisor si es felicitación; el respaldo es
+  JPG, PNG o PDF de hasta 5 MB (`0026`); estados informado, aplicado o rechazado; un período cerrado no se
+  modifica (`ControlPeriodoCerradoMixin`). Al quedar aplicado o rechazado recalcula las metas de su
+  destinatario (`actualizar_indicadores`).
+- **Decisión.** Se descartó guardar el ajuste como un número en `Indicador.ajuste`, que era lo que había:
+  un número no deja trazabilidad (quién, cuándo, con qué respaldo) ni permite rechazar. El indicador conserva
+  el campo `ajuste` como resultado del cálculo, y el modelo `Ajuste` es la fuente.
+
+### `Ausencia` (tabla `delegaciones_app_ausencia`)
+
+- **Por qué existe.** Regla 9: los días libres, vacaciones, días administrativos, licencias y emergencias se
+  descuentan de lo esperado al día; sin eso, un funcionario con licencia aparece en rojo.
+- **Relaciones.** `Funcionario` 1 a 0..N `Ausencia`; `Periodo` 1 a 0..N `Ausencia`; `registrada_por` a
+  `Funcionario`.
+- **Restricciones.** Término no anterior al inicio; no se superpone con otra ausencia del mismo funcionario;
+  tipo de una lista cerrada (con «Emergencia» desde la `0028`); período cerrado no se modifica. Al guardarla o
+  borrarla recalcula las metas del funcionario.
+- **Decisión.** Es un modelo propio y no un campo del usuario (por ejemplo, «en licencia: sí o no») porque una
+  persona tiene varias ausencias en un trimestre, cada una con fechas, tipo y quién la registró, y el cálculo
+  necesita los días exactos (`reglas.dias_ausencia` cuenta los días sin duplicar los que se traslapan). Un
+  campo del usuario solo diría el estado de hoy y perdería el historial que justifica el ajuste de la meta.
+
+### `CasoSocial` (tabla `delegaciones_app_casosocial`)
+
+- **Por qué existe.** El área social atiende a un mismo vecino hasta en tres gestiones (RF-015, hojas «G SOC»
+  de la matriz) y la matriz lo registra por etapas.
+- **Relaciones.** `Funcionario` 1 a 0..N `CasoSocial`.
+- **Restricciones.** Etapa entre 1 y 3 (`clean`); la vista rechaza una cuarta gestión del mismo funcionario
+  con el mismo vecino; tipo de una lista cerrada (informe social, subsidios, PGU, SUF, SAP, derivación).
+- **Decisión.** Se separó de `Actividad` porque guarda datos personales sensibles del vecino (situación
+  social) que no deben verse en las listas de actividades ni en los informes generales; con un modelo aparte
+  el acceso se controla con sus propios permisos (`add_casosocial` solo para el Profesional).
+
+### `Comentario` (tabla `delegaciones_app_comentario`)
+
+- **Por qué existe.** RF-035: coordinar observaciones sobre una actividad o una tarea sin usar el campo de la
+  actividad ni canales externos.
+- **Relaciones.** `Actividad` 0..1 a 0..N `Comentario` y `Compromiso` 0..1 a 0..N `Comentario` (`CASCADE`: el
+  comentario no tiene sentido sin su registro); `autor` a `Funcionario`.
+- **Restricciones.** Pertenece a una actividad o a una tarea, no a ambas (`clean`).
+- **Decisión.** Un solo modelo con dos llaves opcionales en vez de dos tablas de comentarios, porque el
+  comentario tiene la misma forma en los dos casos y la regla «uno u otro» se valida en `clean`.
+
+### Campos nuevos en modelos existentes
+
+| Modelo | Campo | Para qué |
+|---|---|---|
+| `Actividad` | `tipo_accion` (ejecución o gestión previa) | Regla 5: la gestión previa no puntúa |
+| `Actividad` | `gestion_interna` | Regla 1: el usuario es el delegado; casilla en el formulario desde esta versión |
+| `Actividad` | `cuenta_puntaje`, `motivo_sin_puntaje` | Resultado de `reglas.evaluar_puntaje`: la actividad se guarda para el historial aunque no sume |
+| `Compromiso` | `item`, `solicitante_telefono`, `gestion_interna`, `organizacion` | Ítem tipo «tubo»: porcentaje de tareas realizadas con contacto |
+| `ItemMedible` | `tipo_calculo` (actividades o tubo) | La matriz mide «Soluciones de ingresos al tubo» como porcentaje, no como conteo |
+
+### Reglas de octubre en el modelo
+
+| Regla | Dónde se aplica |
+|---|---|
+| RN-014: puntúa solo con contacto, sin gestión interna y sin gestión previa (reglas 1, 2 y 5). | `reglas.evaluar_puntaje()` desde `Actividad.clean()` |
+| RN-015: máximo de ingresos por autor y día, parámetro `max_ingresos_diarios` (regla 3). | `reglas.validar_limite_diario()` |
+| RN-016: cierre semanal al registrar, no al corregir sin cambiar el día (regla 4). | `reglas.validar_fecha_actividad()` |
+| RN-017: tope configurable (120 %), felicitaciones +10 (máximo 3) y reclamos -30 (reglas 7 y 8). | `Indicador.calcular_cumplimiento()` |
+| RN-018: lo esperado al día descuenta las ausencias (regla 9). | `reglas.porcentaje_esperado_ajustado()` |
+
+## Concurrencia
 
 El control de concurrencia (RF-034) usa el campo `version` de `Actividad` y
 `Compromiso`: si dos usuarios editan el mismo registro, gana quien guarda
@@ -348,8 +450,8 @@ están completos son:
 
 | Requisito | Estado |
 |---|---|
-| RF-015 Registrar atención social por etapas | No implementado. |
-| RF-020 Relacionar agenda y medición | No implementado: cerrar un compromiso no alimenta el indicador del ítem. |
-| RF-025 Aplicar incentivos y penalizaciones | No implementado: `Indicador.ajuste` se guarda pero no entra al cálculo. |
-| RF-031 Mostrar vista global por cargos | No implementado. |
-| RF-035 Facilitar coordinación | No implementado: no hay comentarios asociados a registros. |
+| RF-015 Registrar atención social por etapas | Implementado con `CasoSocial` (octubre 2026): hasta tres gestiones por vecino. |
+| RF-020 Relacionar agenda y medición | Implementado con el ítem tipo «tubo»: el porcentaje de tareas realizadas alimenta el indicador y se recalcula al cambiar el estado de una tarea. |
+| RF-025 Aplicar incentivos y penalizaciones | Implementado con `Ajuste`: felicitaciones y reclamos aplicados por la coordinación entran al cálculo. |
+| RF-031 Mostrar vista global por cargos | No implementado (postergado en el backlog, ver docs/BACKLOG_SPRINT.md). |
+| RF-035 Facilitar coordinación | Implementado con `Comentario`: comentarios visibles en el detalle de la actividad. |

@@ -68,10 +68,7 @@ CODIGO_DE_MODULO = {
 
 # Estado de los requisitos que no están completos en el sistema (se declara aquí para que el plan lo diga con claridad).
 OBSERVACIONES_RF = {
-    15: 'No implementado: no existe el registro de atenciones sociales por etapas.',
-    20: 'No implementado: cerrar un compromiso no alimenta el indicador del ítem; solo cuentan las actividades aprobadas.',
-    25: 'No implementado: el campo ajuste del indicador se guarda pero no entra al cálculo.',
-    31: 'No implementado: no hay vista global por cargos.',
+    31: 'No implementado: no hay vista global por cargos (postergado en el backlog).',
 }
 
 # Responsable de ejecutar las pruebas de cada caso de uso (familia del CU) y de los casos de login.

@@ -11,12 +11,12 @@ Equipo de cuatro integrantes: se exigen 8 mantenedores y 4 transacciones.
 
 ## Perfiles y permisos (15 pts)
 
-- [x] Cuatro grupos de Django con permisos por jerarquía: Administrador, Coordinador, Delegado y Funcionario
-  (migraciones `0015_perfiles_de_acceso`, `0018_perfiles_por_jerarquia` y `0019_eliminar_actividad_solo_coordinacion`).
+- [x] Cuatro grupos de Django con permisos por jerarquía: Administrador, Coordinador, Delegado y Profesional
+  (migraciones `0015`, `0018`, `0019`, `0022` que renombra Funcionario a Profesional, `0025`, `0027` y `0028`).
 - [x] Creación de usuarios y asignación de grupo desde **Administración → Funcionarios y usuarios**.
 - [x] Restricciones funcionales: los mantenedores, la auditoría y los perfiles exigen el permiso de Django
   correspondiente; revisar evidencias exige `add_validacion`; eliminar actividades exige `delete_actividad`.
-- [x] El perfil Funcionario no hace operaciones críticas: no revisa, no elimina, no administra.
+- [x] El perfil Profesional no hace operaciones críticas: no revisa, no elimina, no administra.
 - [x] Página de consulta de perfiles y permisos: `/administracion/perfiles/`.
 
 ## Recuperación de contraseña (15 pts)
@@ -34,12 +34,13 @@ Equipo de cuatro integrantes: se exigen 8 mantenedores y 4 transacciones.
 - [x] Panel Administrador: visión global, gestión de usuarios, los 8 mantenedores, transacciones y auditoría reciente.
 - [x] Panel Coordinador: todas las delegaciones con su avance y su delegado, mantenedores autorizados y alertas.
 - [x] Panel Delegado: su delegación, las evidencias que esperan su revisión, su tubo de trabajo y sus métricas.
-- [x] Panel Funcionario: solo sus funciones y la lista de operaciones restringidas.
+- [x] Panel Profesional: solo sus funciones y la lista de operaciones restringidas.
 
 ## Mantenedores (20 pts)
 
-- [x] 8 mantenedores con listar, buscar, agregar, modificar y eliminar con confirmación: Delegaciones, Cargos,
-  Roles, Funcionarios y usuarios, Catálogo, Períodos, Ítems medibles y Metas.
+- [x] 12 mantenedores con listar, buscar, agregar, modificar y eliminar con confirmación: Delegaciones, Cargos,
+  Roles, Funcionarios y usuarios, Catálogo, Organizaciones, Períodos, Parámetros, Ítems medibles, Metas, Ajustes y
+  Ausencias.
 - [x] Eliminar borra el registro si no tiene datos relacionados; si los tiene, lo desactiva y la confirmación
   explica cuáles son.
 - [x] Validaciones en cada formulario (duplicados, fechas, ponderaciones, contraseñas, perfil según el rol).
@@ -70,14 +71,31 @@ Equipo de cuatro integrantes: se exigen 8 mantenedores y 4 transacciones.
 ## Base de datos, EC2, GitHub, IA
 
 - [x] Modelos, relaciones y migraciones (`makemigrations --check` sin cambios pendientes).
-- [ ] EC2: respaldo con `mysqldump`, `git pull`, `migrate` (0016 a 0020), `collectstatic` y reinicio de
-  Gunicorn (README, «Actualizar un servidor ya desplegado»).
-- [ ] Subir la rama `feat/ajustes-grupo-y-evaluacion` y unirla a `main` con un pull request.
-- [x] Evidencia de IA actualizada en `evidencias_ia.md` (prompt 13).
+- [x] EC2 actualizado a `f910537` (PR #16) el 20 de noviembre de 2026, con las migraciones 0021 a 0026.
+- [ ] EC2: desplegar la rama `feat/requerimientos-octubre` (migraciones 0027 y 0028) con los pasos del pull request.
+- [ ] Subir la rama `feat/requerimientos-octubre` y unirla a `main` con un pull request.
+- [x] Evidencia de IA actualizada en `evidencias_ia.md` (prompt 14).
 - [ ] Documento técnico PDF/Word con capturas (login, recuperación, 4 paneles, mantenedores, transacciones,
   EC2, GitHub, IA).
 
 ## Pruebas
 
-- [x] `python manage.py test`: 581 pruebas en verde.
+- [x] `python manage.py test`: 676 pruebas en verde (rama `feat/requerimientos-octubre`).
 - [x] `PLAN_DE_PRUEBAS.md` regenerado con `python manage.py plan_pruebas`.
+
+## Requerimientos de octubre 2026 y exposición final
+
+- [x] Reglas de octubre implementadas y probadas ([docs/REQUERIMIENTOS_V2.md](docs/REQUERIMIENTOS_V2.md)).
+- [x] Casos de uso al día con el código y prueba automática de sus actores ([docs/CASOS_DE_USO.md](docs/CASOS_DE_USO.md)).
+- [x] Diagrama de clases, entidad-relación, paquetes y trazabilidad actualizados ([docs/DIAGRAMA_CLASES.md](docs/DIAGRAMA_CLASES.md), [docs/diagramas/](docs/diagramas/)).
+- [x] Sprint backlog repriorizado con evidencia ([docs/BACKLOG_SPRINT.md](docs/BACKLOG_SPRINT.md)).
+- [x] Plan de mantención con respaldo diario y pruebas en cada pull request ([docs/PLAN_MANTENCION.md](docs/PLAN_MANTENCION.md)).
+- [x] Normativas y estándares ([docs/NORMATIVAS_Y_ESTANDARES.md](docs/NORMATIVAS_Y_ESTANDARES.md)).
+- [x] Resultados medidos con CSV para gráficos ([docs/RESULTADOS.md](docs/RESULTADOS.md)).
+- [x] Guía de la exposición y preguntas de la defensa ([docs/DEMO_EXPOSICION.md](docs/DEMO_EXPOSICION.md), [docs/PREGUNTAS_DEFENSA.md](docs/PREGUNTAS_DEFENSA.md)).
+- [ ] Completar los datos marcados «[COMPLETAR POR EL GRUPO]» (reuniones, sprints, autoría de commits, contribución de cada integrante).
+- [ ] Dejar privados `eva-backend-2` y `proyecto-de-titulo-en-local`, o limpiar su historial: el Excel de organizaciones con domicilios está en el historial de los dos y ambos son públicos.
+- [ ] Crear `ACCESOS_EXPOSICION.txt` (a partir de la plantilla) y probar los accesos el día antes.
+- [ ] Regenerar `docs/casos_uso/imagenes/diapositiva_g06.png` con Graphviz.
+- [ ] En el servidor: crear `~/.my.cnf`, probar `scripts/respaldo.sh` y programarlo con cron.
+- [ ] Preparar la presentación con la estructura de [docs/DEMO_EXPOSICION.md](docs/DEMO_EXPOSICION.md) sección 8.
