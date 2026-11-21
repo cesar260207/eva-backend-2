@@ -93,6 +93,7 @@ Evita que los problemas ocurran.
 | Espacio en disco | `df -h` y `du -sh /var/www/eva-backend-2/media ~/respaldos` (alerta sobre 80 %) | Semanal |
 | Respaldos | `tail ~/respaldos/respaldo.log` (debe decir «OK» cada día) | Semanal |
 | Servicios | `systemctl status gunicorn nginx mysqld` | Semanal |
+| Reinicio automático de Gunicorn | Agregar `Restart=on-failure` y `RestartSec=5` en la sección `[Service]` de `/etc/systemd/system/gunicorn.service` (la unidad del README no lo tiene), luego `sudo systemctl daemon-reload` | Una vez, en el próximo despliegue |
 | Accesos denegados | Consulta de auditoría filtrando «acceso_denegado» en el SGR | Mensual |
 
 ## 5. Mantención adaptativa
