@@ -184,6 +184,39 @@ class RecursosLocalesTests(TestCase):
             self.assertNotContains(respuesta, 'onclick=', msg_prefix=url)
 
 
+class PortadaTests(TestCase):
+    """RNF-011 Usabilidad y RNF-012 Accesibilidad. Portada con accesos según la sesión y contenido visible sin JavaScript."""
+
+    def test_sin_sesion_ofrece_ingresar_y_territorio(self):
+        """RNF-011 Usabilidad. Sin sesión, la portada lleva a ingresar y al territorio, no a pantallas protegidas."""
+        respuesta = self.client.get(reverse('inicio'))
+        self.assertContains(respuesta, 'De la necesidad territorial al resultado verificable.')
+        self.assertContains(respuesta, f'href="{reverse("login")}"')
+        self.assertContains(respuesta, f'href="{reverse("institucional")}"')
+        self.assertNotContains(respuesta, reverse('actividad_nueva'))
+        self.assertNotContains(respuesta, reverse('mantenedores'))
+
+    def test_con_sesion_ofrece_los_mismos_destinos_del_menu(self):
+        """RNF-011 Usabilidad. Con sesión, los accesos siguen las condiciones del menú."""
+        centro = Delegacion.objects.create(nombre='Centro')
+        self.client.force_login(crear_funcionario('portada.pro', 'funcionario', delegacion=centro))
+        respuesta = self.client.get(reverse('inicio'))
+        for url in (reverse('actividad_nueva'), reverse('dashboard'), reverse('panel'), reverse('actividades'), reverse('agenda')):
+            self.assertContains(respuesta, url)
+        self.assertContains(respuesta, reverse('delegacion_detalle', args=['Centro']))
+        self.assertNotContains(respuesta, reverse('delegados'))
+
+    def test_las_cifras_y_las_respuestas_se_ven_sin_javascript(self):
+        """RNF-012 Accesibilidad. El valor final de cada cifra está en el HTML y las respuestas no nacen plegadas."""
+        respuesta = self.client.get(reverse('inicio'))
+        self.assertContains(respuesta, 'data-contar=', count=3)
+        self.assertContains(respuesta, 'data-plegable', count=6)
+        self.assertContains(respuesta, 'aria-expanded="true" aria-controls="respuesta-', count=6)
+        self.assertNotContains(respuesta, 'class="collapse" id="respuesta-')
+        self.assertContains(respuesta, 'ámbar desde el 60 % de lo esperado')
+        self.assertContains(respuesta, '<h1', count=1)
+
+
 class FiltrosDeInterfazTests(TestCase):
     """RNF-011 y RNF-012. Los filtros de presentación solo agregan clases y ordenan campos."""
 
