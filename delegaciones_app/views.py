@@ -267,6 +267,9 @@ def actividad_detalle(request, codigo):
     propio, ve_todo = funcionario_de(request.user), puede_ver_todo(request.user)
     bloqueo_evidencia = _bloqueo_evidencia(propio, actividad)
     es_autor = bool(propio and actividad.funcionario_autor_id == propio.pk)
+    # Comentar exige permiso y una ficha de funcionario (comentario_nuevo la pide como autor).
+    puede_comentar = bool(propio) and request.user.has_perm('delegaciones_app.add_comentario')
+    ver_comentarios = puede_comentar or request.user.has_perm('delegaciones_app.view_comentario')
     return render(request, 'delegaciones_app/actividad_detalle.html', {
         'actividad': actividad,
         'url_lista': _url_de_lista(request, 'actividades'),
@@ -278,6 +281,8 @@ def actividad_detalle(request, codigo):
         'puede_anular': puede_revisar(request.user) and not es_autor and actividad.estado == 'aprobada' and actividad.item.periodo.estado != 'cerrado',
         'hay_pendientes': any(evidencia.estado_revision == 'pendiente' for evidencia in actividad.evidencias.all()),
         'revision_form': RevisionForm(),
+        'puede_comentar': puede_comentar,
+        'comentarios': actividad.comentarios.select_related('autor').order_by('creado') if ver_comentarios else None,
     })
 
 
@@ -766,12 +771,10 @@ def comentario_nuevo(request, codigo):
         registrar_acceso_denegado(request, 'Comentario', codigo, 'funcionario no asociado')
         raise Http404('Recurso no encontrado.')
     actividad = _obtener_autorizado(request, _actividades_autorizadas(request.user), 'Actividad', codigo_verificador=codigo)
-    form = ComentarioForm(request.POST or None)
+    # La actividad y el autor van en la instancia antes de validar: Comentario.clean exige la actividad.
+    form = ComentarioForm(request.POST or None, instance=Comentario(actividad=actividad, autor=funcionario))
     if request.method == 'POST' and form.is_valid():
-        comentario = form.save(commit=False)
-        comentario.actividad = actividad
-        comentario.autor = funcionario
-        comentario.save()
+        comentario = form.save()
         Auditoria.registrar_evento(request.user, 'crear', 'Comentario', comentario.pk, None, {'actividad': codigo})
         return redirect('actividad_detalle', codigo=codigo)
     return render(request, 'delegaciones_app/formulario_nuevo.html', {'form': form, 'titulo': 'Comentar actividad'})

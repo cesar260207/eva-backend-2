@@ -1025,6 +1025,53 @@ class ComentarioAccesoTests(BaseOperacion):
 		self.assertEqual(json.loads(evento.valor_nuevo)['motivo'], 'funcionario no asociado')
 
 
+class AccesosOctubreTests(BaseOperacion):
+	"""CU-24, CU-64 y CU-03 (RF-015, RF-025, RF-035). Las pantallas de octubre tienen acceso solo para quien tiene el permiso."""
+
+	def setUp(self):
+		super().setUp()
+		self.administrador = crear_funcionario('admin-op', 'administrador', cargo=self.cargo)
+
+	def _ve(self, usuario, url, texto):
+		self.client.force_login(usuario)
+		return texto in self.client.get(url).content.decode()
+
+	def test_informar_ajuste_esta_en_el_menu_del_delegado_y_del_administrador(self):
+		"""CU-64 Informar felicitación o reclamo (RF-025). El enlace depende del permiso add_ajuste."""
+		esperados = {self.verificador: True, self.administrador: True, self.coordinador: False, self.funcionario: False}
+		for usuario, esperado in esperados.items():
+			with self.subTest(usuario=usuario.username):
+				self.assertEqual(self._ve(usuario, reverse('actividades'), reverse('ajuste_nuevo')), esperado)
+				self.assertEqual(self.client.get(reverse('ajuste_nuevo')).status_code, 200 if esperado else 404)
+
+	def test_registrar_atencion_social_esta_en_el_menu_del_profesional_y_del_administrador(self):
+		"""CU-03 Registrar atención social (RF-015). El enlace depende del permiso add_casosocial."""
+		esperados = {self.funcionario: True, self.administrador: True, self.coordinador: False, self.verificador: False}
+		for usuario, esperado in esperados.items():
+			with self.subTest(usuario=usuario.username):
+				self.assertEqual(self._ve(usuario, reverse('actividades'), reverse('caso_social_nuevo')), esperado)
+				self.assertEqual(self.client.get(reverse('caso_social_nuevo')).status_code, 200 if esperado else 404)
+
+	def test_comentar_esta_en_el_detalle_para_quien_tiene_el_permiso(self):
+		"""CU-24 Comentar actividad (RF-035). El botón aparece con add_comentario; la coordinación no comenta."""
+		actividad = self._actividad()
+		detalle, comentar = reverse('actividad_detalle', args=[actividad.codigo_verificador]), reverse('comentario_nuevo', args=[actividad.codigo_verificador])
+		esperados = {self.funcionario: True, self.verificador: True, self.administrador: True, self.coordinador: False}
+		for usuario, esperado in esperados.items():
+			with self.subTest(usuario=usuario.username):
+				self.assertEqual(self._ve(usuario, detalle, comentar), esperado)
+
+	def test_el_comentario_guardado_se_ve_en_el_detalle(self):
+		"""CU-24 Comentar actividad (RF-035). Tras comentar, el comentario aparece en el detalle, también para la coordinación."""
+		actividad = self._actividad()
+		self.client.force_login(self.verificador)
+		respuesta = self.client.post(reverse('comentario_nuevo', args=[actividad.codigo_verificador]), {'contenido': 'Revisar con la junta de vecinos'})
+		detalle = reverse('actividad_detalle', args=[actividad.codigo_verificador])
+		self.assertRedirects(respuesta, detalle)
+		self.assertContains(self.client.get(detalle), 'Revisar con la junta de vecinos')
+		self.assertTrue(self._ve(self.coordinador, detalle, 'Revisar con la junta de vecinos'))
+
+
 class ActividadVistasTests(BaseOperacion):
 	"""CU-01, CU-01.1, CU-01.2, CU-10, CU-10.1, CU-10.2 (RF-009 a RF-011). Registro, consulta, modificación y eliminación de actividades."""
 

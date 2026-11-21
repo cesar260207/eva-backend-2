@@ -34,12 +34,14 @@ CATALOGO_CU = {
     'CU-18': 'Resumen ejecutivo', 'CU-18.1': 'Consolidar datos de delegación', 'CU-18.2': 'Navegar al detalle de gestión',
     'CU-20': 'Generación de informes', 'CU-20.1': 'Consolidar datos filtrados', 'CU-20.2': 'Restringir por ámbito de permisos',
     'CU-23': 'Trabajo colaborativo en línea', 'CU-23.1': 'Controlar conflicto de concurrencia',
+    'CU-24': 'Comentar actividad',
     'CU-25': 'Modificar parámetros',
     'CU-26': 'Administración de delegaciones, usuarios y roles', 'CU-26.1': 'Denegar acceso por ámbito',
     'CU-27': 'Administración de catálogos', 'CU-27.1': 'Restringir elemento duplicado',
     'CU-28': 'Administración de períodos', 'CU-28.1': 'Restricción por período cerrado',
     'CU-29': 'Búsqueda y filtros', 'CU-29.1': 'Restricción de búsqueda por ámbito',
     'CU-30': 'Auditoría de cambios', 'CU-30.1': 'Bloqueo por alteración no autorizada',
+    'CU-64': 'Informar felicitación o reclamo',
 }
 
 CATALOGO_RF = {
@@ -66,7 +68,6 @@ OBSERVACIONES_RF = {
     20: 'No implementado: cerrar un compromiso no alimenta el indicador del ítem; solo cuentan las actividades aprobadas.',
     25: 'No implementado: el campo ajuste del indicador se guarda pero no entra al cálculo.',
     31: 'No implementado: no hay vista global por cargos.',
-    35: 'No implementado: no hay observaciones o comentarios asociados a registros.',
 }
 
 # Responsable de ejecutar las pruebas de cada caso de uso (familia del CU) y de los casos de login.
