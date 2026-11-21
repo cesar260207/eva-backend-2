@@ -145,3 +145,26 @@ Rama `feat/interfaz-ronda-2`, creada desde `main` en caf02d6 (PR #20). Mismo for
 5. **Límites:** ninguno en riesgo.
 6. **No verificado:** nada pendiente en esta fase.
 7. **Commits:** `docs: línea base de la segunda ronda de la interfaz`.
+
+## Ronda 2, fase 1. Territorio (21-11-2026)
+
+1. **Qué hicimos**
+   - Corregimos las cifras de población en la vista `institucional` (única excepción permitida en `views.py`): 88,0 % urbana y 12,0 % rural según el Censo de Población y Vivienda 2024 del INE, y agregamos al contexto `fuente_poblacion`. El total 250.141 no cambió.
+   - Reescribimos `institucional.html` en varias líneas con los componentes de la portada:
+     - hero en dos columnas con kicker «Territorio», el mismo título, una línea de introducción y dos botones (sin sesión «Ingresar» y «Ver delegaciones»; con sesión «Ir a mi panel» y «Ver delegaciones»);
+     - a la derecha, un esquema propio de la comuna en SVG: franja de mar al oeste con olas que se mueven muy lento, zona urbana punteada, la zona rural difusa al oriente, líneas desde Centro y el norte arriba. Los 6 nodos laten suavemente y desfasados. Debajo dice «Esquema referencial, no a escala»;
+     - cuatro cifras con el conteo animado (250.141, 88,0 %, 12,0 % y 6 delegaciones municipales), una barra urbana y rural que se llena al aparecer y la línea «Fuente: Censo de Población y Vivienda 2024, INE»;
+     - las seis delegaciones con una fila de 6 botones, tarjetas con su motivo geométrico propio, aparición escalonada y movimiento al pasar el mouse. Cada tarjeta tiene un `id` estable (`delegacion-las-companias`, etc.);
+     - al pasar el mouse o enfocar un nodo o un botón se resalta su tarjeta, y al revés; al hacer clic, la página baja a la tarjeta y la marca como seleccionada;
+     - con sesión, «Ver seguimiento» solo en la tarjeta de la propia delegación, o en las seis para la coordinación (la misma condición del menú y de la vista). Sin sesión, ninguna tarjeta enlaza a pantallas privadas;
+     - cierre con una banda terracota: «¿Trabajas en una delegación?» con «Ingresar», o «Ir a mi panel» con sesión.
+   - Quitamos las insignias «Territorio» e «Información institucional de referencia» y el bloque «Principio de acceso».
+   - Sin JavaScript, los nodos y los botones son enlaces normales a cada tarjeta, todas las tarjetas se ven completas y el esquema queda como imagen con su texto alternativo.
+   - Accesibilidad: el dibujo tiene `role="img"` y un `aria-label` que nombra las 6 delegaciones; los nodos son enlaces que se enfocan con teclado y su nombre es el texto visible; un solo `h1`. El movimiento se apaga con `prefers-reduced-motion`.
+2. **Archivos cambiados:** `delegaciones_app/views.py` (solo los textos de `urbano` y `rural` y la clave `fuente_poblacion`), `delegaciones_app/templatetags/sgr_interfaz.py` (filtro `partes_cifra`, que separa «88,0 %» en número, decimales y sufijo para el conteo), `templates/delegaciones_app/institucional.html`, `static/css/sgr.css`, `static/js/sgr.js`, `delegaciones_app/test_unit_interfaz.py`. **Creado:** `templates/includes/_motivo_delegacion.html`.
+3. **Pruebas:** 709 en total, 709 aprobadas, 0 fallidas (línea base 703). Seis pruebas nuevas: el censo con su fuente; sin «Principio de acceso» ni insignias; sin sesión ningún enlace al seguimiento; el Profesional de Centro ve solo Centro y el Coordinador las seis; `id` de cada tarjeta, esquema accesible y un solo `h1`; y el filtro `partes_cifra`. No ajustamos ninguna prueba existente.
+4. **Qué mirar:** «Territorio» sin sesión, con `funcionario.centro` (solo Centro tiene «Ver seguimiento») y con `coordinador.demo` (las seis lo tienen). Pasar el mouse por los nodos del esquema y hacer clic en uno.
+5. **Comprobado con capturas:** a 1280 px sin sesión y como Profesional, y a 375 px. En 375 px la etiqueta del mar quedaba tapada por «Avenida del Mar»; la subimos a la parte norte del mar.
+6. **Límites:** en `views.py` cambiamos solo lo que permite la regla 8. Las cifras para el conteo salen del filtro y no se escriben dos veces en la plantilla; la cantidad de delegaciones es el largo de la lista de la vista.
+7. **No verificado:** el movimiento en un navegador real (las capturas son imágenes fijas; en ellas las cifras y la barra aparecen a mitad de la animación).
+8. **Commits:** `fix: población urbana y rural según el Censo 2024 del INE, con su fuente`; `feat: Territorio con esquema interactivo, cifras animadas y delegaciones enlazadas`; `test: pruebas de Territorio (censo, enlaces por perfil, ids y esquema)`; `docs: avance de la fase 1 de la segunda ronda`.
