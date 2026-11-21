@@ -5,6 +5,13 @@ from django.core.management.base import BaseCommand, CommandError
 
 from delegaciones_app.models import Cargo, ItemMedible, ParametroVersionado, Periodo
 
+PARAMETROS_DE_OCTUBRE = (
+    ('maximo_cumplimiento', '120', 'Tope del cumplimiento de cada ítem (regla 7 de octubre 2026).'),
+    ('valor_felicitacion', '10', 'Porcentaje por felicitación aplicada (regla 8).'),
+    ('max_felicitaciones', '3', 'Máximo de felicitaciones aplicables (regla 8).'),
+    ('valor_reclamo', '-30', 'Porcentaje por reclamo aplicado (regla 8).'),
+)
+
 
 class Command(BaseCommand):
     help = 'Carga cargos e ítems de la Matriz SGR desde un JSON versionado.'
@@ -38,8 +45,8 @@ class Command(BaseCommand):
                     },
                 )
                 total_items += 1
-        ParametroVersionado.objects.update_or_create(
-            periodo=periodo, clave='maximo_cumplimiento',
-            defaults={'valor': '120', 'descripcion': 'Tope definido por la regla nueva de octubre 2026.'},
-        )
+        # Regla 7 y 8 de octubre. La matriz dice otra cosa (tope 150 %, reclamo -20 % en algunas hojas): son
+        # preguntas pendientes para el municipio, así que un valor ya definido en el período no se pisa.
+        for clave, valor, descripcion in PARAMETROS_DE_OCTUBRE:
+            ParametroVersionado.objects.get_or_create(periodo=periodo, clave=clave, defaults={'valor': valor, 'descripcion': descripcion})
         self.stdout.write(self.style.SUCCESS(f'Matriz cargada: {len(filas)} cargos y {total_items} ítems.'))

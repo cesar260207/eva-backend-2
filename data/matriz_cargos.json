@@ -1,0 +1,574 @@
+{
+  "fuente": "Matriz SGR trimestral del municipio",
+  "cargos": [
+    {
+      "nombre": "Apoyo administrativo",
+      "items": [
+        {
+          "nombre": "Atencion de usuario telefono y presencial",
+          "ponderacion": 20.0,
+          "meta_trimestre": 240.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Llamadas preventivas a usuarios",
+          "ponderacion": 30.0,
+          "meta_trimestre": 90.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Informe de inventarios",
+          "ponderacion": 25.0,
+          "meta_trimestre": 1.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Informe a comunicaciones",
+          "ponderacion": 20.0,
+          "meta_trimestre": 12.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Emergencia",
+          "ponderacion": 5.0,
+          "meta_trimestre": 76.0,
+          "tipo_calculo": "actividades"
+        }
+      ],
+      "felicitacion": 10.0,
+      "reclamo": -30.0
+    },
+    {
+      "nombre": "Coordinador DISERCO",
+      "items": [
+        {
+          "nombre": "Informes personal",
+          "ponderacion": 10.0,
+          "meta_trimestre": 3.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Informe trabajo",
+          "ponderacion": 10.0,
+          "meta_trimestre": 12.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Operativo delegacion",
+          "ponderacion": 15.0,
+          "meta_trimestre": 24.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Operativo DISERCO",
+          "ponderacion": 10.0,
+          "meta_trimestre": 12.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Talleres",
+          "ponderacion": 10.0,
+          "meta_trimestre": 12.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Terreno",
+          "ponderacion": 10.0,
+          "meta_trimestre": 24.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Atencion requerimiento usuario",
+          "ponderacion": 15.0,
+          "meta_trimestre": 24.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Emergencia",
+          "ponderacion": 5.0,
+          "meta_trimestre": 0.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Soluciones de ingresos al tubo",
+          "ponderacion": 15.0,
+          "meta_trimestre": 0.8,
+          "tipo_calculo": "tubo"
+        }
+      ],
+      "felicitacion": 10.0,
+      "reclamo": -20.0
+    },
+    {
+      "nombre": "Territorial OO.CC. 1",
+      "items": [
+        {
+          "nombre": "Atencion de usuario telefono y presencial",
+          "ponderacion": 15.0,
+          "meta_trimestre": 60.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Visitas, reuniones con organizaciones",
+          "ponderacion": 15.0,
+          "meta_trimestre": 24.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Conformacion de organizaciones",
+          "ponderacion": 25.0,
+          "meta_trimestre": 1.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Gestion de talleres y actividades",
+          "ponderacion": 15.0,
+          "meta_trimestre": 6.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Emergencia",
+          "ponderacion": 5.0,
+          "meta_trimestre": 0.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Soluciones al ingreso al tubo",
+          "ponderacion": 25.0,
+          "meta_trimestre": 0.8,
+          "tipo_calculo": "tubo"
+        }
+      ],
+      "felicitacion": 10.0,
+      "reclamo": -30.0
+    },
+    {
+      "nombre": "Territorial OO.CC. 2",
+      "items": [
+        {
+          "nombre": "Atencion de usuario telefono y presencial",
+          "ponderacion": 15.0,
+          "meta_trimestre": 60.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Visitas, reuniones con organizaciones",
+          "ponderacion": 15.0,
+          "meta_trimestre": 24.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Conformacion de organizaciones",
+          "ponderacion": 25.0,
+          "meta_trimestre": 1.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Gestion de talleres y actividades",
+          "ponderacion": 15.0,
+          "meta_trimestre": 6.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Emergencia",
+          "ponderacion": 5.0,
+          "meta_trimestre": 6.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Soluciones al ingreso al tubo",
+          "ponderacion": 25.0,
+          "meta_trimestre": 0.8,
+          "tipo_calculo": "tubo"
+        }
+      ],
+      "felicitacion": 10.0,
+      "reclamo": -30.0
+    },
+    {
+      "nombre": "Territorial OO.CC. 3",
+      "items": [
+        {
+          "nombre": "Atencion de usuario telefono y presencial",
+          "ponderacion": 15.0,
+          "meta_trimestre": 60.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Visitas, reuniones con organizaciones",
+          "ponderacion": 15.0,
+          "meta_trimestre": 24.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Conformacion de organizaciones",
+          "ponderacion": 25.0,
+          "meta_trimestre": 10.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Gestion de talleres y actividades",
+          "ponderacion": 15.0,
+          "meta_trimestre": 6.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Emergencia",
+          "ponderacion": 5.0,
+          "meta_trimestre": 0.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Soluciones al ingreso al tubo",
+          "ponderacion": 25.0,
+          "meta_trimestre": 0.8,
+          "tipo_calculo": "tubo"
+        }
+      ],
+      "felicitacion": 10.0,
+      "reclamo": -30.0
+    },
+    {
+      "nombre": "Territorial OO.CC. 4",
+      "items": [
+        {
+          "nombre": "Atencion de usuario telefono y presencial",
+          "ponderacion": 15.0,
+          "meta_trimestre": 60.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Visitas, reuniones con organizaciones",
+          "ponderacion": 15.0,
+          "meta_trimestre": 24.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Conformacion de organizaciones",
+          "ponderacion": 25.0,
+          "meta_trimestre": 1.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Gestion de talleres y actividades",
+          "ponderacion": 15.0,
+          "meta_trimestre": 6.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Emergencia",
+          "ponderacion": 5.0,
+          "meta_trimestre": 0.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Soluciones al ingreso al tubo",
+          "ponderacion": 25.0,
+          "meta_trimestre": 0.8,
+          "tipo_calculo": "tubo"
+        }
+      ],
+      "felicitacion": 10.0,
+      "reclamo": -30.0
+    },
+    {
+      "nombre": "Gestor social 1",
+      "items": [
+        {
+          "nombre": "Atención social a usuario presencial",
+          "ponderacion": 20.0,
+          "meta_trimestre": 90.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Visita terreno",
+          "ponderacion": 20.0,
+          "meta_trimestre": 12.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Entrega informe",
+          "ponderacion": 25.0,
+          "meta_trimestre": 40.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Entrega beneficio",
+          "ponderacion": 20.0,
+          "meta_trimestre": 8.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Emergencia",
+          "ponderacion": 5.0,
+          "meta_trimestre": 0.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Soluciones de ingresos al tubo",
+          "ponderacion": 10.0,
+          "meta_trimestre": 0.8,
+          "tipo_calculo": "tubo"
+        }
+      ],
+      "felicitacion": 10.0,
+      "reclamo": -20.0
+    },
+    {
+      "nombre": "Gestor social 2",
+      "items": [
+        {
+          "nombre": "Atención social a usuario presencial",
+          "ponderacion": 25.0,
+          "meta_trimestre": 90.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Visita terreno",
+          "ponderacion": 20.0,
+          "meta_trimestre": 12.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Entrega informe",
+          "ponderacion": 20.0,
+          "meta_trimestre": 40.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Entrega beneficio",
+          "ponderacion": 20.0,
+          "meta_trimestre": 8.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Emergencia",
+          "ponderacion": 5.0,
+          "meta_trimestre": 304.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Soluciones de ingresos al tubo",
+          "ponderacion": 10.0,
+          "meta_trimestre": 0.8,
+          "tipo_calculo": "tubo"
+        }
+      ],
+      "felicitacion": 10.0,
+      "reclamo": -30.0
+    },
+    {
+      "nombre": "Gestor social 3",
+      "items": [
+        {
+          "nombre": "Atención social a usuario presencial",
+          "ponderacion": 25.0,
+          "meta_trimestre": 90.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Visita terreno",
+          "ponderacion": 20.0,
+          "meta_trimestre": 12.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Entrega informe",
+          "ponderacion": 20.0,
+          "meta_trimestre": 40.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Entrega beneficio",
+          "ponderacion": 20.0,
+          "meta_trimestre": 8.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Emergencia",
+          "ponderacion": 5.0,
+          "meta_trimestre": 10.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Soluciones de ingresos al tubo",
+          "ponderacion": 10.0,
+          "meta_trimestre": 0.8,
+          "tipo_calculo": "tubo"
+        }
+      ],
+      "felicitacion": 10.0,
+      "reclamo": -30.0
+    },
+    {
+      "nombre": "Gestor social 4",
+      "items": [
+        {
+          "nombre": "Atención social a usuario presencial",
+          "ponderacion": 20.0,
+          "meta_trimestre": 90.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Visita terreno",
+          "ponderacion": 20.0,
+          "meta_trimestre": 12.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Entrega informe",
+          "ponderacion": 25.0,
+          "meta_trimestre": 40.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Entrega beneficio",
+          "ponderacion": 20.0,
+          "meta_trimestre": 8.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Emergencia",
+          "ponderacion": 5.0,
+          "meta_trimestre": 34.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Soluciones de ingresos al tubo",
+          "ponderacion": 10.0,
+          "meta_trimestre": 0.8,
+          "tipo_calculo": "tubo"
+        }
+      ],
+      "felicitacion": 10.0,
+      "reclamo": -30.0
+    },
+    {
+      "nombre": "Gestor social 5",
+      "items": [
+        {
+          "nombre": "Atención social a usuario presencial",
+          "ponderacion": 20.0,
+          "meta_trimestre": 90.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Visita terreno",
+          "ponderacion": 20.0,
+          "meta_trimestre": 12.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Entrega informe",
+          "ponderacion": 25.0,
+          "meta_trimestre": 40.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Entrega beneficio",
+          "ponderacion": 20.0,
+          "meta_trimestre": 15.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Emergencia",
+          "ponderacion": 5.0,
+          "meta_trimestre": 15.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Soluciones de ingresos al tubo",
+          "ponderacion": 10.0,
+          "meta_trimestre": 0.8,
+          "tipo_calculo": "tubo"
+        }
+      ],
+      "felicitacion": 10.0,
+      "reclamo": -30.0
+    },
+    {
+      "nombre": "Planificación y control",
+      "items": [
+        {
+          "nombre": "Reunion semanal con el equipo",
+          "ponderacion": 15.0,
+          "meta_trimestre": 12.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Solucion de problemas a usuarios particulares",
+          "ponderacion": 30.0,
+          "meta_trimestre": 8.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Emergencia",
+          "ponderacion": 5.0,
+          "meta_trimestre": 100.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Soluciones de ingresos al tubo",
+          "ponderacion": 35.0,
+          "meta_trimestre": 0.8,
+          "tipo_calculo": "tubo"
+        }
+      ],
+      "felicitacion": 10.0,
+      "reclamo": -30.0
+    },
+    {
+      "nombre": "Gestor de seguridad",
+      "items": [
+        {
+          "nombre": "Formacion de comites de seguridad",
+          "ponderacion": 20.0,
+          "meta_trimestre": 36.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Levantamiento de incivilidades",
+          "ponderacion": 20.0,
+          "meta_trimestre": 40.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Gestion de mediacion",
+          "ponderacion": 10.0,
+          "meta_trimestre": 50.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Recuperacion de espacios publicos",
+          "ponderacion": 10.0,
+          "meta_trimestre": 50.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Infracciones varias",
+          "ponderacion": 15.0,
+          "meta_trimestre": 45.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Salidas a terreno",
+          "ponderacion": 10.0,
+          "meta_trimestre": 45.0,
+          "tipo_calculo": "actividades"
+        },
+        {
+          "nombre": "Soluciones de ingresos al tubo",
+          "ponderacion": 15.0,
+          "meta_trimestre": 0.8,
+          "tipo_calculo": "tubo"
+        }
+      ],
+      "felicitacion": 10.0,
+      "reclamo": -30.0
+    }
+  ],
+  "advertencias": [
+    "«Planificación y control»: las ponderaciones suman 85 %, no 100 %.",
+    "El reclamo no vale lo mismo en todas las hojas: -30 %, -20 %."
+  ]
+}

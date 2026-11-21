@@ -344,8 +344,8 @@ mantenedor('item', 'ítem medible', 'ítems medibles', '/administracion/items/',
            'Validar reglas de configuración', 'que el ítem sea del cargo y que las ponderaciones no pasen de 100 %', con_periodo=True,
            cu_reg='CU-04', valid_cu='CU-04.1', error_cu='CU-04.2', error_nombre='Bloquear guardado por ponderación inválida')
 base('matriz', 'Cargar matriz de cargos', None, [A], 'Crear los ítems de los 13 cargos desde la matriz del municipio.',
-     'El archivo de la matriz está en el servidor.', 'Ítems medibles creados por cargo y período.', 'Ejecutar el comando, que lee la matriz y crea los ítems.',
-     [], 'comando cargar_matriz (servidor)', nota='Sin pantalla. Necesita data/matriz_cargos.json, que genera la FASE 2 del prompt.', hu='Requerimientos de octubre')
+     'data/matriz_cargos.json, generado desde el Excel con generar_matriz (sin nombres de personas).', 'Ítems medibles creados por cargo y período.', 'Ejecutar el comando con el período de destino; crea los 13 cargos y sus ítems sin pisar los parámetros ya definidos.',
+     [], 'comando cargar_matriz (servidor)', nota='Sin pantalla. La matriz trae un cargo cuyas ponderaciones suman 85 %: se informa como advertencia.', hu='Requerimientos de octubre')
 mantenedor('meta', 'meta', 'metas', '/administracion/metas/', [C, A], [C, A], [C, A], [C, A], 'HU-05 (EP-02)',
            'Validar parámetros de meta', 'ítem, funcionario y valor objetivo mayor que 0', cu_reg='CU-05', valid_cu='CU-05.1',
            error_cu='CU-05.2', error_nombre='Bloquear guardado por valor inválido', extra_inc_reg=['recalcular'])
