@@ -733,7 +733,10 @@ class MantenedoresTests(TestCase):
 		self.client.force_login(self.coordinador)
 		respuesta = self.client.get(reverse('mantenedores'))
 		self.assertContains(respuesta, 'Abrir sección', count=10)
-		self.assertContains(respuesta, 'No disponible para tu perfil', count=2)
+		# Las tarjetas que el Coordinador no usa ya no se muestran deshabilitadas: no aparecen.
+		self.assertNotContains(respuesta, 'No disponible para tu perfil')
+		for slug in ('roles', 'funcionarios'):
+			self.assertNotContains(respuesta, reverse('mantenedor_lista', args=[slug]), msg_prefix=slug)
 
 	def test_las_doce_listas_tienen_agregar_y_buscar(self):
 		self.assertEqual(len(MANTENEDORES), 12)
