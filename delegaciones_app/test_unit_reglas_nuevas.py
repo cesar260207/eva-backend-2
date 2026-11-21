@@ -265,6 +265,84 @@ class ItemTipoTuboTests(EscenarioBase, TestCase):
         self.assertEqual(Indicador.generar(self.meta, fecha=date(2026, 9, 30)).cumplimiento, Decimal('0'))
 
 
+class RecalculoDelSemaforoTests(EscenarioBase, TestCase):
+    """CU-06.1 Recalcular indicadores automáticamente (RF-022, RF-027). Ajustes, ausencias y tareas del tubo actualizan el semáforo."""
+
+    def setUp(self):
+        self.crear_escenario()
+        self.meta = Meta.objects.create(item=self.item, funcionario=self.autor, valor_objetivo=10)
+
+    def _ultimo(self, meta=None):
+        return Indicador.objects.filter(meta=meta or self.meta).order_by('fecha_calculo', 'pk').last()
+
+    def _ajuste(self, **cambios):
+        datos = {'tipo': 'felicitacion', 'emisor': 'Junta de vecinos', 'periodo': self.periodo, 'informado_por': self.verificador, 'funcionario': self.autor}
+        datos.update(cambios)
+        return Ajuste.objects.create(**datos)
+
+    def test_un_ajuste_informado_no_recalcula(self):
+        """CU-06.1 Recalcular indicadores automáticamente (RF-022). Regla 8: informar no cambia el puntaje hasta que se decide."""
+        self._ajuste()
+        self.assertIsNone(self._ultimo())
+
+    def test_aplicar_una_felicitacion_recalcula_el_cumplimiento(self):
+        """CU-06.1 Recalcular indicadores automáticamente (RF-022, RF-025). Regla 8: al aplicarla, el cumplimiento sube 10 puntos sin correr un comando."""
+        ajuste = self._ajuste()
+        ajuste.estado = 'aplicado'
+        ajuste.save()
+        self.assertEqual(self._ultimo().cumplimiento, Decimal('10'))
+
+    def test_rechazar_deja_un_calculo_nuevo_sin_cambio(self):
+        """CU-06.1 Recalcular indicadores automáticamente (RF-025). Regla 8: el ajuste rechazado no suma."""
+        ajuste = self._ajuste()
+        ajuste.estado = 'rechazado'
+        ajuste.save()
+        self.assertEqual(self._ultimo().cumplimiento, Decimal('0'))
+
+    def test_borrar_un_ajuste_aplicado_lo_quita_del_cumplimiento(self):
+        """CU-06.1 Recalcular indicadores automáticamente (RF-025). Al eliminar el ajuste aplicado, el cumplimiento vuelve atrás."""
+        ajuste = self._ajuste(estado='aplicado')
+        self.assertEqual(self._ultimo().cumplimiento, Decimal('10'))
+        ajuste.delete()
+        self.assertEqual(self._ultimo().cumplimiento, Decimal('0'))
+
+    def test_el_ajuste_a_la_delegacion_recalcula_solo_a_sus_funcionarios(self):
+        """CU-06.1 Recalcular indicadores automáticamente (RF-025). Regla 8: la felicitación a Centro no toca las metas de Rural."""
+        rural = crear_funcionario('rural-recalculo', 'funcionario', cargo=self.cargo, delegacion=self.rural).funcionario
+        meta_rural = Meta.objects.create(item=self.item, funcionario=rural, valor_objetivo=10)
+        self._ajuste(funcionario=None, delegacion=self.centro, estado='aplicado')
+        self.assertEqual(self._ultimo().cumplimiento, Decimal('10'))
+        self.assertIsNone(self._ultimo(meta_rural))
+
+    def test_registrar_y_borrar_una_ausencia_recalcula(self):
+        """CU-06.1 Recalcular indicadores automáticamente (RF-026, RF-027). Regla 9: la ausencia renueva el cálculo de las metas del funcionario."""
+        ausencia = Ausencia.objects.create(funcionario=self.autor, periodo=self.periodo, tipo='licencia', desde=date(2026, 9, 1), hasta=date(2026, 9, 5), registrada_por=self.verificador)
+        primero = self._ultimo()
+        self.assertIsNotNone(primero)
+        ausencia.delete()
+        self.assertGreater(self._ultimo().pk, primero.pk)
+
+    def test_cambiar_el_estado_de_una_tarea_del_tubo_recalcula(self):
+        """CU-06.1 Recalcular indicadores automáticamente (RF-020, RF-022). Al marcar «realizada» la tarea, sube el porcentaje del tubo."""
+        tubo = ItemMedible.objects.create(cargo=self.cargo, periodo=self.periodo, nombre='Tubo de trabajo', ponderacion=0, tipo_calculo='tubo')
+        meta = Meta.objects.create(item=tubo, funcionario=self.autor, valor_objetivo=1)
+        tarea = self.nuevo_compromiso(item=tubo, fecha_ingreso=date(2026, 9, 10), solicitante_telefono='912345678')
+        self.assertEqual(self._ultimo(meta).cumplimiento, Decimal('0'))
+        tarea.set_estado('realizado', self.autor, 'Poda realizada')
+        self.assertEqual((self._ultimo(meta).avance, self._ultimo(meta).cumplimiento), (Decimal('1'), Decimal('100')))
+
+    def test_una_tarea_sin_item_tubo_no_recalcula(self):
+        """CU-06.1 Recalcular indicadores automáticamente (RF-020). Las tareas que no son de un ítem tipo tubo no generan cálculos."""
+        self.nuevo_compromiso()
+        self.assertFalse(Indicador.objects.exists())
+
+    def test_un_periodo_cerrado_no_se_recalcula(self):
+        """CU-28.1 Restricción por período cerrado (RF-022, RN-013). Los indicadores de un período cerrado quedan congelados."""
+        Periodo.objects.filter(pk=self.periodo.pk).update(estado='cerrado')
+        self.assertEqual(Indicador.recalcular(Meta.objects.filter(pk=self.meta.pk)), [])
+        self.assertFalse(Indicador.objects.exists())
+
+
 class EsperadoConAusenciasTests(EscenarioBase, TestCase):
     """CU-17.1 Calcular diferencia de avance (RF-026). Regla 9: las ausencias se descuentan de lo esperado al día."""
 

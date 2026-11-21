@@ -533,11 +533,23 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 			return 'La tarea está vencida sin realizarse: se conserva con su historial de seguimiento.'
 		return None
 
+	def save(self, *args, **kwargs):
+		super().save(*args, **kwargs)
+		self.actualizar_indicadores()
+
 	def delete(self, *args, **kwargs):
 		motivo = self.motivo_no_eliminable()
 		if motivo:
 			raise ValidationError(motivo)
-		return super().delete(*args, **kwargs)
+		resultado = super().delete(*args, **kwargs)
+		self.actualizar_indicadores()
+		return resultado
+
+	def actualizar_indicadores(self):
+		"""Ítem tipo «tubo»: crear, cambiar de estado o eliminar una tarea cambia el porcentaje realizado de su delegación."""
+		if not self.item_id or self.item.tipo_calculo != 'tubo':
+			return []
+		return Indicador.recalcular(Meta.objects.filter(item_id=self.item_id, funcionario__delegacion_id=self.delegacion_id))
 
 	def registrar_historial(self, autor, estado_anterior, observacion=None):
 		HistorialCompromiso.objects.create(
@@ -887,6 +899,12 @@ class Indicador(ControlPeriodoCerradoMixin, models.Model):
 		indicador.save()
 		return indicador
 
+	@classmethod
+	def recalcular(cls, metas):
+		"""CU-06.1: un Indicador nuevo para cada meta afectada; las de un período cerrado quedan congeladas (RN-013)."""
+		metas = metas.select_related('funcionario', 'item__periodo')
+		return [cls.generar(meta) for meta in metas if meta.item.periodo.estado != 'cerrado']
+
 	def calcular_avance(self):
 		"""RN-003 y RN-009: actividades aprobadas del ítem en el período que tienen una validación aprobada.
 
@@ -992,6 +1010,27 @@ class Ajuste(ControlPeriodoCerradoMixin, models.Model):
 		if self.tipo == 'felicitacion' and not self.emisor.strip():
 			raise ValidationError({'emisor': 'Indica quién emitió la felicitación.'})
 
+	def save(self, *args, **kwargs):
+		super().save(*args, **kwargs)
+		if self.estado in ('aplicado', 'rechazado'):
+			self.actualizar_indicadores()
+
+	def delete(self, *args, **kwargs):
+		aplicado = self.estado == 'aplicado'
+		resultado = super().delete(*args, **kwargs)
+		if aplicado:
+			self.actualizar_indicadores()
+		return resultado
+
+	def actualizar_indicadores(self):
+		"""Regla 8: al aplicar o rechazar el ajuste se recalculan las metas de su destinatario (funcionario o delegación)."""
+		metas = Meta.objects.filter(item__periodo_id=self.periodo_id)
+		if self.funcionario_id:
+			metas = metas.filter(funcionario_id=self.funcionario_id)
+		else:
+			metas = metas.filter(funcionario__delegacion_id=self.delegacion_id)
+		return Indicador.recalcular(metas)
+
 
 class Ausencia(ControlPeriodoCerradoMixin, models.Model):
 	TIPOS = [
@@ -1019,6 +1058,19 @@ class Ausencia(ControlPeriodoCerradoMixin, models.Model):
 			).exclude(pk=self.pk)
 			if solapada.exists():
 				raise ValidationError('La ausencia se superpone con otra ausencia existente.')
+
+	def save(self, *args, **kwargs):
+		super().save(*args, **kwargs)
+		self.actualizar_indicadores()
+
+	def delete(self, *args, **kwargs):
+		resultado = super().delete(*args, **kwargs)
+		self.actualizar_indicadores()
+		return resultado
+
+	def actualizar_indicadores(self):
+		"""Regla 9: la ausencia cambia lo esperado al día del funcionario; se recalculan sus metas del período."""
+		return Indicador.recalcular(Meta.objects.filter(item__periodo_id=self.periodo_id, funcionario_id=self.funcionario_id))
 
 
 class CasoSocial(models.Model):
