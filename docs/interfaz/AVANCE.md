@@ -89,3 +89,23 @@ Registro de cada fase del rediseño (rama `feat/interfaz-terracota`). Se agrega 
 7. **No verificado:** el movimiento en sí (las capturas son imágenes fijas) y el modo de movimiento reducido del sistema operativo; ambos están cubiertos en el CSS (`@media (prefers-reduced-motion: reduce)`) y en `sgr.js`.
 8. **Límites:** no se cambió la vista `index`. Las respuestas no muestran códigos internos (RN, RF, CU), porque una prueba existente lo impide en las pantallas.
 9. **Commits:** `feat: portada con hero de órbitas, accesos rápidos y preguntas frecuentes`; `test: pruebas de la portada con y sin sesión`; `docs: avance de la fase 3 de la interfaz`.
+
+## Fase 4. Paneles, encabezado, pie, tablas y accesibilidad (21-11-2026)
+
+1. **Qué hicimos**
+   - Paneles: «Tus funciones», «Tu delegación», «Coordinación de delegados», «Transacciones autorizadas», «Gestión de usuarios» y «Transacciones» pasaron de botones a mosaicos con ícono, texto de acción y movimiento al pasar el mouse. Mismos textos, mismos enlaces y mismas condiciones. El acceso principal va en terracota: «Registrar actividad con evidencia» (Profesional), «Revisar evidencias pendientes» (Delegado), «Delegados y asignaciones» (Coordinador) y «Crear usuario» (Administrador). Los mantenedores del Coordinador quedan como lista de enlaces con flecha.
+   - Encabezado: franja superior con «Municipalidad de La Serena · Departamento de Gestión Territorial» y el botón «Accesibilidad»; menú claro con desenfoque que se compacta al bajar. En el celular, el menú se abre en un panel con áreas de toque de 44 px. Con el texto aumentado, el menú baja a una segunda fila.
+   - Pie (`footer` > `div.container`, fondo carbón y borde terracota de 4 px): marca y descripción del SGR; «Secciones» con las mismas condiciones del menú; «Ayuda» con «¿Olvidaste tu contraseña?» (sin sesión), «Territorio» y el botón de accesibilidad; franja «Sistema de Gestión de Resultados · Prototipo académico INACAP 2026». Sin teléfonos, direcciones, redes ni páginas inventadas.
+   - Tablas de actividades, tubo de trabajo, mantenedores y auditoría: encabezado fijo dentro de la tabla, filas más aireadas, filtros en una tarjeta clara y estado vacío con ícono. Los nombres de los parámetros de búsqueda no cambiaron.
+   - Barra de accesibilidad: «Aumentar texto», «Achicar texto», «Alto contraste», «Links subrayados» y «Reiniciar», con las clases del kit (`a11y-font-0`, `a11y-font-1`, `a11y-font-2`, `a11y-contrast`) y una propia (`a11y-subrayar`). Los botones de alternar llevan `aria-pressed`; la preferencia se guarda en `localStorage` dentro de `try/catch`. Sin JavaScript, el botón no aparece.
+   - Revisión: agregamos `aria-label` a cinco campos que solo tenían texto de ejemplo (búsquedas de mantenedores, auditoría y medición, y los motivos de anulación y de acción). No hay etiquetas `img` en las plantillas. Una prueba nueva revisa que las pantallas principales tengan un solo `h1`.
+2. **Archivos cambiados:** `base.html`, `sgr.css`, los 4 paneles, `actividades.html`, `agenda.html`, `solicitudes.html`, `mantenedores.html`, `crud/lista.html`, `crud/auditoria.html`, `actividad_detalle.html`, `_filtros.html`, `test_unit_interfaz.py`.
+3. **Pruebas:** 703 en total, 703 aprobadas, 0 fallidas (línea base 681).
+4. **Qué mirar:**
+   - El panel de cada perfil: mosaicos con el acceso principal en terracota.
+   - «Accesibilidad» arriba a la derecha: probar cada botón y recargar la página (la preferencia se mantiene).
+   - El pie con y sin sesión.
+   - «Actividades» con muchos registros: al bajar dentro de la tabla, el encabezado queda fijo.
+5. **Comprobado con capturas:** los 4 paneles, «Actividades» y «Administración» como Profesional a 1280 px; el panel del Delegado en alto contraste con texto al 125 % y al 150 %.
+6. **Límites:** las condiciones de cada mosaico y de cada enlace del pie son las mismas del menú o del panel original. No se tocó ninguna vista.
+7. **Commits:** `feat: paneles con mosaicos de acceso rápido`; `feat: pie en bloques y barra de accesibilidad con las clases del kit`; `feat: tablas con encabezado fijo, filtros en tarjeta y estados vacíos`; `test: pruebas del pie, la barra de accesibilidad y el menú activo`; `docs: avance de la fase 4 de la interfaz`.
