@@ -397,3 +397,52 @@ class RecuperarContrasenaTests(TestCase):
     def test_el_login_ofrece_recuperar_la_contrasena(self):
         """HU-26 Recuperar contraseña por correo (RF-002). El enlace está en la pantalla de ingreso."""
         self.assertContains(self.client.get(reverse('login')), reverse('password_reset'))
+
+
+class CierreDeSesionTests(TestCase):
+    """HU-26 Acceso con identidad individual (RF-002, RNF-004). La sesión vence por inactividad y al cerrar el navegador."""
+
+    def setUp(self):
+        self.usuario = crear_funcionario('sesion.prueba', 'funcionario')
+
+    def _ingresar(self):
+        return self.client.post(reverse('login'), {'username': 'sesion.prueba', 'password': CLAVE_PRUEBA})
+
+    def _sesion(self):
+        from django.contrib.sessions.models import Session
+
+        return Session.objects.get(session_key=self.client.session.session_key)
+
+    def test_la_sesion_vence_a_los_30_minutos_sin_actividad(self):
+        """HU-26 Acceso con identidad individual (RNF-004). Plazo de inactividad de 30 minutos por defecto (SESSION_INACTIVIDAD_MINUTOS)."""
+        from django.conf import settings
+
+        self.assertEqual((settings.SESSION_COOKIE_AGE, settings.SESSION_SAVE_EVERY_REQUEST), (30 * 60, True))
+        self._ingresar()
+        restante = (self._sesion().expire_date - timezone.now()).total_seconds()
+        self.assertTrue(29 * 60 < restante <= 30 * 60, restante)
+
+    def test_la_cookie_de_sesion_no_sobrevive_al_cierre_del_navegador(self):
+        """HU-26 Acceso con identidad individual (RNF-004). La cookie no tiene fecha de expiración: el navegador la borra al cerrarse."""
+        cookie = self._ingresar().cookies['sessionid']
+        self.assertEqual((cookie['max-age'], cookie['expires']), ('', ''))
+        self.assertTrue(cookie['httponly'])
+
+    def test_una_sesion_inactiva_vuelve_a_pedir_el_inicio_de_sesion(self):
+        """HU-26 Acceso con identidad individual (RNF-004). Pasado el plazo sin actividad, el panel lleva al login."""
+        self._ingresar()
+        sesion = self._sesion()
+        sesion.expire_date = timezone.now() - timedelta(minutes=1)
+        sesion.save()
+        respuesta = self.client.get(reverse('panel'))
+        self.assertRedirects(respuesta, f"{reverse('login')}?next={reverse('panel')}")
+
+    def test_usar_el_sistema_renueva_el_plazo(self):
+        """HU-26 Acceso con identidad individual (RNF-004). Quien está trabajando no pierde la sesión: cada página renueva los 30 minutos."""
+        self._ingresar()
+        sesion = self._sesion()
+        sesion.expire_date = timezone.now() + timedelta(minutes=5)
+        sesion.save()
+        self.assertEqual(self.client.get(reverse('panel')).status_code, 200)
+        restante = (self._sesion().expire_date - timezone.now()).total_seconds()
+        self.assertGreater(restante, 29 * 60)

@@ -165,6 +165,14 @@ LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'panel'  # cada perfil llega a su propio panel
 LOGOUT_REDIRECT_URL = 'inicio'
 
+# Cierre de sesión (RNF-004, OWASP A07). Por defecto Django mantiene la sesión dos semanas, aunque se cierre el
+# navegador. Aquí la sesión vence tras SESSION_INACTIVIDAD_MINUTOS sin actividad (30 por defecto): cada página
+# abierta renueva el plazo (SESSION_SAVE_EVERY_REQUEST) y la cookie no sobrevive al cierre del navegador.
+SESSION_COOKIE_AGE = env.int('SESSION_INACTIVIDAD_MINUTOS', default=30) * 60
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_HTTPONLY = True
+
 # Correo para la recuperación de contraseña. Sin EMAIL_BACKEND en el .env los correos se muestran
 # en la consola (útil en desarrollo); en EC2 se usa SMTP, por ejemplo Gmail con una contraseña de aplicación.
 EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
