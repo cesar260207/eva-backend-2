@@ -216,6 +216,48 @@ class PortadaTests(TestCase):
         self.assertContains(respuesta, 'ámbar desde el 60 % de lo esperado')
         self.assertContains(respuesta, '<h1', count=1)
 
+    def test_sin_sesion_muestra_cifras_publicas_con_su_fuente(self):
+        """RNF-011 Usabilidad. Sin sesión no se ven cifras de gestión interna; sí las de la comuna con su fuente."""
+        respuesta = self.client.get(reverse('inicio'))
+        for interna in ('Tareas en el tubo de trabajo', 'Tareas que requieren atención', 'Cumplimiento promedio'):
+            self.assertNotContains(respuesta, interna)
+        self.assertContains(respuesta, 'Fuente: Censo de Población y Vivienda 2024, INE')
+        self.client.force_login(crear_funcionario('portada.cifras', 'funcionario'))
+        respuesta = self.client.get(reverse('inicio'))
+        self.assertContains(respuesta, 'Tareas en el tubo de trabajo')
+        self.assertContains(respuesta, 'data-contar=', count=3)
+
+    def test_las_cifras_publicas_son_las_de_territorio(self):
+        """RNF-011 Usabilidad. La portada repite la población y la ruralidad que entrega la vista de Territorio."""
+        territorio = self.client.get(reverse('institucional')).context
+        respuesta = self.client.get(reverse('inicio'))
+        self.assertContains(respuesta, f'<span class="visually-hidden">{territorio["poblacion"]}</span>')
+        self.assertContains(respuesta, f'<span class="visually-hidden">{territorio["rural"]}</span>')
+
+    def test_ninguna_tarjeta_enlaza_al_seguimiento_de_una_delegacion_ajena(self):
+        """CU-26.1 Denegar acceso por ámbito (RF-029). Las tarjetas llevan a Territorio; el seguimiento, solo si se puede abrir."""
+        centro = Delegacion.objects.create(nombre='Centro')
+        Delegacion.objects.create(nombre='Rural')
+        respuesta = self.client.get(reverse('inicio'))
+        self.assertContains(respuesta, f'href="{reverse("institucional")}#delegacion-rural"')
+        self.assertNotContains(respuesta, reverse('delegacion_detalle', args=['Centro']))
+        self.client.force_login(crear_funcionario('portada.centro', 'funcionario', delegacion=centro))
+        respuesta = self.client.get(reverse('inicio'))
+        self.assertContains(respuesta, reverse('delegacion_detalle', args=['Centro']))
+        self.assertNotContains(respuesta, reverse('delegacion_detalle', args=['Rural']))
+        self.client.force_login(crear_funcionario('portada.coord', 'coordinador'))
+        respuesta = self.client.get(reverse('inicio'))
+        self.assertContains(respuesta, reverse('delegacion_detalle', args=['Rural']))
+
+    def test_sin_sesion_los_accesos_rapidos_no_repiten_el_hero(self):
+        """RNF-011 Usabilidad. «Ingresar» y «Territorio» están en el hero y en el menú; los accesos rápidos llevan a otras partes."""
+        html = self.client.get(reverse('inicio')).content.decode('utf-8')
+        accesos = html.split('aria-label="Accesos rápidos"', 1)[1].split('</nav>', 1)[0]
+        self.assertNotIn(reverse('login'), accesos)
+        self.assertNotIn(f'href="{reverse("institucional")}"', accesos)
+        for ancla in ('#como-funciona', '#delegaciones', '#preguntas'):
+            self.assertIn(f'href="{ancla}"', accesos)
+
 
 class EncabezadoPieYAccesibilidadTests(TestCase):
     """RNF-011 Usabilidad y RNF-012 Accesibilidad. Menú con la sección activa, pie en bloques y barra de accesibilidad."""
@@ -235,6 +277,18 @@ class EncabezadoPieYAccesibilidadTests(TestCase):
             self.assertIn(f'href="{url}"', pie)
         self.assertNotIn(reverse('password_reset'), pie)
         self.assertNotIn(reverse('delegados'), pie)
+
+    def test_en_el_pie_cada_destino_aparece_una_sola_vez(self):
+        """RNF-011 Usabilidad. Con o sin sesión, el pie no repite enlaces (antes «Territorio» salía dos veces)."""
+        destinos = re.compile(r'href="([^"]+)"')
+        for usuario in (None, crear_funcionario('pie.unico', 'funcionario')):
+            if usuario:
+                self.client.force_login(usuario)
+            pie = self.client.get(reverse('inicio')).content.decode('utf-8').split('<footer', 1)[1]
+            enlaces = destinos.findall(pie)
+            self.assertTrue(enlaces)
+            self.assertEqual(len(enlaces), len(set(enlaces)), enlaces)
+            self.assertEqual(enlaces.count(reverse('institucional')), 1)
 
     def test_la_barra_de_accesibilidad_usa_las_clases_del_kit(self):
         """RNF-012 Accesibilidad. Botones de la barra y clase inicial a11y-font-0 en la etiqueta html."""
