@@ -1,29 +1,38 @@
 {% extends 'base.html' %}
 {% block title %}Subir evidencia · {{ actividad.codigo_verificador }} | SGR{% endblock %}
 {% block content %}
-<a class="btn btn-sm btn-link px-0 mb-2" href="{% url 'actividad_detalle' actividad.codigo_verificador %}">&larr; Volver a la actividad</a>
+<a class="volver" href="{% url 'actividad_detalle' actividad.codigo_verificador %}">&larr; Volver a la actividad</a>
 <div class="row justify-content-center">
-    <div class="col-lg-7">
-        <div class="page-kicker">Actividad {{ actividad.codigo_verificador }}</div>
-        <h1 class="page-title mb-2">Subir evidencia</h1>
-        <p class="page-intro mb-4">{{ actividad.solicitud_problema|truncatechars:140 }} · {{ actividad.delegacion }} · {{ actividad.fecha|date:'d-m-Y' }}</p>
+    <div class="col-lg-8 col-xl-7">
+        <div class="page-header">
+            <div>
+                <div class="page-kicker">Actividad {{ actividad.codigo_verificador }}</div>
+                <h1 class="page-title mb-2">Subir evidencia</h1>
+                <p class="page-intro mb-0">{{ actividad.solicitud_problema|truncatechars:140 }} · {{ actividad.delegacion }} · {{ actividad.fecha|date:'d-m-Y' }}</p>
+            </div>
+        </div>
         <div class="panel">
-            <form method="post" enctype="multipart/form-data">
+            <form method="post" enctype="multipart/form-data" novalidate>
                 {% csrf_token %}
-                {% for error in evidencia_form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
-                <div class="mb-3">
-                    <label class="form-label" for="{{ evidencia_form.archivo_vinculo.id_for_label }}">Archivo de respaldo</label>
-                    <input class="form-control{% if evidencia_form.archivo_vinculo.errors %} is-invalid{% endif %}" type="file" name="{{ evidencia_form.archivo_vinculo.html_name }}" id="{{ evidencia_form.archivo_vinculo.id_for_label }}" accept=".jpg,.jpeg,.png,.pdf" required>
-                    {% for error in evidencia_form.archivo_vinculo.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
-                    <div class="form-text">Foto (JPG o PNG) o documento PDF, de hasta {{ tamano_maximo }} MB.</div>
+                {% for error in evidencia_form.non_field_errors %}<div class="alert alert-danger" role="alert" tabindex="-1" data-resumen-errores>{{ error }}</div>{% endfor %}
+                <div class="campo">
+                    <label class="form-label" for="{{ evidencia_form.archivo_vinculo.id_for_label }}">Archivo de respaldo <span class="required-mark" aria-hidden="true">*</span><span class="visually-hidden"> (obligatorio)</span></label>
+                    <div class="zona-archivo{% if evidencia_form.archivo_vinculo.errors %} is-invalid{% endif %}">
+                        {% include 'includes/_icono.html' with nombre='subir' clase='icono-grande' %}
+                        <strong>Elige el archivo de respaldo</strong>
+                        <span class="text-muted" id="ayuda-archivo">Foto (JPG o PNG) o documento PDF, de hasta {{ tamano_maximo }} MB.</span>
+                        <input class="form-control{% if evidencia_form.archivo_vinculo.errors %} is-invalid{% endif %}" type="file" name="{{ evidencia_form.archivo_vinculo.html_name }}" id="{{ evidencia_form.archivo_vinculo.id_for_label }}" accept=".jpg,.jpeg,.png,.pdf" required aria-describedby="ayuda-archivo{% if evidencia_form.archivo_vinculo.errors %} error-archivo{% endif %}"{% if evidencia_form.archivo_vinculo.errors %} aria-invalid="true"{% endif %} data-nombre-archivo="archivo-elegido">
+                        <span class="archivo-elegido" id="archivo-elegido" aria-live="polite"></span>
+                    </div>
+                    {% if evidencia_form.archivo_vinculo.errors %}<div class="invalid-feedback d-block" id="error-archivo">{% for error in evidencia_form.archivo_vinculo.errors %}<span class="d-block">{{ error }}</span>{% endfor %}</div>{% endif %}
                 </div>
-                <div class="mb-3">
+                <div class="campo">
                     <label class="form-label" for="{{ evidencia_form.comentario.id_for_label }}">Comentario (opcional)</label>
                     <textarea class="form-control" name="{{ evidencia_form.comentario.html_name }}" id="{{ evidencia_form.comentario.id_for_label }}" rows="2" placeholder="Ej.: acta firmada por la junta de vecinos">{{ evidencia_form.comentario.value|default:'' }}</textarea>
                 </div>
-                <div class="d-flex justify-content-end gap-2">
+                <div class="form-acciones">
                     <a class="btn btn-light" href="{% url 'actividad_detalle' actividad.codigo_verificador %}">Ahora no</a>
-                    <button class="btn btn-sgr" type="submit">Subir evidencia</button>
+                    <button class="btn btn-sgr" type="submit">{% include 'includes/_icono.html' with nombre='subir' %}Subir evidencia</button>
                 </div>
             </form>
         </div>
