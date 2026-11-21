@@ -312,6 +312,10 @@ responde con un mensaje de éxito o de error.
 Perfil = nivel de permisos (grupo de Django); rol = función y alcance (tabla `rol`). Los cuatro perfiles
 son Administrador, Coordinador, Delegado y Profesional; cada uno recibe los permisos de las tareas que realiza.
 
+**Cierre de sesión.** En todos los perfiles la sesión se cierra tras 30 minutos sin actividad (cada página abierta
+renueva el plazo) y al cerrar el navegador. El plazo se cambia con `SESSION_INACTIVIDAD_MINUTOS` en el `.env`.
+`python manage.py clearsessions` borra de la base las sesiones vencidas (semanal, ver el plan de mantención).
+
 | Perfil (grupo Django) | En la pauta | Roles que lo usan | Puede | No puede |
 |---|---|---|---|---|
 | Administrador | Administrador (acceso total) | administrador | Los 12 mantenedores, gestión de usuarios y perfiles, todas las transacciones, auditoría, visión global | — |
