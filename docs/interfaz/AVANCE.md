@@ -125,3 +125,23 @@ Registro de cada fase del rediseño (rama `feat/interfaz-terracota`). Se agrega 
 5. **Para desplegar:** correr `python manage.py collectstatic --noinput` en el servidor después del `git pull` (detalle en `CAMBIOS_INTERFAZ.md`). No lo ejecutamos.
 6. **No verificado:** capturas «antes» (se sacan desde `main`); el movimiento en un navegador real y el modo de movimiento reducido del sistema operativo; la revisión de las páginas de referencia con navegador.
 7. **Commits:** `fix: cifras de la portada con respaldo y texto de ejemplo con contraste suficiente`; `docs: guía de estilo de la interfaz`; `docs: cambios de la interfaz con capturas y pasos para desplegar`; `docs: avance de la fase 5 de la interfaz`.
+
+# Segunda ronda: Territorio, modo oscuro y ajustes
+
+Rama `feat/interfaz-ronda-2`, creada desde `main` en caf02d6 (PR #20). Mismo formato de informe que la primera ronda.
+
+## Ronda 2, fase 0. Preparación (21-11-2026)
+
+1. **Qué hicimos**
+   - Actualizamos `main` (sin cambios nuevos desde caf02d6) y creamos la rama `feat/interfaz-ronda-2`.
+   - Revisamos la configuración de Git: nombre y correo están configurados.
+   - Línea base: `check` sin problemas y 703 pruebas aprobadas.
+   - Leímos la guía de estilo, `base.html`, `sgr.css`, `sgr.js`, la portada, Territorio, la vista `institucional` y `test_unit_interfaz.py`.
+   - Contamos los colores escritos a mano en `sgr.css`: 141 apariciones en formato `#…` (58 valores distintos) y 20 en `rgba(…)`. El plan para el modo oscuro: los que son fondo, borde o texto pasan a variables con su valor oscuro; los que van sobre fondos que no cambian (texto blanco sobre terracota, el pie oscuro) quedan como están o pasan a variables propias del pie.
+   - Buscamos en las pruebas y en `docs/DEMO_EXPOSICION.md` los textos de Territorio y de la portada que vamos a cambiar («Principio de acceso», «Información institucional de referencia», «Las delegaciones hoy», «Ver contexto», etc.): ninguno aparece.
+2. **Archivos:** solo este informe.
+3. **Pruebas:** 703 en total, 703 aprobadas, 0 fallidas. Es la línea base de esta ronda.
+4. **Qué mirar:** nada cambia en pantalla en esta fase.
+5. **Límites:** ninguno en riesgo.
+6. **No verificado:** nada pendiente en esta fase.
+7. **Commits:** `docs: línea base de la segunda ronda de la interfaz`.
