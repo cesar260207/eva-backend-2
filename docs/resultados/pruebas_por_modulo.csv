@@ -1,0 +1,15 @@
+modulo,pruebas,aprobadas
+test_integracion,223,223
+test_unit_organizacion,69,69
+test_unit_compromisos,54,54
+test_unit_actividades,51,51
+test_unit_transversal,50,50
+test_unit_medicion,49,49
+test_unit_reglas_nuevas,44,44
+test_unit_delegaciones,43,43
+test_unit_seguridad,31,31
+test_unit_alertas,28,28
+test_unit_plan_pruebas,16,16
+test_unit_autenticacion,8,8
+test_unit_matriz,8,8
+test_casos_de_uso,2,2

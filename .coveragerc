@@ -1,0 +1,12 @@
+[run]
+source =
+    delegaciones_app
+    gestion_app
+    gestion_laserena
+omit =
+    */migrations/*
+    */test_*.py
+    */pruebas_base.py
+
+[report]
+skip_empty = True
