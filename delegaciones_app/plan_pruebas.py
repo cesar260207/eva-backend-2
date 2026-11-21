@@ -44,6 +44,7 @@ CATALOGO_CU = {
     'CU-64': 'Informar felicitación o reclamo',
     'CU-65': 'Consultar ajustes', 'CU-67': 'Aplicar o rechazar ajuste',
     'CU-71': 'Registrar ausencia', 'CU-72': 'Consultar ausencias',
+    'CU-83': 'Importar organizaciones',
 }
 
 CATALOGO_RF = {

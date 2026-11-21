@@ -297,8 +297,8 @@ base('org_exp', 'Exportar organizaciones', None, [U], 'Descargar la lista de org
      '/administracion/organizaciones/exportar/', hu='Requerimientos de octubre')
 base('org_imp', 'Importar organizaciones', None, [A], 'Cargar la base de juntas de vecinos entregada por el municipio.',
      'El Excel está en el servidor (nunca en GitHub).', 'Organizaciones creadas o actualizadas con su delegación.',
-     'Ejecutar el comando, que lee el Excel, asigna la delegación por territorio y guarda.', [], 'comando importar_organizaciones (servidor)',
-     nota='Sin pantalla. Hoy deja 1.812 de 2.709 sin delegación: lo corrige la FASE 2 del prompt.', hu='Requerimientos de octubre')
+     'Ejecutar el comando, que lee el Excel, asigna la delegación por territorio (CIAS, PAMPA, ANTENA, AV DEL MAR, CENTRO, RURAL), deduce el tipo por el nombre y guarda.', [], 'comando importar_organizaciones (servidor)',
+     nota='Sin pantalla. Con el Excel de 2.709 organizaciones quedan 24 sin delegación (ALFALFARES y filas sin territorio), marcadas para asignar a mano.', hu='Requerimientos de octubre')
 # G10 delegaciones
 mantenedor('del', 'delegación', 'delegaciones', '/administracion/delegaciones/', [C, A], [C, A], [C, A], [C, A],
            'HU-26', 'Validar datos de delegación', 'que el nombre esté y no se repita', con_baja=True)

@@ -1,10 +1,44 @@
 import json
+import re
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
 from delegaciones_app.models import Delegacion, Organizacion
+
+# Columna «Territ. deleg.» del Excel del municipio y la delegación del sistema. ALFALFARES y las filas sin
+# territorio quedan sin delegación para que la coordinación las asigne a mano.
+DELEGACION_POR_TERRITORIO = {
+    'CIAS': 'Las Compañías', 'PAMPA': 'La Pampa', 'ANTENA': 'La Antena', 'AV DEL MAR': 'Avenida del Mar',
+    'CENTRO': 'Centro', 'RURAL': 'Rural',
+}
+
+# Tipos del documento de requerimientos de octubre 2026, en orden: gana la primera regla que calza con el nombre.
+# Lo que no calza es funcional: la Ley 19.418 distingue juntas de vecinos (territoriales) y organizaciones funcionales.
+REGLAS_DE_TIPO = (
+    ('junta_vecinos', r'JUNTAS? DE VECINOS|JUNTA VECINAL|^JJ\.? ?VV'),
+    # Los comités de vivienda o de agua potable rural suelen constituirse como organizaciones funcionales.
+    ('funcional', r'COMITE (DE |PRO )?(LA )?(VIVIENDA|AGUA|HABITACIONAL)|AGUA POTABLE|\bAPR\b'),
+    ('adulto_mayor', r'ADULTOS? MAYOR(ES)?|TERCERA EDAD|ABUELIT'),
+    ('deportiva', r'DEPORT|FUTBOL|RAYUELA|BASQUET|VOLEIBOL|ATLETISMO|CICLISMO|TENIS|BOXEO|KARATE|SKATE|\bSURF|PATIN|HANDBOL'),
+    ('cultural', r'CENTRO DE MADRES|CENTRO DE PADRES|CULTURA|JUVENIL|JOVENES|FOLCLOR|FOLKLOR|\bBAILE|DANZA|\bCORO\b|MUSIC|TEATRO|\bARTE|ARTESAN|TALLER|CONJUNTO'),
+    ('comite', r'\bCOMITE'),
+)
+
+
+def normalizar(texto):
+    """Mayúsculas, sin tildes y con un solo espacio entre palabras."""
+    sin_tildes = unicodedata.normalize('NFKD', str(texto or '')).encode('ascii', 'ignore').decode()
+    return re.sub(r'\s+', ' ', sin_tildes).strip().upper()
+
+
+def delegacion_de_territorio(territorio, delegaciones):
+    """Delegación del territorio del Excel (CIAS, PAMPA, etc.) o por su nombre; None si no corresponde a ninguna."""
+    clave = normalizar(territorio)
+    nombre = DELEGACION_POR_TERRITORIO.get(clave, clave)
+    return delegaciones.get(normalizar(nombre))
 
 
 class Command(BaseCommand):
@@ -24,7 +58,7 @@ class Command(BaseCommand):
             raise CommandError(f'No se pudo leer el archivo de organizaciones: {error}') from error
         if not isinstance(datos, list):
             raise CommandError('El archivo debe contener una lista de organizaciones.')
-        delegaciones = {d.nombre.casefold(): d for d in Delegacion.objects.all()}
+        delegaciones = {normalizar(d.nombre): d for d in Delegacion.objects.all()}
         creadas = actualizadas = 0
         for fila in datos:
             nombre = str(fila.get('nombre') or fila.get('organizacion') or '').strip()
@@ -32,7 +66,7 @@ class Command(BaseCommand):
                 continue
             territorio = str(fila.get('territorio') or fila.get('localidad') or '').strip()
             tipo = self._tipo(nombre, fila.get('tipo'))
-            delegacion = delegaciones.get(territorio.casefold())
+            delegacion = delegacion_de_territorio(territorio, delegaciones)
             domicilio = 'Domicilio anonimizado' if options['anonimizar'] else str(fila.get('domicilio') or '').strip()
             defaults = {
                 'tipo': tipo,
@@ -45,7 +79,7 @@ class Command(BaseCommand):
                 'registro_direccion': str(fila.get('registro_direccion') or '').strip(),
                 'delegacion': delegacion,
                 'verificada': bool(delegacion and territorio),
-                'observaciones': '' if delegacion else 'Importada sin territorio verificable.',
+                'observaciones': '' if delegacion else f'Importada sin delegación: territorio «{territorio or "sin dato"}». Asignar a mano.',
                 'activa': True,
             }
             objeto, creado = Organizacion.objects.update_or_create(
@@ -114,15 +148,7 @@ class Command(BaseCommand):
             opciones = {clave: clave for clave, _ in Organizacion.TIPOS}
             if valor in opciones:
                 return valor
-        texto = nombre.lower()
-        if 'junta de vecinos' in texto or texto.startswith('jjvv'):
-            return 'junta_vecinos'
-        if 'club de adulto' in texto:
-            return 'adulto_mayor'
-        if 'deportivo' in texto or 'club deportivo' in texto:
-            return 'deportiva'
-        if 'centro de padres' in texto or 'cultural' in texto or 'juvenil' in texto:
-            return 'cultural'
-        if 'comité' in texto or 'comite' in texto:
-            return 'comite'
-        return 'sin_clasificar'
+        texto = normalizar(nombre)
+        if not texto:
+            return 'sin_clasificar'
+        return next((tipo for tipo, patron in REGLAS_DE_TIPO if re.search(patron, texto)), 'funcional')
