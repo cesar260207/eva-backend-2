@@ -1208,6 +1208,17 @@ class AusenciaDesdeSemaforoTests(BaseOperacion):
 class ActividadVistasTests(BaseOperacion):
 	"""CU-01, CU-01.1, CU-01.2, CU-10, CU-10.1, CU-10.2 (RF-009 a RF-011). Registro, consulta, modificación y eliminación de actividades."""
 
+	def test_el_formulario_permite_marcar_gestion_interna(self):
+		"""CU-01 Registro de actividades (RF-009, RF-022). Regla 1: la casilla del formulario deja la actividad como «otra gestión»."""
+		fijar_hoy(self, date(2026, 9, 1))
+		self.client.force_login(self.funcionario)
+		self.assertContains(self.client.get(reverse('actividad_nueva')), 'name="gestion_interna"')
+		self.client.post(reverse('actividad_nueva'), self._datos_actividad(
+			solicitud_problema='Pedido del delegado', contacto_nombre='Delegado Centro', contacto_telefono='912345678', gestion_interna='on',
+		))
+		actividad = Actividad.objects.get(solicitud_problema='Pedido del delegado')
+		self.assertEqual((actividad.gestion_interna, actividad.cuenta_puntaje), (True, False))
+
 	def test_registrar_actividad_genera_codigo_y_auditoria(self):
 		fijar_hoy(self, date(2026, 9, 1))  # el formulario usa el 1 de septiembre (regla 4)
 		self.client.force_login(self.funcionario)

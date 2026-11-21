@@ -343,13 +343,18 @@ class ActividadForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm):
 
     class Meta:
         model = Actividad
-        fields = ['delegacion', 'item', 'catalogo', 'fecha', 'solicitud_problema', 'accion', 'contacto_nombre', 'contacto_telefono', 'organizacion', 'tipo_accion', 'compromiso']
+        fields = ['delegacion', 'item', 'catalogo', 'fecha', 'solicitud_problema', 'accion', 'contacto_nombre', 'contacto_telefono', 'organizacion', 'tipo_accion', 'compromiso', 'gestion_interna']
         labels = {
+            'gestion_interna': 'Gestión interna (el usuario es el delegado)',
             'item': 'Ítem de medición', 'catalogo': 'Tipo de atención', 'fecha': 'Fecha y hora',
             'solicitud_problema': 'Solicitud o problema', 'accion': 'Acción ejecutada',
             'contacto_nombre': 'Nombre de contacto', 'contacto_telefono': 'Teléfono de contacto', 'compromiso': 'Tarea del tubo de trabajo vinculada (opcional)',
         }
-        help_texts = {'item': 'Solo ítems de períodos abiertos. La fecha debe caer dentro del período del ítem.'}
+        help_texts = {
+            'item': 'Solo ítems de períodos abiertos. La fecha debe caer dentro del período del ítem.',
+            # Regla 1 de octubre: se guarda para el historial como «otra gestión», sin puntaje.
+            'gestion_interna': 'Marcar si la actividad la pidió el delegado: queda como «otra gestión» y no suma puntaje. Con una tarea del tubo vinculada, manda el origen de la tarea.',
+        }
         widgets = {
             'fecha': forms.DateTimeInput(attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
             'solicitud_problema': forms.Textarea(attrs={'rows': 3}),

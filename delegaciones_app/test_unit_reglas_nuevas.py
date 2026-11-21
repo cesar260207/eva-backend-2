@@ -148,6 +148,19 @@ class PuntajeDeActividadTests(EscenarioBase, TestCase):
         self.assertFalse(actividad.cuenta_puntaje)
         self.assertIn('Otra gestión', actividad.motivo_sin_puntaje)
 
+    def test_una_actividad_suelta_marcada_como_interna_es_otra_gestion(self):
+        """CU-07.1 Aplicar fórmulas de medición (RF-022). Regla 1: sin tarea del tubo, la casilla de gestión interna también la deja sin puntaje."""
+        actividad = self._registrar(gestion_interna=True)
+        self.assertEqual((actividad.gestion_interna, actividad.cuenta_puntaje), (True, False))
+        self._aprobar(actividad)
+        self.assertEqual(self.meta.actividades_que_aportan(self.periodo).count(), 0)
+
+    def test_la_tarea_externa_manda_sobre_la_casilla(self):
+        """CU-07.1 Aplicar fórmulas de medición (RF-022). Regla 1: con una tarea vinculada, el origen de la tarea decide si es gestión interna."""
+        externa = self.nuevo_compromiso(folio='EXT-1', origen='externo')
+        actividad = self._registrar(compromiso=externa, gestion_interna=True)
+        self.assertEqual((actividad.gestion_interna, actividad.cuenta_puntaje), (False, True))
+
 
 class CumplimientoConAjustesTests(EscenarioBase, TestCase):
     """CU-07.1 Aplicar fórmulas de medición (RF-022, RF-024, RN-005). Reglas 7 y 8 de octubre: tope, felicitaciones y reclamos."""
