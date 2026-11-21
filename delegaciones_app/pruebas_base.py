@@ -2,6 +2,7 @@
 import shutil
 import tempfile
 from datetime import date, datetime, timedelta
+from unittest import mock
 
 from django.contrib.auth.models import User
 from django.test import override_settings
@@ -13,6 +14,15 @@ from .models import (
 from .permisos import asignar_perfil
 
 CLAVE_PRUEBA = 'clave-segura'
+
+
+def fijar_hoy(prueba, fecha):
+    """Fija el «hoy» del cierre semanal (regla 4) mientras dura la prueba, para que las pruebas con fechas fijas de
+    septiembre no dependan del día en que se ejecutan. Devuelve el reemplazo: su return_value cambia la fecha."""
+    parche = mock.patch('delegaciones_app.reglas.fecha_de_hoy', return_value=fecha)
+    reemplazo = parche.start()
+    prueba.addCleanup(parche.stop)
+    return reemplazo
 
 
 def crear_funcionario(username, *roles, cargo=None, delegacion=None):

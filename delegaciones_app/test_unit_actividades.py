@@ -1,5 +1,5 @@
 """Pruebas unitarias del registro de actividades, la carga de evidencias y su validación (EP-01 y EP-03)."""
-from datetime import datetime
+from datetime import date, datetime
 
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -10,7 +10,7 @@ from django.utils import timezone
 from .forms import ActividadForm, EvidenciaForm
 from .informes import filtrar_actividades
 from .models import Actividad, Cargo, Catalogo, Evidencia, Indicador, ItemMedible, Meta, Organizacion, Validacion, validar_tamano_evidencia
-from .pruebas_base import EscenarioBase, crear_funcionario
+from .pruebas_base import EscenarioBase, crear_funcionario, fijar_hoy
 
 
 class ActividadUnitTests(EscenarioBase, TestCase):
@@ -18,6 +18,8 @@ class ActividadUnitTests(EscenarioBase, TestCase):
 
     def setUp(self):
         self.crear_escenario()
+        # La fecha válida es el 10 de septiembre: el viernes 11 su semana sigue abierta (regla 4).
+        self.hoy = fijar_hoy(self, date(2026, 9, 11))
 
     def _datos(self, **cambios):
         datos = {
@@ -63,6 +65,7 @@ class ActividadUnitTests(EscenarioBase, TestCase):
     def test_los_limites_del_periodo_son_validos(self):
         """CU-01.1 Validar campos de actividad (RF-010). El primer y el último día del período se aceptan."""
         for dia in (datetime(2026, 9, 1, 0, 0), datetime(2026, 9, 30, 23, 59)):
+            self.hoy.return_value = dia.date()
             self.autor.registrar_actividad(self._datos(fecha=timezone.make_aware(dia), solicitud_problema=f'Día {dia:%d}'))
         self.assertEqual(Actividad.objects.count(), 2)
 

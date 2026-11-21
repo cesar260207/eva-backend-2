@@ -6,9 +6,14 @@ from django.db.models import Count
 from django.utils import timezone
 
 
+def fecha_de_hoy():
+	"""Fecha local que usa el cierre semanal; las pruebas con fechas fijas la reemplazan (pruebas_base.fijar_hoy)."""
+	return timezone.localdate()
+
+
 def semana_abierta(fecha, hoy=None):
 	"""Devuelve si una fecha de actividad todavía pertenece a una semana abierta."""
-	hoy = hoy or timezone.localdate()
+	hoy = hoy or fecha_de_hoy()
 	if fecha > hoy:
 		return False
 	lunes_actual = hoy - timedelta(days=hoy.weekday())
@@ -19,7 +24,7 @@ def semana_abierta(fecha, hoy=None):
 
 def validar_fecha_actividad(fecha, periodo, cierre_semanal=True):
 	"""Regla 4: el cierre semanal solo se aplica a los ingresos (cierre_semanal=False al corregir sin cambiar la fecha)."""
-	hoy = timezone.localdate()
+	hoy = fecha_de_hoy()
 	if fecha > hoy:
 		raise ValidationError({'fecha': 'La fecha de la actividad no puede estar en el futuro.'})
 	if cierre_semanal and not semana_abierta(fecha, hoy):

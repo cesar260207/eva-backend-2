@@ -22,7 +22,7 @@ from django.views import View
 from .crud import MANTENEDORES
 from .informes import filtrar_actividades, filtrar_compromisos
 from .models import validar_tamano_evidencia
-from .pruebas_base import crear_funcionario
+from .pruebas_base import crear_funcionario, fijar_hoy
 from .permisos import RolRequeridoMixin, asignar_perfil, roles_de, rol_requerido, tiene_rol
 from .models import (
 	Actividad, Auditoria, Cargo, Catalogo, Comentario, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
@@ -169,10 +169,10 @@ class MedicionTests(TestCase):
 		meta.actualizar_valor_objetivo(4)
 		self.assertEqual(Meta.objects.get(pk=meta.pk).valor_objetivo, 4)
 
-	def test_rn005_tope_por_defecto_150_y_ponderado(self):
+	def test_rn005_tope_por_defecto_120_y_ponderado(self):
 		indicador = self._indicador(avance=20, ponderador=50)
-		self.assertEqual(indicador.cumplimiento, Decimal('150'))
-		self.assertEqual(indicador.ponderacion, Decimal('75.00'))
+		self.assertEqual(indicador.cumplimiento, Decimal('120'))
+		self.assertEqual(indicador.ponderacion, Decimal('60.00'))
 
 	def test_rn005_tope_configurable_por_parametro(self):
 		ParametroVersionado.objects.create(periodo=self.periodo, clave='maximo_cumplimiento', valor='120')
@@ -221,13 +221,19 @@ class OperacionTests(TestCase):
 		self.periodo = Periodo.objects.create(nombre='Septiembre 2026', fecha_inicio=date(2026, 9, 1), fecha_termino=date(2026, 9, 30))
 		self.item = ItemMedible.objects.create(cargo=self.cargo, periodo=self.periodo, nombre='Atencion territorial', ponderacion=100)
 		self.catalogo = Catalogo.objects.create(codigo='AT-OPER', nombre='Operativo en terreno', tipo='atencion')
+		# Las actividades son del 10 y 11 de septiembre: el viernes 11 su semana sigue abierta (regla 4).
+		fijar_hoy(self, date(2026, 9, 11))
 
 	def _funcionario(self, username):
 		usuario = User.objects.create_user(username, password='clave-segura')
 		return Funcionario.objects.create(usuario=usuario, identificador_institucional=username, nombre=username, cargo=self.cargo, delegacion=self.centro)
 
 	def _actividad(self, dia=10, **cambios):
-		datos = {'item': self.item, 'catalogo': self.catalogo, 'fecha': timezone.make_aware(datetime(2026, 9, dia, 10, 0)), 'solicitud_problema': 'Consulta vecinal', 'accion': 'Orientacion'}
+		# Regla 2: sin nombre y teléfono del usuario la actividad no puntúa.
+		datos = {
+			'item': self.item, 'catalogo': self.catalogo, 'fecha': timezone.make_aware(datetime(2026, 9, dia, 10, 0)), 'solicitud_problema': 'Consulta vecinal',
+			'accion': 'Orientacion', 'contacto_nombre': 'Vecina de prueba', 'contacto_telefono': '912345678',
+		}
 		datos.update(cambios)
 		return self.autor.registrar_actividad(datos)
 
@@ -972,7 +978,7 @@ class BaseOperacion(TestCase):
 	def _datos_actividad(self, **cambios):
 		datos = {
 			'delegacion': self.centro.pk, 'item': self.item.pk, 'catalogo': self.catalogo.pk, 'fecha': '2026-09-01T10:00',
-			'solicitud_problema': 'Solicitud corregida', 'accion': 'Accion', 'contacto_nombre': '', 'contacto_telefono': '',
+			'solicitud_problema': 'Solicitud corregida', 'accion': 'Accion', 'contacto_nombre': '', 'contacto_telefono': '', 'tipo_accion': 'ejecucion',
 		}
 		datos.update(cambios)
 		return datos
@@ -1023,6 +1029,7 @@ class ActividadVistasTests(BaseOperacion):
 	"""CU-01, CU-01.1, CU-01.2, CU-10, CU-10.1, CU-10.2 (RF-009 a RF-011). Registro, consulta, modificación y eliminación de actividades."""
 
 	def test_registrar_actividad_genera_codigo_y_auditoria(self):
+		fijar_hoy(self, date(2026, 9, 1))  # el formulario usa el 1 de septiembre (regla 4)
 		self.client.force_login(self.funcionario)
 		respuesta = self.client.post(reverse('actividad_nueva'), self._datos_actividad(solicitud_problema='Consulta vecinal', contacto_nombre='Organizacion demo'))
 		actividad = Actividad.objects.get(solicitud_problema='Consulta vecinal')
@@ -1430,7 +1437,7 @@ class MedicionVistasTests(BaseOperacion):
 		self.assertEqual((filas['Rural']['cumplimiento'], filas['Rural']['estado']), (Decimal('25.00'), 'Rojo'))
 		self.assertEqual(respuesta.context['periodo'], self.periodo)
 		self.assertContains(respuesta, 'Septiembre 2026')
-		self.assertContains(respuesta, 'Tope: 150 %')
+		self.assertContains(respuesta, 'Tope: 120 %')
 		self.assertEqual(filas['Centro']['detalle'], ['Atencion territorial: 1 de 1 actividades'])
 
 	def test_las_barras_de_progreso_no_usan_coma_decimal(self):
@@ -1535,12 +1542,14 @@ class SeedDemoTests(TestCase):
 		cargar_demo()
 		filas = contar_filas()
 		esperadas = {
-			'Delegacion': 6, 'Funcionario': 9, 'FuncionarioRol': 10, 'UsuarioMaestro': 1, 'Periodo': 1, 'ParametroVersionado': 1,
-			'ItemMedible': 1, 'Meta': 6, 'Catalogo': 5, 'Indicador': 6, 'Compromiso': 8, 'HistorialCompromiso': 8,
+			'Delegacion': 6, 'Funcionario': 9, 'FuncionarioRol': 9, 'UsuarioMaestro': 1, 'Periodo': 1, 'ParametroVersionado': 5,
+			# Un ítem por cargo: el de los delegados y el de funcionario.centro (Profesional).
+			'ItemMedible': 2, 'Meta': 6, 'Catalogo': 5, 'Indicador': 6, 'Compromiso': 8, 'HistorialCompromiso': 8,
 			'Actividad': 1, 'Evidencia': 1, 'Validacion': 1, 'MedicionDelegacion': 6,
 		}
 		for modelo, total in esperadas.items():
-			self.assertEqual(filas[modelo], total, modelo)
+			with self.subTest(modelo=modelo):
+				self.assertEqual(filas[modelo], total, modelo)
 
 	def test_cuentas_demo_y_delegados_inactivos(self):
 		cargar_demo()
@@ -1613,7 +1622,7 @@ class AuditoriaTests(BaseOperacion):
 	def test_un_acceso_denegado_por_rol_queda_registrado(self):
 		self.client.force_login(self.funcionario)
 		self.client.get(reverse('mantenedor_lista', args=['catalogo']))
-		evento = self._evento('acceso_denegado', 'Acceso').get()
+		evento = self._evento('acceso_denegado', 'Catalogo').get()
 		self.assertEqual(evento.funcionario, self.funcionario.funcionario)
 		self.assertEqual(json.loads(evento.valor_nuevo)['motivo'], 'permiso insuficiente')
 
@@ -1884,7 +1893,7 @@ class FichaPersonalTests(BaseOperacion):
 			Validacion(evidencia=self._evidencia(extra), funcionario_verificador=self.verificador.funcionario).aprobar_evidencia()
 		Indicador.generar(self.meta)
 		fila = self._ficha().context['filas'][0]
-		self.assertEqual(fila['cumplimiento'], Decimal('150.00'))
+		self.assertEqual(fila['cumplimiento'], Decimal('120.00'))
 		self.assertIn('se aplica el tope', fila['formula'][1])
 
 	def test_una_meta_sin_calculo_se_informa_sin_formula(self):
