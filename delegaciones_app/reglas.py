@@ -58,7 +58,7 @@ def dias_ausencia(funcionario, periodo, hasta=None):
 	for ausencia in funcionario.ausencias.filter(desde__lte=hasta, hasta__gte=desde):
 		inicio = max(desde, ausencia.desde)
 		termino = min(hasta, ausencia.hasta)
-		dias.update(desde + timedelta(days=i) for i in range((termino - inicio).days + 1))
+		dias.update(inicio + timedelta(days=i) for i in range((termino - inicio).days + 1))
 	return len(dias)
 
 
