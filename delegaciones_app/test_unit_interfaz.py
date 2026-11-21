@@ -11,7 +11,7 @@ from django.urls import reverse
 
 from .models import Delegacion
 from .pruebas_base import CLAVE_PRUEBA, EscenarioBase, crear_funcionario, fijar_hoy
-from .templatetags.sgr_interfaz import campo_sgr, campos, campos_restantes
+from .templatetags.sgr_interfaz import campo_sgr, campos, campos_restantes, partes_cifra
 
 
 MENSAJES_DE_PERMISOS = ('Restringido para tu perfil', 'Permisos mínimos', 'Permisos intermedios', 'Acceso total')
@@ -294,3 +294,62 @@ class FiltrosDeInterfazTests(TestCase):
         form = self.Formulario()
         self.assertEqual([c.name for c in campos(form, 'telefono nombre inexistente oculto')], ['telefono', 'nombre'])
         self.assertEqual([c.name for c in campos_restantes(form, 'telefono')], ['nombre', 'activo'])
+
+    def test_partes_cifra_separa_el_numero_para_el_conteo(self):
+        """RNF-012 Accesibilidad. El conteo parte del número sin formato y termina en el texto original."""
+        self.assertEqual(partes_cifra('250.141'), {'plano': '250141', 'decimales': 0, 'texto': '250.141', 'sufijo': ''})
+        self.assertEqual(partes_cifra('88,0 %'), {'plano': '88.0', 'decimales': 1, 'texto': '88,0', 'sufijo': '%'})
+
+
+DELEGACIONES_TERRITORIO = ('Avenida del Mar', 'Centro', 'La Antena', 'Las Compañías', 'La Pampa', 'Rural')
+
+
+class TerritorioTests(TestCase):
+    """RNF-011 y RNF-012. Territorio con cifras del censo y su fuente, esquema accesible y enlaces según el perfil."""
+
+    def test_muestra_el_censo_2024_con_su_fuente(self):
+        """RNF-011 Usabilidad. 88,0 % urbana y 12,0 % rural (Censo 2024, INE), con la fuente a la vista."""
+        respuesta = self.client.get(reverse('institucional'))
+        for texto in ('250.141', '88,0 %', '12,0 %', 'Fuente: Censo de Población y Vivienda 2024, INE'):
+            self.assertContains(respuesta, texto)
+        self.assertNotContains(respuesta, '89,14')
+        self.assertNotContains(respuesta, '10,86')
+        self.assertContains(respuesta, 'data-contar=', count=4)
+
+    def test_no_muestra_mensajes_de_permisos_ni_insignias_de_relleno(self):
+        """RNF-011 Usabilidad. Sin «Principio de acceso» ni las insignias «Territorio» e «Información institucional de referencia»."""
+        respuesta = self.client.get(reverse('institucional'))
+        self.assertNotContains(respuesta, 'Principio de acceso')
+        self.assertNotContains(respuesta, 'Información institucional de referencia')
+        self.assertNotContains(respuesta, 'badge-soft">Territorio')
+
+    def test_sin_sesion_ninguna_tarjeta_enlaza_al_seguimiento(self):
+        """RNF-011 Usabilidad. Sin sesión no hay enlaces a pantallas privadas."""
+        respuesta = self.client.get(reverse('institucional'))
+        for nombre in DELEGACIONES_TERRITORIO:
+            self.assertNotContains(respuesta, reverse('delegacion_detalle', args=[nombre]), msg_prefix=nombre)
+        self.assertContains(respuesta, '¿Trabajas en una delegación?')
+
+    def test_cada_perfil_ve_solo_el_seguimiento_que_puede_abrir(self):
+        """CU-26.1 Denegar acceso por ámbito (RF-029). El Profesional de Centro ve solo Centro; el Coordinador, las seis."""
+        centro = Delegacion.objects.create(nombre='Centro')
+        self.client.force_login(crear_funcionario('territorio.pro', 'funcionario', delegacion=centro))
+        respuesta = self.client.get(reverse('institucional'))
+        self.assertContains(respuesta, reverse('delegacion_detalle', args=['Centro']))
+        for nombre in DELEGACIONES_TERRITORIO[2:] + DELEGACIONES_TERRITORIO[:1]:
+            self.assertNotContains(respuesta, reverse('delegacion_detalle', args=[nombre]), msg_prefix=nombre)
+        self.client.force_login(crear_funcionario('territorio.coord', 'coordinador'))
+        respuesta = self.client.get(reverse('institucional'))
+        for nombre in DELEGACIONES_TERRITORIO:
+            self.assertContains(respuesta, reverse('delegacion_detalle', args=[nombre]), count=1, msg_prefix=nombre)
+
+    def test_cada_tarjeta_tiene_su_id_y_el_esquema_es_accesible(self):
+        """RNF-012 Accesibilidad. Un id estable por tarjeta, esquema con nombre accesible y un solo h1."""
+        respuesta = self.client.get(reverse('institucional'))
+        for slug in ('avenida-del-mar', 'centro', 'la-antena', 'las-companias', 'la-pampa', 'rural'):
+            self.assertContains(respuesta, f'id="delegacion-{slug}"')
+            self.assertContains(respuesta, f'href="#delegacion-{slug}"', count=2)
+        self.assertContains(respuesta, 'role="img"')
+        self.assertContains(respuesta, 'con sus delegaciones: Avenida del Mar, Centro, La Antena, Las Compañías, La Pampa, Rural.')
+        self.assertContains(respuesta, 'Esquema referencial, no a escala')
+        self.assertContains(respuesta, '<h1', count=1)
