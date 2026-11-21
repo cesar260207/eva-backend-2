@@ -10,6 +10,23 @@
 </head>
 <body>
     <a class="skip-link" href="#contenido-principal">Ir al contenido principal</a>
+    <div class="sgr-utilidad">
+        <div class="container-fluid px-4">
+            <span>Municipalidad de La Serena · Departamento de Gestión Territorial</span>
+            <button class="btn-accesibilidad" type="button" data-bs-toggle="collapse" data-bs-target="#panel-accesibilidad" aria-expanded="false" aria-controls="panel-accesibilidad" data-requiere-js hidden>{% include 'includes/_icono.html' with nombre='accesibilidad' %}Accesibilidad</button>
+        </div>
+    </div>
+    <section class="collapse panel-accesibilidad" id="panel-accesibilidad" aria-labelledby="titulo-accesibilidad">
+        <div class="container-fluid px-4">
+            <h2 id="titulo-accesibilidad">Accesibilidad</h2>
+            <button class="btn-a11y" type="button" data-a11y="mas"><span class="btn-a11y-texto" aria-hidden="true">A+</span>Aumentar texto</button>
+            <button class="btn-a11y" type="button" data-a11y="menos"><span class="btn-a11y-texto" aria-hidden="true">A-</span>Achicar texto</button>
+            <button class="btn-a11y" type="button" data-a11y="contraste" aria-pressed="false">Alto contraste</button>
+            <button class="btn-a11y" type="button" data-a11y="subrayar" aria-pressed="false">Links subrayados</button>
+            <button class="btn-a11y" type="button" data-a11y="reiniciar">Reiniciar</button>
+            <span class="small text-muted ms-lg-2" data-a11y-nivel aria-live="polite"></span>
+        </div>
+    </section>
     {% with ruta=request.resolver_match.url_name %}
     {% block encabezado %}
     <header class="sgr-header" data-encabezado>
@@ -81,8 +98,40 @@
     {% block pie %}
     <footer class="footer">
         <div class="container">
-            <strong>Municipalidad de La Serena</strong><br>
-            <small>Departamento de Gestión Territorial</small>
+            <div class="footer-grid">
+                <div class="footer-marca">
+                    <span class="brand-mark" aria-hidden="true">SGR</span>
+                    <div>
+                        <strong>Municipalidad de La Serena</strong>
+                        <span>Departamento de Gestión Territorial</span>
+                        <p>El Sistema de Gestión de Resultados registra la gestión de las delegaciones municipales, valida su evidencia y mide su avance.</p>
+                    </div>
+                </div>
+                <nav aria-labelledby="pie-secciones">
+                    <h2 id="pie-secciones">Secciones</h2>
+                    <ul>
+                        {% if user.is_authenticated %}
+                        <li><a href="{% url 'panel' %}">Mi panel</a></li>
+                        <li><a href="{% url 'actividades' %}">Actividades</a></li>
+                        <li><a href="{% url 'agenda' %}">Tareas</a></li>
+                        <li><a href="{% url 'dashboard' %}">Resultados</a></li>
+                        {% else %}
+                        <li><a href="{% url 'inicio' %}">Inicio</a></li>
+                        <li><a href="{% url 'institucional' %}">Territorio</a></li>
+                        <li><a href="{% url 'login' %}">Ingresar</a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                <nav aria-labelledby="pie-ayuda">
+                    <h2 id="pie-ayuda">Ayuda</h2>
+                    <ul>
+                        {% if not user.is_authenticated %}<li><a href="{% url 'password_reset' %}">¿Olvidaste tu contraseña?</a></li>{% endif %}
+                        <li><a href="{% url 'institucional' %}">Territorio</a></li>
+                        <li data-requiere-js hidden><button class="btn-enlace" type="button" data-bs-toggle="collapse" data-bs-target="#panel-accesibilidad" aria-expanded="false" aria-controls="panel-accesibilidad" data-a11y-desde-pie>{% include 'includes/_icono.html' with nombre='accesibilidad' clase='icono-sm' %}Opciones de accesibilidad</button></li>
+                    </ul>
+                </nav>
+            </div>
+            <div class="footer-franja">Sistema de Gestión de Resultados · Prototipo académico INACAP 2026</div>
         </div>
     </footer>
     {% endblock %}
