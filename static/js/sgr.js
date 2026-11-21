@@ -173,8 +173,9 @@
                     }
                 }
                 window.requestAnimationFrame(paso);
+                /* Respaldo: si el navegador pausa los cuadros de animación, el valor final igual queda a la vista. */
+                window.setTimeout(function () { cifra.textContent = textoFinal; }, 1200);
             }
-            cifra.textContent = (0).toLocaleString('es-CL', formato);
             observar([cifra], contar);
         });
     }

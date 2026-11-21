@@ -228,7 +228,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 textarea.form-control { min-height: 96px; }
 .form-control:hover, .form-select:hover { border-color: var(--ink); }
 .form-control:focus, .form-select:focus { border-color: var(--terracotta); box-shadow: 0 0 0 .2rem rgba(168, 50, 36, .16); }
-.form-control::placeholder { color: #8a7d74; }
+.form-control::placeholder { color: var(--muted); opacity: 1; }
 .form-control.is-invalid, .form-select.is-invalid, .form-control[aria-invalid="true"], .form-select[aria-invalid="true"] { border-color: var(--rojo); border-width: 2px; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b0123b' stroke-width='2' stroke-linecap='round'%3e%3ccircle cx='12' cy='12' r='9'/%3e%3cpath d='M9 9l6 6M15 9l-6 6'/%3e%3c/svg%3e"); }
 .form-select.is-invalid, .form-select[aria-invalid="true"] { background-image: var(--bs-form-select-bg-img), url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b0123b' stroke-width='2' stroke-linecap='round'%3e%3ccircle cx='12' cy='12' r='9'/%3e%3cpath d='M9 9l6 6M15 9l-6 6'/%3e%3c/svg%3e"); }
 .form-control.is-invalid:focus, .form-select.is-invalid:focus { border-color: var(--rojo); box-shadow: 0 0 0 .2rem rgba(176, 18, 59, .16); }
