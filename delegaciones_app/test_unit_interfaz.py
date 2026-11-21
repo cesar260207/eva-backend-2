@@ -217,6 +217,52 @@ class PortadaTests(TestCase):
         self.assertContains(respuesta, '<h1', count=1)
 
 
+class EncabezadoPieYAccesibilidadTests(TestCase):
+    """RNF-011 Usabilidad y RNF-012 Accesibilidad. Menú con la sección activa, pie en bloques y barra de accesibilidad."""
+
+    def test_el_pie_respeta_la_sesion_y_no_inventa_enlaces(self):
+        """RNF-011 Usabilidad. Sin sesión: inicio, territorio, ingreso y recuperación; con sesión: las secciones del menú."""
+        respuesta = self.client.get(reverse('institucional'))
+        pie = respuesta.content.decode('utf-8').split('<footer', 1)[1]
+        for url in (reverse('inicio'), reverse('institucional'), reverse('login'), reverse('password_reset')):
+            self.assertIn(f'href="{url}"', pie)
+        self.assertIn('Prototipo académico INACAP 2026', pie)
+        self.assertNotIn('href="#"', pie)
+        self.assertNotIn('http', pie)
+        self.client.force_login(crear_funcionario('pie.ui', 'funcionario'))
+        pie = self.client.get(reverse('institucional')).content.decode('utf-8').split('<footer', 1)[1]
+        for url in (reverse('panel'), reverse('actividades'), reverse('agenda'), reverse('dashboard')):
+            self.assertIn(f'href="{url}"', pie)
+        self.assertNotIn(reverse('password_reset'), pie)
+        self.assertNotIn(reverse('delegados'), pie)
+
+    def test_la_barra_de_accesibilidad_usa_las_clases_del_kit(self):
+        """RNF-012 Accesibilidad. Botones de la barra y clase inicial a11y-font-0 en la etiqueta html."""
+        respuesta = self.client.get(reverse('inicio'))
+        self.assertContains(respuesta, '<html lang="es" class="a11y-font-0">')
+        for accion, texto in (('mas', 'Aumentar texto'), ('menos', 'Achicar texto'), ('contraste', 'Alto contraste'), ('subrayar', 'Links subrayados'), ('reiniciar', 'Reiniciar')):
+            self.assertContains(respuesta, f'data-a11y="{accion}"')
+            self.assertContains(respuesta, texto)
+        self.assertContains(respuesta, 'data-a11y="contraste" aria-pressed="false"')
+        self.assertContains(respuesta, 'Ir al contenido principal')
+
+    def test_el_menu_marca_la_seccion_activa_sin_cambiar_sus_enlaces(self):
+        """RNF-011 Usabilidad. La sección actual lleva aria-current y el enlace del menú conserva su forma."""
+        self.client.force_login(crear_funcionario('menu.ui', 'funcionario'))
+        respuesta = self.client.get(reverse('agenda'))
+        self.assertContains(respuesta, f'aria-current="page" href="{reverse("agenda")}">Tareas</a>')
+        respuesta = self.client.get(reverse('actividades'))
+        self.assertContains(respuesta, f'aria-current="page" href="{reverse("actividades")}">Actividades</a>')
+        self.assertContains(respuesta, f'href="{reverse("agenda")}">Tareas</a>')
+
+    def test_las_pantallas_principales_tienen_un_solo_h1(self):
+        """RNF-012 Accesibilidad. Un solo título principal por pantalla."""
+        centro = Delegacion.objects.create(nombre='Centro')
+        self.client.force_login(crear_funcionario('h1.ui', 'delegado', delegacion=centro))
+        for url in (reverse('panel'), reverse('actividades'), reverse('agenda'), reverse('semaforo'), reverse('dashboard'), reverse('alertas'), reverse('ficha_personal'), reverse('actividad_nueva')):
+            self.assertContains(self.client.get(url), '<h1', count=1, msg_prefix=url)
+
+
 class FiltrosDeInterfazTests(TestCase):
     """RNF-011 y RNF-012. Los filtros de presentación solo agregan clases y ordenan campos."""
 
