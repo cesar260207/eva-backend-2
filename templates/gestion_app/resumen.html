@@ -62,12 +62,12 @@
         </thead>
         <tbody>
             {% for delegacion in delegaciones %}
-            <tr class="{% if delegacion.desviacion %}table-{{ delegacion.estado_class }}{% endif %}">
+            <tr class="{% if delegacion.desviacion %}fila-{{ delegacion.estado_class }}{% endif %}">
                 <td>{{ delegacion.nombre }}</td>
                 <td>{{ esperado }}%</td>
                 <td>{{ delegacion.cumplimiento }}%</td>
                 <td>{% if delegacion.diferencia != None %}{{ delegacion.diferencia }} puntos{% else %}-{% endif %}</td>
-                <td><span class="badge bg-{{ delegacion.estado_class }} rounded-pill">{{ delegacion.estado }}</span></td>
+                <td>{% include 'includes/_semaforo_insignia.html' with estado=delegacion.estado estado_class=delegacion.estado_class %}</td>
                 <td>{{ delegacion.ultimos_datos|date:'d-m-Y'|default:'Sin cálculo' }}</td>
                 <td>{% if perms.delegaciones_app.view_meta %}<a class="btn btn-sm btn-outline-sgr" href="{% url 'mantenedor_lista' 'metas' %}?q={{ delegacion.nombre|urlencode }}">Gestionar metas</a>{% endif %}</td>
             </tr>

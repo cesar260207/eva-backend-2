@@ -5,7 +5,7 @@
 
 <div class="row g-3 mb-4">
     {% for fila in resultado_delegacion %}
-    <div class="col-6 col-lg-3"><div class="metric amber h-100"><small>Cumplimiento de {{ fila.nombre }}</small><strong>{{ fila.cumplimiento }} %</strong><small><span class="badge bg-{{ fila.estado_class }}">{{ fila.estado }}</span> {{ periodo }}</small></div></div>
+    <div class="col-6 col-lg-3"><div class="metric amber h-100"><small>Cumplimiento de {{ fila.nombre }}</small><strong>{{ fila.cumplimiento }} %</strong><small>{% include 'includes/_semaforo_insignia.html' with estado=fila.estado estado_class=fila.estado_class %} {{ periodo }}</small></div></div>
     {% empty %}
     <div class="col-6 col-lg-3"><div class="metric amber h-100"><small>Cumplimiento</small><strong>-</strong><small>Sin período vigente o sin metas</small></div></div>
     {% endfor %}
@@ -49,7 +49,7 @@
             <table class="table table-sm align-middle">
                 <thead><tr><th>Folio</th><th>Responsable</th><th>Plazo</th><th>Estado</th></tr></thead>
                 <tbody>
-                {% for compromiso in tareas_abiertas %}<tr><td>{{ compromiso.folio }}</td><td>{{ compromiso.funcionario_responsable.nombre }}</td><td>{{ compromiso.fecha_comprometida|date:'d-m-Y' }}</td><td>{{ compromiso.get_estado_display }}{% if compromiso.vencido %} <span class="badge bg-danger">Vencida</span>{% endif %}</td></tr>
+                {% for compromiso in tareas_abiertas %}<tr><td>{{ compromiso.folio }}</td><td>{{ compromiso.funcionario_responsable.nombre }}</td><td>{{ compromiso.fecha_comprometida|date:'d-m-Y' }}</td><td>{{ compromiso.get_estado_display }}{% if compromiso.vencido %} {% include 'includes/_semaforo_insignia.html' with estado='Vencida' estado_class='danger' %}{% endif %}</td></tr>
                 {% empty %}<tr><td colspan="4" class="text-muted">No hay tareas abiertas.</td></tr>{% endfor %}
                 </tbody>
             </table>

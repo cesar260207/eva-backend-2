@@ -55,7 +55,7 @@
         <table class="table table-sm align-middle">
             <thead><tr><th>Delegación</th><th class="text-end">Cumplimiento</th><th>Estado</th></tr></thead>
             <tbody>
-            {% for fila in delegaciones %}<tr><td>{{ fila.nombre }}</td><td class="text-end">{{ fila.cumplimiento }} %</td><td><span class="badge bg-{{ fila.estado_class }}">{{ fila.estado }}</span></td></tr>
+            {% for fila in delegaciones %}<tr><td>{{ fila.nombre }}</td><td class="text-end">{{ fila.cumplimiento }} %</td><td>{% include 'includes/_semaforo_insignia.html' with estado=fila.estado estado_class=fila.estado_class %}</td></tr>
             {% empty %}<tr><td colspan="3" class="text-muted">Sin indicadores para el período vigente.</td></tr>{% endfor %}
             </tbody>
         </table>

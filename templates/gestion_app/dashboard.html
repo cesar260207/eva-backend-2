@@ -30,7 +30,7 @@
         </div>
         <div class="col-lg-5">
             <div class="small text-muted mb-2">Meta esperada al día · {{ hoy|date:'d-m-Y' }}</div>
-            <div class="progress"><div class="progress-bar bg-success" style="width: {{ esperado|unlocalize }}%"></div></div>
+            <div class="progress" role="img" aria-label="Esperado al día: {{ esperado }} %"><div class="progress-bar barra-success" style="width: {{ esperado|unlocalize }}%"></div></div>
             <div class="d-flex justify-content-between small mt-1"><span>0 %</span><strong>{{ esperado }} % esperado</strong><span>100 %</span></div>
         </div>
     </div>
@@ -40,14 +40,14 @@
 <div class="row g-3">
     {% for delegacion in delegaciones %}
     <div class="col-md-6 col-xl-4">
-        <div class="card h-100 {% if delegacion.desviacion %}border-{{ delegacion.estado_class }}{% endif %}">
+        <div class="card h-100 {% if delegacion.desviacion %}borde-{{ delegacion.estado_class }}{% endif %}">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0">{{ delegacion.nombre }}</h5>
-                    <span class="badge {% if delegacion.estado_class == 'success' %}badge-success-soft{% elif delegacion.estado_class == 'warning' %}badge-warning-soft{% elif delegacion.estado_class == 'danger' %}badge-danger-soft{% else %}bg-secondary{% endif %}">{{ delegacion.estado }}</span>
+                    <h2 class="h5 mb-0">{{ delegacion.nombre }}</h2>
+                    {% include 'includes/_semaforo_insignia.html' with estado=delegacion.estado estado_class=delegacion.estado_class %}
                 </div>
                 <div class="progress progress-lg mb-3">
-                    <div class="progress-bar bg-{{ delegacion.estado_class }}" role="progressbar" style="width: {{ delegacion.ancho|unlocalize }}%;" aria-valuenow="{{ delegacion.ancho|unlocalize }}" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar barra-{{ delegacion.estado_class }}" role="progressbar" style="width: {{ delegacion.ancho|unlocalize }}%;" aria-valuenow="{{ delegacion.ancho|unlocalize }}" aria-valuemin="0" aria-valuemax="100">
                         {{ delegacion.cumplimiento }}%
                     </div>
                 </div>

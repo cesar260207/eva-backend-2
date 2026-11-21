@@ -43,7 +43,7 @@
     <table class="table table-sm align-middle">
         <thead><tr><th>Delegación</th><th>Delegado</th><th class="text-end">Cumplimiento</th><th class="text-end">Diferencia con lo esperado</th><th>Estado</th></tr></thead>
         <tbody>
-        {% for fila in delegaciones %}<tr><td>{{ fila.nombre }}</td><td>{{ fila.delegados|default:'Sin delegado activo' }}</td><td class="text-end">{{ fila.cumplimiento }} %</td><td class="text-end">{{ fila.diferencia|default:'-' }}</td><td><span class="badge bg-{{ fila.estado_class }}">{{ fila.estado }}</span></td></tr>
+        {% for fila in delegaciones %}<tr><td>{{ fila.nombre }}</td><td>{{ fila.delegados|default:'Sin delegado activo' }}</td><td class="text-end">{{ fila.cumplimiento }} %</td><td class="text-end">{{ fila.diferencia|default:'-' }}</td><td>{% include 'includes/_semaforo_insignia.html' with estado=fila.estado estado_class=fila.estado_class %}</td></tr>
         {% empty %}<tr><td colspan="5" class="text-muted">Sin indicadores para el período vigente.</td></tr>{% endfor %}
         </tbody>
     </table>

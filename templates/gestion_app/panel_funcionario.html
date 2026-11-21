@@ -18,7 +18,7 @@
     </div>
     <div class="d-flex align-items-center gap-3">
         <div class="text-end"><small class="text-muted d-block">Cumplimiento</small><strong class="fs-4">{{ fila.cumplimiento }} %</strong></div>
-        <span class="badge bg-{{ fila.estado_class }}">{{ fila.estado }}</span>
+        {% include 'includes/_semaforo_insignia.html' with estado=fila.estado estado_class=fila.estado_class %}
         <a class="btn btn-outline-sgr" href="{% url 'delegacion_detalle' fila.nombre %}">Ver mi delegación</a>
     </div>
 </div>
@@ -53,7 +53,7 @@
         <table class="table table-sm align-middle">
             <thead><tr><th>Folio</th><th>Plazo</th><th>Estado</th></tr></thead>
             <tbody>
-            {% for compromiso in mis_compromisos %}<tr><td>{{ compromiso.folio }}</td><td>{{ compromiso.fecha_comprometida|date:'d-m-Y' }}</td><td>{{ compromiso.get_estado_display }}{% if compromiso.vencido %} <span class="badge bg-danger">Vencido</span>{% endif %}</td></tr>
+            {% for compromiso in mis_compromisos %}<tr><td>{{ compromiso.folio }}</td><td>{{ compromiso.fecha_comprometida|date:'d-m-Y' }}</td><td>{{ compromiso.get_estado_display }}{% if compromiso.vencido %} {% include 'includes/_semaforo_insignia.html' with estado='Vencido' estado_class='danger' %}{% endif %}</td></tr>
             {% empty %}<tr><td colspan="3" class="text-muted">No tienes tareas abiertas.</td></tr>{% endfor %}
             </tbody>
         </table>

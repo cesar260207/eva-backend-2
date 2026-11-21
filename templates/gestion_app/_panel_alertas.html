@@ -6,7 +6,7 @@
     <p class="small text-muted">Revisa estas situaciones para saber qué requiere atención en tu ámbito.</p>
     <ul class="list-unstyled mb-0">
     {% for alerta in alertas %}
-        <li class="mb-2"><span class="badge bg-{{ alerta.nivel }}">{{ alerta.etiqueta }}</span> <a class="text-dark" href="{{ alerta.url }}">{{ alerta.motivo }}</a></li>
+        <li class="mb-2">{% include 'includes/_semaforo_insignia.html' with estado=alerta.etiqueta estado_class=alerta.nivel %} <a class="text-dark" href="{{ alerta.url }}">{{ alerta.motivo }}</a></li>
     {% empty %}
         <li class="empty-state py-2">No hay alertas por ahora.</li>
     {% endfor %}

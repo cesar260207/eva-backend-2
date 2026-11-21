@@ -44,7 +44,7 @@
                     <td>{{ compromiso.delegacion }}</td>
                     <td class="col-fecha">{{ compromiso.fecha_comprometida|date:'d-m-Y' }}</td>
                     <td>{{ compromiso.funcionario_responsable.nombre|default:'Sin responsable' }}</td>
-                    <td><span class="badge {% if compromiso.estado_class == 'danger' %}badge-danger-soft{% elif compromiso.estado_class == 'success' %}badge-success-soft{% else %}badge-warning-soft{% endif %}">{{ compromiso.estado_display }}</span></td>
+                    <td>{% include 'includes/_semaforo_insignia.html' with estado=compromiso.estado_display estado_class=compromiso.estado_class %}</td>
                     <td>
                         <div class="acciones-tarea">
                             {% if compromiso.puede_modificar %}

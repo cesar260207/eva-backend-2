@@ -33,7 +33,7 @@
                     <h5 class="mb-1">{{ solicitud.folio }}</h5>
                     <small class="text-muted">{{ solicitud.delegacion }} · {{ solicitud.eje }}</small>
                 </div>
-                <span class="badge bg-{{ solicitud.estado_class }} rounded-pill text-uppercase">{{ solicitud.estado_display }}</span>
+                {% include 'includes/_semaforo_insignia.html' with estado=solicitud.estado_display estado_class=solicitud.estado_class %}
             </div>
             <p class="mb-3">{{ solicitud.descripcion }}</p>
             <div class="row small text-muted mb-3">

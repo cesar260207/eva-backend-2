@@ -101,7 +101,7 @@
             {% for fila in filas %}
                 <tr>
                     {% for valor in fila.valores %}<td>{{ valor }}</td>{% endfor %}
-                    {% if config.baja %}<td>{% if fila.activo %}<span class="badge bg-success">Activo</span>{% else %}<span class="badge bg-secondary">Inactivo</span>{% endif %}</td>{% endif %}
+                    {% if config.baja %}<td>{% if fila.activo %}{% include 'includes/_semaforo_insignia.html' with estado='Activo' estado_class='success' %}{% else %}{% include 'includes/_semaforo_insignia.html' with estado='Inactivo' estado_class='secondary' %}{% endif %}</td>{% endif %}
                     <td>
                         <div class="d-flex flex-wrap gap-2">
                             {% if puede.change %}<a class="btn btn-sm btn-outline-sgr" href="{% url 'mantenedor_editar' config.slug fila.pk %}">Modificar</a>
