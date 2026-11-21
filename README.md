@@ -368,6 +368,24 @@ Las pruebas están en `delegaciones_app`:
 `plan_pruebas` ejecuta todo y escribe `PLAN_DE_PRUEBAS.md`: cobertura por caso de uso y por
 requisito, la tabla CP, CU, RF, método de prueba y resultado, y las fichas de login.
 
+## Preguntas pendientes para el municipio
+
+La matriz SGR y el documento de requerimientos de octubre 2026 no coinciden en algunos valores. El sistema
+deja cada valor como parámetro versionado del período (mantenedor «Parámetros del período») y usa el del
+documento de octubre hasta que el municipio confirme:
+
+| Tema | Matriz SGR | Documento de octubre | Valor en el sistema | Parámetro |
+|---|---|---|---|---|
+| Tope del cumplimiento de cada ítem | 150 % | 120 % (regla 7) | 120 % | `maximo_cumplimiento` |
+| Valor de un reclamo | -20 % en la hoja RECLAMOS y en «Coordinador DISERCO» y «Gestor social 1»; -30 % en las demás hojas de cargo | No lo fija | -30 % | `valor_reclamo` |
+| Ponderaciones de «Planificación y control» | Suman 85 % | No lo fija | Se cargan como están; para iniciar el período el sistema exige 100 % por cargo | Ítems medibles |
+| Meta del ítem «Emergencia» | En varias hojas coincide con el avance (por ejemplo, 304) | No lo fija | Se carga como está | Ítems medibles y metas |
+| Felicitación dirigida a un gestor | No lo distingue | No valen las del usuario al gestor por mensaje; las informa el delegado | Se acepta para cualquier funcionario si tiene respaldo formal y la informa el delegado | Ajustes |
+| Organizaciones sin delegación | 2 del territorio «ALFALFARES» y 22 sin territorio | No lo fija | Quedan sin delegación y sin verificar, para asignar a mano | Organizaciones |
+
+`cargar_matriz` crea estos parámetros con los valores de la tabla, pero no pisa un valor que la
+coordinación ya haya definido en el período.
+
 ## Alcance y requisitos pendientes
 
 Todos los casos de uso de la especificación detallada (CU-01 a CU-30, con sus extensiones) tienen pruebas. Entre los requisitos
