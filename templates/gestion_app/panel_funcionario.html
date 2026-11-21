@@ -26,12 +26,12 @@
 <div class="row g-3 mb-4">
     <div class="col-lg-6"><div class="panel h-100">
         <div class="section-label">Tus funciones</div>
-        <div class="d-grid gap-2">
-            <a class="btn btn-sgr" href="{% url 'actividad_nueva' %}">Registrar actividad con evidencia</a>
-            <a class="btn btn-outline-sgr" href="{% url 'actividades' %}">Mis actividades</a>
-            {% if puede_revisar %}<a class="btn btn-outline-sgr" href="{% url 'actividades' %}?estado=pendiente">Revisar evidencias de mi delegación</a>{% endif %}
-            <a class="btn btn-outline-sgr" href="{% url 'agenda' %}">Ver tubo de trabajo</a>
-            <a class="btn btn-outline-sgr" href="{% url 'ficha_personal' %}">Mi ficha y mis metas</a>
+        <div class="mosaicos mosaicos-panel">
+            <a class="mosaico mosaico-principal" href="{% url 'actividad_nueva' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='subir' %}</span><span class="mosaico-texto">Registrar actividad con evidencia{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+            <a class="mosaico" href="{% url 'actividades' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='lista' %}</span><span class="mosaico-texto">Mis actividades{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+            {% if puede_revisar %}<a class="mosaico" href="{% url 'actividades' %}?estado=pendiente"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='revisar' %}</span><span class="mosaico-texto">Revisar evidencias de mi delegación{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>{% endif %}
+            <a class="mosaico" href="{% url 'agenda' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='tubo' %}</span><span class="mosaico-texto">Ver tubo de trabajo{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+            <a class="mosaico" href="{% url 'ficha_personal' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='usuario' %}</span><span class="mosaico-texto">Mi ficha y mis metas{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
         </div>
     </div></div>
     <div class="col-lg-6">{% include 'gestion_app/_panel_alertas.html' %}</div>

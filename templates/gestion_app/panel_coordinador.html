@@ -14,22 +14,22 @@
 <div class="row g-3 mb-4">
     <div class="col-lg-4"><div class="panel h-100">
         <div class="section-label">Mantenedores autorizados</div>
-        <ul class="list-unstyled mb-0">
+        <ul class="lista-enlaces">
         {% for m in mantenedores %}
-            <li class="mb-2"><a href="{% url 'mantenedor_lista' m.slug %}">{{ m.titulo }}</a></li>
+            <li><a href="{% url 'mantenedor_lista' m.slug %}">{{ m.titulo }}{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</a></li>
         {% endfor %}
         </ul>
     </div></div>
     <div class="col-lg-4"><div class="panel h-100">
         <div class="section-label">Coordinación de delegados</div>
-        <div class="d-grid gap-2 mb-3">
-            <a class="btn btn-sgr" href="{% url 'delegados' %}">Delegados y asignaciones</a>
+        <div class="mosaicos mosaicos-panel mb-3">
+            <a class="mosaico mosaico-principal" href="{% url 'delegados' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='equipo' %}</span><span class="mosaico-texto">Delegados y asignaciones{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
         </div>
         <div class="section-label">Transacciones autorizadas</div>
-        <div class="d-grid gap-2">
-            <a class="btn btn-outline-sgr" href="{% url 'actividades' %}?estado=pendiente">Actividades por revisar</a>
-            <a class="btn btn-outline-sgr" href="{% url 'agenda' %}">Ver tubo de trabajo</a>
-            <a class="btn btn-outline-sgr" href="{% url 'informe' %}">Informes</a>
+        <div class="mosaicos mosaicos-panel">
+            <a class="mosaico" href="{% url 'actividades' %}?estado=pendiente"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='revisar' %}</span><span class="mosaico-texto">Actividades por revisar{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+            <a class="mosaico" href="{% url 'agenda' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='tubo' %}</span><span class="mosaico-texto">Ver tubo de trabajo{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+            <a class="mosaico" href="{% url 'informe' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='documento' %}</span><span class="mosaico-texto">Informes{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
         </div>
     </div></div>
     <div class="col-lg-4">{% include 'gestion_app/_panel_alertas.html' %}</div>
