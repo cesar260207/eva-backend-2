@@ -1,3 +1,52 @@
 {% extends 'base.html' %}
+{% load static sgr_interfaz %}
 {% block title %}Ingresar | SGR{% endblock %}
-{% block content %}<div class="row justify-content-center"><div class="col-md-6 col-lg-4"><div class="panel"><div class="page-kicker">Acceso institucional</div><h1 class="page-title h3 mb-3">Ingresar al SGR</h1><p class="text-muted">Usa tu cuenta para acceder a las funciones autorizadas por tu perfil y delegación.</p><form method="post">{% csrf_token %}{{ form.as_p }}<button class="btn btn-sgr w-100" type="submit">Ingresar</button></form><p class="small text-center mt-3 mb-0"><a href="{% url 'password_reset' %}">¿Olvidaste tu contraseña?</a></p></div></div></div>{% endblock %}
+{% block encabezado %}{% endblock %}
+{% block main_clase %}ingreso{% endblock %}
+{% block content %}
+<div class="ingreso-fondo" aria-hidden="true">
+    <svg viewBox="0 0 300 300" focusable="false">
+        <circle class="orbita-anillo" cx="150" cy="150" r="120"/>
+        <circle class="orbita-anillo-solido" cx="150" cy="150" r="80"/>
+        <g class="orbita-giro-ingreso">
+            <circle class="orbita-punto" cx="150" cy="30" r="8"/>
+            <circle class="orbita-punto" cx="254" cy="210" r="8"/>
+            <circle class="orbita-punto" cx="46" cy="210" r="8"/>
+        </g>
+    </svg>
+</div>
+<div class="ingreso-contenido">
+    <section class="ingreso-tarjeta" aria-labelledby="titulo-ingreso">
+        <a class="ingreso-marca" href="{% url 'inicio' %}">
+            <span class="brand-mark" aria-hidden="true">SGR</span>
+            <span>Gestión de Resultados</span>
+        </a>
+        <h1 class="ingreso-titulo" id="titulo-ingreso">Ingresar al SGR</h1>
+        <p class="ingreso-subtitulo">Municipalidad de La Serena</p>
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger" role="alert" tabindex="-1" data-resumen-errores>
+            {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+        </div>
+        {% endif %}
+        <form method="post" novalidate>
+            {% csrf_token %}
+            <div class="campo">
+                <label class="form-label" for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+                {{ form.username|campo_sgr:"form-control-lg" }}
+                {% if form.username.errors %}<div class="invalid-feedback d-block" id="{{ form.username.auto_id }}_error">{% for error in form.username.errors %}<span class="d-block">{{ error }}</span>{% endfor %}</div>{% endif %}
+            </div>
+            <div class="campo">
+                <label class="form-label" for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>
+                <div class="campo-clave">
+                    {{ form.password|campo_sgr:"form-control-lg" }}
+                    <button class="btn-ver-clave" type="button" data-ver-clave="{{ form.password.id_for_label }}" aria-pressed="false" aria-label="Mostrar contraseña" hidden><svg class="icono" aria-hidden="true" focusable="false"><use href="{% static 'icons/sgr-iconos.svg' %}#i-ojo"></use></svg></button>
+                </div>
+                {% if form.password.errors %}<div class="invalid-feedback d-block" id="{{ form.password.auto_id }}_error">{% for error in form.password.errors %}<span class="d-block">{{ error }}</span>{% endfor %}</div>{% endif %}
+            </div>
+            <button class="btn btn-sgr btn-ingresar" type="submit">Ingresar</button>
+        </form>
+        <p class="ingreso-ayuda"><a href="{% url 'password_reset' %}">¿Olvidaste tu contraseña?</a></p>
+    </section>
+    <p class="ingreso-volver"><a href="{% url 'inicio' %}">Volver al inicio</a></p>
+</div>
+{% endblock %}
