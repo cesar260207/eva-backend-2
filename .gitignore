@@ -29,3 +29,7 @@ docs/evaluacion/
 # Django build
 /staticfiles/
 /media/
+
+# Datos del cliente (Excel y Word con datos personales): se quedan solo en el computador
+data/*.xlsx
+docs/requerimientos/
