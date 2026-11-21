@@ -1,0 +1,27 @@
+digraph G {
+rankdir=LR; newrank=true; nodesep=0.22; ranksep=0.75; splines=true; pad=0.25;
+graph [fontname="DejaVu Sans", fontsize=15, labelloc=t, labeljust=l];
+node [fontname="DejaVu Sans", fontsize=11];
+edge [fontname="DejaVu Sans", fontsize=9, color="#333333", fontcolor="#444444"];
+subgraph cluster_s { label=<<b>Gestionar evidencias (G03 · EP-03)</b>>; color="#333333"; penwidth=1.4; margin=14;
+"evi_subir" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Subir evidencia</b><br/><font point-size="9" color="#555555">CU-09</font>>];
+"evi_ver" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Ver evidencia</b><br/><font point-size="9" color="#555555">CU-52</font>>];
+"act_buscar" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Buscar actividad por código<br/><font point-size="9" color="#555555">CU-10.1</font>>];
+"evi_valid" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Validar archivo de evidencia<br/><font point-size="9" color="#555555">CU-09.1</font>>];
+"auditar" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Registrar en auditoría<br/><font point-size="9" color="#555555">CU-45</font>>];
+"evi_invalida" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Rechazar carga inválida<br/><font point-size="9" color="#555555">CU-09.2</font>>];
+"evi_bloqueo" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Bloquear carga de evidencia<br/><font point-size="9" color="#555555">CU-53</font>>];
+}
+"A_Usuario" [shape=none, image="cu_v2/dot/_actor.png", labelloc=b, imagepos=tc, height=1.05, width=1.2, fixedsize=true, label=<<b>Usuario<br/>(cualquier perfil)</b>>, fontsize=11];
+{rank=same; "A_Usuario";}
+label=<<font point-size="10" color="#444444">Rojo: caso de detalle · Gris: incluido (siempre ocurre) · Café: extensión (solo si se cumple su condición) · Triángulo: herencia</font>>; labelloc=b; labeljust=r;
+{rank=same; "evi_subir"; "evi_ver";}
+"A_Usuario" -> "evi_subir" [arrowhead=none, penwidth=1.1, weight=3];
+"evi_subir" -> "act_buscar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"evi_subir" -> "evi_valid" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"evi_subir" -> "auditar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Usuario" -> "evi_ver" [arrowhead=none, penwidth=1.1, weight=3];
+"evi_ver" -> "act_buscar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"evi_subir" -> "evi_bloqueo" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"evi_valid" -> "evi_invalida" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»"];
+}

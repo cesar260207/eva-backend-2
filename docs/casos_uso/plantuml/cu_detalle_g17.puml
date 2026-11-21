@@ -1,0 +1,62 @@
+@startuml cu_detalle_g17
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #8E2B24
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+}
+skinparam ArrowFontSize 11
+
+left to right direction
+title Consultar resultados (G17 · EP-05): caso de uso detallado
+actor "Usuario" as Usuario
+rectangle "Consultar resultados" {
+  usecase "CU-06\nSeguimiento de avance (ficha personal)" as ficha
+  usecase "CU-16\nConsultar semáforo de cumplimiento" as semaforo
+  usecase "CU-17\nComparar avance esperado y real" as comparar
+  usecase "CU-18\nConsultar resumen ejecutivo" as resumen
+  usecase "CU-136\nConsultar territorio y delegación" as tablero
+  usecase "CU-31\nConsultar alertas" as alertas
+  usecase "CU-29.1\nRestricción de búsqueda por ámbito" as ambito
+  usecase "CU-07\nCálculo automático de cumplimiento" as calculo
+  usecase "CU-16.1\nCalcular estado del semáforo" as estado_sem
+  usecase "CU-17.1\nCalcular diferencia de avance" as diferencia
+  usecase "CU-18.1\nConsolidar datos de delegación" as consolidar
+  usecase "CU-14.2\nGenerar alerta por vencimiento próximo" as alerta
+  usecase "CU-06.2\nDestacar meta cumplida" as cumplida
+  usecase "CU-07.3\nMostrar detalle en reporte" as detalle_formula
+  usecase "CU-17.2\nDestacar desviación significativa" as desviacion
+  usecase "CU-18.2\nNavegar al detalle de gestión" as navegar
+  usecase "CU-26.1\nDenegar acceso por ámbito" as denegar
+}
+Usuario --> ficha
+Usuario --> semaforo
+Usuario --> comparar
+Usuario --> resumen
+Usuario --> tablero
+Usuario --> alertas
+ficha ..> calculo : <<include>>
+ficha ..> ambito : <<include>>
+semaforo ..> estado_sem : <<include>>
+semaforo ..> ambito : <<include>>
+comparar ..> diferencia : <<include>>
+comparar ..> ambito : <<include>>
+resumen ..> consolidar : <<include>>
+resumen ..> ambito : <<include>>
+tablero ..> ambito : <<include>>
+alertas ..> alerta : <<include>>
+alertas ..> ambito : <<include>>
+cumplida ..> ficha : <<extend>>
+detalle_formula ..> calculo : <<extend>>
+desviacion ..> diferencia : <<extend>>
+navegar ..> resumen : <<extend>>
+denegar ..> ambito : <<extend>>
+@enduml

@@ -1,0 +1,85 @@
+@startuml cu_detalle_g15
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #8E2B24
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+}
+skinparam ArrowFontSize 11
+
+left to right direction
+title Gestionar períodos y parámetros (G15 · EP-08): caso de uso detallado
+actor "Coordinador" as Coordinador
+actor "Administrador" as Administrador
+rectangle "Gestionar períodos y parámetros" {
+  usecase "CU-117\nRegistrar período" as per_reg
+  usecase "CU-118\nConsultar períodos" as per_con
+  usecase "CU-119\nModificar período" as per_mod
+  usecase "CU-120\nEliminar período" as per_eli
+  usecase "CU-28\nAbrir, cerrar o reabrir período" as per_estado
+  usecase "CU-121\nRegistrar parámetro" as par_reg
+  usecase "CU-122\nConsultar parámetros" as par_con
+  usecase "CU-25\nModificar parámetro" as par_mod
+  usecase "CU-123\nEliminar parámetro" as par_eli
+  usecase "CU-124\nValidar datos de período" as per_valid
+  usecase "CU-125\nValidar datos de parámetro" as par_valid
+  usecase "CU-29\nBuscar y filtrar" as buscar
+  usecase "CU-45\nRegistrar en auditoría" as auditar
+  usecase "CU-69\nInformar error de validación" as error_valid
+  usecase "CU-126\nExigir motivo de reapertura" as reabrir
+  usecase "CU-28.1\nRestricción por período cerrado" as periodo_cerrado
+  usecase "CU-127\nImpedir eliminación con datos relacionados" as protegido
+  usecase "CU-70\nConsulta sin coincidencias" as sin_resultados
+}
+Coordinador --> per_reg
+Administrador --> per_reg
+Coordinador --> per_con
+Administrador --> per_con
+Coordinador --> per_mod
+Administrador --> per_mod
+Coordinador --> per_eli
+Administrador --> per_eli
+Coordinador --> per_estado
+Administrador --> per_estado
+Administrador --> par_reg
+Coordinador --> par_con
+Administrador --> par_con
+Coordinador --> par_mod
+Administrador --> par_mod
+Administrador --> par_eli
+per_reg ..> per_valid : <<include>>
+per_reg ..> auditar : <<include>>
+per_con ..> buscar : <<include>>
+per_mod ..> buscar : <<include>>
+per_mod ..> per_valid : <<include>>
+per_mod ..> auditar : <<include>>
+per_eli ..> buscar : <<include>>
+per_eli ..> auditar : <<include>>
+per_estado ..> buscar : <<include>>
+per_estado ..> auditar : <<include>>
+par_reg ..> par_valid : <<include>>
+par_reg ..> auditar : <<include>>
+par_con ..> buscar : <<include>>
+par_mod ..> buscar : <<include>>
+par_mod ..> par_valid : <<include>>
+par_mod ..> auditar : <<include>>
+par_eli ..> buscar : <<include>>
+par_eli ..> auditar : <<include>>
+error_valid ..> per_valid : <<extend>>
+error_valid ..> par_valid : <<extend>>
+reabrir ..> per_estado : <<extend>>
+periodo_cerrado ..> per_mod : <<extend>>
+periodo_cerrado ..> par_reg : <<extend>>
+periodo_cerrado ..> par_mod : <<extend>>
+periodo_cerrado ..> par_eli : <<extend>>
+protegido ..> per_eli : <<extend>>
+sin_resultados ..> buscar : <<extend>>
+@enduml

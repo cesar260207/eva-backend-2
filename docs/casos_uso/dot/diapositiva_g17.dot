@@ -1,0 +1,51 @@
+digraph G {
+rankdir=LR; newrank=true; nodesep=0.22; ranksep=0.75; splines=true; pad=0.25;
+graph [fontname="DejaVu Sans", fontsize=15, labelloc=t, labeljust=l];
+node [fontname="DejaVu Sans", fontsize=11];
+edge [fontname="DejaVu Sans", fontsize=9, color="#333333", fontcolor="#444444"];
+subgraph cluster_s { label=<<b>Consultar resultados (G17 · EP-05)</b>>; color="#333333"; penwidth=1.4; margin=14;
+"ficha" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Seguimiento de avance (ficha personal)</b><br/><font point-size="9" color="#555555">CU-06</font>>];
+"semaforo" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Consultar semáforo de cumplimiento</b><br/><font point-size="9" color="#555555">CU-16</font>>];
+"comparar" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Comparar avance esperado y real</b><br/><font point-size="9" color="#555555">CU-17</font>>];
+"resumen" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Consultar resumen ejecutivo</b><br/><font point-size="9" color="#555555">CU-18</font>>];
+"tablero" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Consultar territorio y delegación</b><br/><font point-size="9" color="#555555">CU-136</font>>];
+"alertas" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Consultar alertas</b><br/><font point-size="9" color="#555555">CU-31</font>>];
+"ambito" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Restricción de búsqueda por ámbito<br/><font point-size="9" color="#555555">CU-29.1</font>>];
+"calculo" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Cálculo automático de cumplimiento<br/><font point-size="9" color="#555555">CU-07</font>>];
+"estado_sem" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Calcular estado del semáforo<br/><font point-size="9" color="#555555">CU-16.1</font>>];
+"diferencia" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Calcular diferencia de avance<br/><font point-size="9" color="#555555">CU-17.1</font>>];
+"consolidar" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Consolidar datos de delegación<br/><font point-size="9" color="#555555">CU-18.1</font>>];
+"alerta" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Generar alerta por vencimiento próximo<br/><font point-size="9" color="#555555">CU-14.2</font>>];
+"cumplida" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Destacar meta cumplida<br/><font point-size="9" color="#555555">CU-06.2</font>>];
+"detalle_formula" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Mostrar detalle en reporte<br/><font point-size="9" color="#555555">CU-07.3</font>>];
+"desviacion" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Destacar desviación significativa<br/><font point-size="9" color="#555555">CU-17.2</font>>];
+"navegar" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Navegar al detalle de gestión<br/><font point-size="9" color="#555555">CU-18.2</font>>];
+"denegar" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Denegar acceso por ámbito<br/><font point-size="9" color="#555555">CU-26.1</font>>];
+}
+"A_Usuario" [shape=none, image="cu_v2/dot/_actor.png", labelloc=b, imagepos=tc, height=1.05, width=1.2, fixedsize=true, label=<<b>Usuario<br/>(cualquier perfil)</b>>, fontsize=11];
+{rank=same; "A_Usuario";}
+label=<<font point-size="10" color="#444444">Rojo: caso de detalle · Gris: incluido (siempre ocurre) · Café: extensión (solo si se cumple su condición) · Triángulo: herencia</font>>; labelloc=b; labeljust=r;
+{rank=same; "ficha"; "semaforo"; "comparar"; "resumen"; "tablero"; "alertas";}
+"A_Usuario" -> "ficha" [arrowhead=none, penwidth=1.1, weight=3];
+"ficha" -> "calculo" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"ficha" -> "ambito" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Usuario" -> "semaforo" [arrowhead=none, penwidth=1.1, weight=3];
+"semaforo" -> "estado_sem" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"semaforo" -> "ambito" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Usuario" -> "comparar" [arrowhead=none, penwidth=1.1, weight=3];
+"comparar" -> "diferencia" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"comparar" -> "ambito" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Usuario" -> "resumen" [arrowhead=none, penwidth=1.1, weight=3];
+"resumen" -> "consolidar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"resumen" -> "ambito" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Usuario" -> "tablero" [arrowhead=none, penwidth=1.1, weight=3];
+"tablero" -> "ambito" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Usuario" -> "alertas" [arrowhead=none, penwidth=1.1, weight=3];
+"alertas" -> "alerta" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"alertas" -> "ambito" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"ficha" -> "cumplida" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"resumen" -> "navegar" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"calculo" -> "detalle_formula" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»"];
+"diferencia" -> "desviacion" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»"];
+"ambito" -> "denegar" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»"];
+}

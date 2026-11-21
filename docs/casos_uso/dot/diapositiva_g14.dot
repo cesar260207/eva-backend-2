@@ -1,0 +1,42 @@
+digraph G {
+rankdir=LR; newrank=true; nodesep=0.22; ranksep=0.75; splines=true; pad=0.25;
+graph [fontname="DejaVu Sans", fontsize=15, labelloc=t, labeljust=l];
+node [fontname="DejaVu Sans", fontsize=11];
+edge [fontname="DejaVu Sans", fontsize=9, color="#333333", fontcolor="#444444"];
+subgraph cluster_s { label=<<b>Gestionar catálogo (G14 · EP-08)</b>>; color="#333333"; penwidth=1.4; margin=14;
+"cat_reg" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Registrar elemento de catálogo</b><br/><font point-size="9" color="#555555">CU-112</font>>];
+"cat_con" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Consultar elementos del catálogo</b><br/><font point-size="9" color="#555555">CU-113</font>>];
+"cat_mod" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Modificar elemento de catálogo</b><br/><font point-size="9" color="#555555">CU-114</font>>];
+"cat_eli" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Eliminar elemento de catálogo</b><br/><font point-size="9" color="#555555">CU-115</font>>];
+"cat_valid" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Validar datos de catálogo<br/><font point-size="9" color="#555555">CU-116</font>>];
+"buscar" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Buscar y filtrar<br/><font point-size="9" color="#555555">CU-29</font>>];
+"auditar" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Registrar en auditoría<br/><font point-size="9" color="#555555">CU-45</font>>];
+"cat_error" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Restringir elemento duplicado<br/><font point-size="9" color="#555555">CU-27.1</font>>];
+"desactivar" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Desactivar en vez de eliminar<br/><font point-size="9" color="#555555">CU-85</font>>];
+"sin_resultados" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Consulta sin coincidencias<br/><font point-size="9" color="#555555">CU-70</font>>];
+}
+"A_Coordinador" [shape=none, image="cu_v2/dot/_actor.png", labelloc=b, imagepos=tc, height=1.05, width=1.2, fixedsize=true, label=<<b>Coordinador</b>>, fontsize=11];
+"A_Administrador" [shape=none, image="cu_v2/dot/_actor.png", labelloc=b, imagepos=tc, height=1.05, width=1.2, fixedsize=true, label=<<b>Administrador</b>>, fontsize=11];
+{rank=same; "A_Coordinador"; "A_Administrador";}
+label=<<font point-size="10" color="#444444">Rojo: caso de detalle · Gris: incluido (siempre ocurre) · Café: extensión (solo si se cumple su condición) · Triángulo: herencia</font>>; labelloc=b; labeljust=r;
+{rank=same; "cat_reg"; "cat_con"; "cat_mod"; "cat_eli";}
+"A_Coordinador" -> "cat_reg" [arrowhead=none, penwidth=1.1, weight=3];
+"A_Administrador" -> "cat_reg" [arrowhead=none, penwidth=1.1, weight=3];
+"cat_reg" -> "cat_valid" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"cat_reg" -> "auditar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Coordinador" -> "cat_con" [arrowhead=none, penwidth=1.1, weight=3];
+"A_Administrador" -> "cat_con" [arrowhead=none, penwidth=1.1, weight=3];
+"cat_con" -> "buscar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Coordinador" -> "cat_mod" [arrowhead=none, penwidth=1.1, weight=3];
+"A_Administrador" -> "cat_mod" [arrowhead=none, penwidth=1.1, weight=3];
+"cat_mod" -> "buscar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"cat_mod" -> "cat_valid" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"cat_mod" -> "auditar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Coordinador" -> "cat_eli" [arrowhead=none, penwidth=1.1, weight=3];
+"A_Administrador" -> "cat_eli" [arrowhead=none, penwidth=1.1, weight=3];
+"cat_eli" -> "buscar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"cat_eli" -> "auditar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"cat_eli" -> "desactivar" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"cat_valid" -> "cat_error" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»"];
+"buscar" -> "sin_resultados" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»"];
+}

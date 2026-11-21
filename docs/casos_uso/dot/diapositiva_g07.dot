@@ -1,0 +1,41 @@
+digraph G {
+rankdir=LR; newrank=true; nodesep=0.22; ranksep=0.75; splines=true; pad=0.25;
+graph [fontname="DejaVu Sans", fontsize=15, labelloc=t, labeljust=l];
+node [fontname="DejaVu Sans", fontsize=11];
+edge [fontname="DejaVu Sans", fontsize=9, color="#333333", fontcolor="#444444"];
+subgraph cluster_s { label=<<b>Gestionar ausencias (G07 · EP-02)</b>>; color="#333333"; penwidth=1.4; margin=14;
+"au_reg" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Registrar ausencia</b><br/><font point-size="9" color="#555555">CU-71</font>>];
+"au_con" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Consultar ausencias</b><br/><font point-size="9" color="#555555">CU-72</font>>];
+"au_mod" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Modificar ausencia</b><br/><font point-size="9" color="#555555">CU-73</font>>];
+"au_valid" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Validar datos de ausencia<br/><font point-size="9" color="#555555">CU-74</font>>];
+"buscar" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Buscar y filtrar<br/><font point-size="9" color="#555555">CU-29</font>>];
+"auditar" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Registrar en auditoría<br/><font point-size="9" color="#555555">CU-45</font>>];
+"error_valid" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Informar error de validación<br/><font point-size="9" color="#555555">CU-69</font>>];
+"superpuesta" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Rechazar ausencia superpuesta<br/><font point-size="9" color="#555555">CU-75</font>>];
+"periodo_cerrado" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Restricción por período cerrado<br/><font point-size="9" color="#555555">CU-28.1</font>>];
+"sin_resultados" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Consulta sin coincidencias<br/><font point-size="9" color="#555555">CU-70</font>>];
+}
+"A_Delegado" [shape=none, image="cu_v2/dot/_actor.png", labelloc=b, imagepos=tc, height=1.05, width=1.2, fixedsize=true, label=<<b>Delegado</b>>, fontsize=11];
+"A_Administrador" [shape=none, image="cu_v2/dot/_actor.png", labelloc=b, imagepos=tc, height=1.05, width=1.2, fixedsize=true, label=<<b>Administrador</b>>, fontsize=11];
+"A_Coordinador" [shape=none, image="cu_v2/dot/_actor.png", labelloc=b, imagepos=tc, height=1.05, width=1.2, fixedsize=true, label=<<b>Coordinador</b>>, fontsize=11];
+{rank=same; "A_Delegado"; "A_Administrador"; "A_Coordinador";}
+label=<<font point-size="10" color="#444444">Rojo: caso de detalle · Gris: incluido (siempre ocurre) · Café: extensión (solo si se cumple su condición) · Triángulo: herencia</font>>; labelloc=b; labeljust=r;
+{rank=same; "au_reg"; "au_con"; "au_mod";}
+"A_Delegado" -> "au_reg" [arrowhead=none, penwidth=1.1, weight=3];
+"A_Administrador" -> "au_reg" [arrowhead=none, penwidth=1.1, weight=3];
+"au_reg" -> "au_valid" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"au_reg" -> "auditar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Coordinador" -> "au_con" [arrowhead=none, penwidth=1.1, weight=3];
+"A_Administrador" -> "au_con" [arrowhead=none, penwidth=1.1, weight=3];
+"au_con" -> "buscar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Coordinador" -> "au_mod" [arrowhead=none, penwidth=1.1, weight=3];
+"A_Administrador" -> "au_mod" [arrowhead=none, penwidth=1.1, weight=3];
+"au_mod" -> "buscar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"au_mod" -> "au_valid" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"au_mod" -> "auditar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"au_reg" -> "periodo_cerrado" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"au_mod" -> "periodo_cerrado" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"au_valid" -> "error_valid" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»"];
+"au_valid" -> "superpuesta" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»"];
+"buscar" -> "sin_resultados" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»"];
+}

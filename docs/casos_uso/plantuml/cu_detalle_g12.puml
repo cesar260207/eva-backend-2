@@ -1,0 +1,48 @@
+@startuml cu_detalle_g12
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #8E2B24
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+}
+skinparam ArrowFontSize 11
+
+left to right direction
+title Gestionar roles (G12 · EP-08): caso de uso detallado
+actor "Administrador" as Administrador
+rectangle "Gestionar roles" {
+  usecase "CU-98\nRegistrar rol" as rol_reg
+  usecase "CU-99\nConsultar roles" as rol_con
+  usecase "CU-100\nModificar rol" as rol_mod
+  usecase "CU-101\nEliminar rol" as rol_eli
+  usecase "CU-102\nValidar datos de rol" as rol_valid
+  usecase "CU-29\nBuscar y filtrar" as buscar
+  usecase "CU-45\nRegistrar en auditoría" as auditar
+  usecase "CU-69\nInformar error de validación" as error_valid
+  usecase "CU-103\nImpedir eliminar rol del sistema" as rol_sistema
+  usecase "CU-70\nConsulta sin coincidencias" as sin_resultados
+}
+Administrador --> rol_reg
+Administrador --> rol_con
+Administrador --> rol_mod
+Administrador --> rol_eli
+rol_reg ..> rol_valid : <<include>>
+rol_reg ..> auditar : <<include>>
+rol_con ..> buscar : <<include>>
+rol_mod ..> buscar : <<include>>
+rol_mod ..> rol_valid : <<include>>
+rol_mod ..> auditar : <<include>>
+rol_eli ..> buscar : <<include>>
+rol_eli ..> auditar : <<include>>
+error_valid ..> rol_valid : <<extend>>
+rol_sistema ..> rol_eli : <<extend>>
+sin_resultados ..> buscar : <<extend>>
+@enduml

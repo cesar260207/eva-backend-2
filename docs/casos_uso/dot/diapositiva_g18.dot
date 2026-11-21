@@ -1,0 +1,24 @@
+digraph G {
+rankdir=LR; newrank=true; nodesep=0.22; ranksep=0.75; splines=true; pad=0.25;
+graph [fontname="DejaVu Sans", fontsize=15, labelloc=t, labeljust=l];
+node [fontname="DejaVu Sans", fontsize=11];
+edge [fontname="DejaVu Sans", fontsize=9, color="#333333", fontcolor="#444444"];
+subgraph cluster_s { label=<<b>Generar informes (G18 · EP-06)</b>>; color="#333333"; penwidth=1.4; margin=14;
+"informe" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Generar informe</b><br/><font point-size="9" color="#555555">CU-20</font>>];
+"inf_cons" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Consolidar datos filtrados<br/><font point-size="9" color="#555555">CU-20.1</font>>];
+"inf_ambito" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Restringir por ámbito de permisos<br/><font point-size="9" color="#555555">CU-20.2</font>>];
+"imprimir" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Imprimir informe<br/><font point-size="9" color="#555555">CU-137</font>>];
+"exportar" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Exportar informe<br/><font point-size="9" color="#555555">CU-138</font>>];
+"sin_resultados" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Consulta sin coincidencias<br/><font point-size="9" color="#555555">CU-70</font>>];
+}
+"A_Usuario" [shape=none, image="cu_v2/dot/_actor.png", labelloc=b, imagepos=tc, height=1.05, width=1.2, fixedsize=true, label=<<b>Usuario<br/>(cualquier perfil)</b>>, fontsize=11];
+{rank=same; "A_Usuario";}
+label=<<font point-size="10" color="#444444">Rojo: caso de detalle · Gris: incluido (siempre ocurre) · Café: extensión (solo si se cumple su condición) · Triángulo: herencia</font>>; labelloc=b; labeljust=r;
+{rank=same; "informe";}
+"A_Usuario" -> "informe" [arrowhead=none, penwidth=1.1, weight=3];
+"informe" -> "inf_cons" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"informe" -> "inf_ambito" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"informe" -> "imprimir" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"informe" -> "exportar" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"inf_cons" -> "sin_resultados" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»"];
+}

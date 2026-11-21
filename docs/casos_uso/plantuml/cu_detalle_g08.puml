@@ -1,0 +1,35 @@
+@startuml cu_detalle_g08
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #8E2B24
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+}
+skinparam ArrowFontSize 11
+
+left to right direction
+title Gestionar atenciones sociales (G08 · EP-01): caso de uso detallado
+actor "Profesional" as Profesional
+actor "Administrador" as Administrador
+rectangle "Gestionar atenciones sociales" {
+  usecase "CU-03\nRegistrar atención social" as social
+  usecase "CU-76\nValidar datos de atención social" as social_valid
+  usecase "CU-45\nRegistrar en auditoría" as auditar
+  usecase "CU-69\nInformar error de validación" as error_valid
+  usecase "CU-77\nRechazar por máximo de tres gestiones" as tres
+}
+Profesional --> social
+Administrador --> social
+social ..> social_valid : <<include>>
+social ..> auditar : <<include>>
+error_valid ..> social_valid : <<extend>>
+tres ..> social : <<extend>>
+@enduml

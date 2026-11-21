@@ -1,0 +1,55 @@
+@startuml cu_detalle_g13
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #8E2B24
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+}
+skinparam ArrowFontSize 11
+
+left to right direction
+title Gestionar funcionarios y usuarios (G13 · EP-08): caso de uso detallado
+actor "Administrador" as Administrador
+rectangle "Gestionar funcionarios y usuarios" {
+  usecase "CU-104\nRegistrar funcionario" as fun_reg
+  usecase "CU-105\nConsultar funcionarios" as fun_con
+  usecase "CU-106\nModificar funcionario" as fun_mod
+  usecase "CU-107\nEliminar funcionario" as fun_eli
+  usecase "CU-108\nValidar datos de funcionario" as fun_valid
+  usecase "CU-109\nAsignar perfil de acceso" as perfil
+  usecase "CU-29\nBuscar y filtrar" as buscar
+  usecase "CU-45\nRegistrar en auditoría" as auditar
+  usecase "CU-69\nInformar error de validación" as error_valid
+  usecase "CU-110\nInformar usuario duplicado" as usuario_dup
+  usecase "CU-111\nImpedir desactivar la propia cuenta" as propia_cuenta
+  usecase "CU-85\nDesactivar en vez de eliminar" as desactivar
+  usecase "CU-70\nConsulta sin coincidencias" as sin_resultados
+}
+Administrador --> fun_reg
+Administrador --> fun_con
+Administrador --> fun_mod
+Administrador --> fun_eli
+fun_reg ..> fun_valid : <<include>>
+fun_reg ..> perfil : <<include>>
+fun_reg ..> auditar : <<include>>
+fun_con ..> buscar : <<include>>
+fun_mod ..> buscar : <<include>>
+fun_mod ..> fun_valid : <<include>>
+fun_mod ..> perfil : <<include>>
+fun_mod ..> auditar : <<include>>
+fun_eli ..> buscar : <<include>>
+fun_eli ..> auditar : <<include>>
+error_valid ..> fun_valid : <<extend>>
+usuario_dup ..> fun_valid : <<extend>>
+propia_cuenta ..> fun_eli : <<extend>>
+desactivar ..> fun_eli : <<extend>>
+sin_resultados ..> buscar : <<extend>>
+@enduml

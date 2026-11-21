@@ -1,0 +1,55 @@
+@startuml cu_detalle_g04
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #8E2B24
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+}
+skinparam ArrowFontSize 11
+
+left to right direction
+title Validar actividades (G04 · EP-03): caso de uso detallado
+actor "Delegado" as Delegado
+actor "Coordinador" as Coordinador
+actor "Administrador" as Administrador
+rectangle "Validar actividades" {
+  usecase "CU-11\nAprobar o rechazar actividad" as validar
+  usecase "CU-54\nAnular aprobación" as anular
+  usecase "CU-10.1\nBuscar actividad por código" as act_buscar
+  usecase "CU-11.1\nRegistrar trazabilidad de decisión" as trazabilidad
+  usecase "CU-06.1\nRecalcular indicadores automáticamente" as recalcular
+  usecase "CU-07.2\nRecalcular por anulación de registro" as recalc_anula
+  usecase "CU-45\nRegistrar en auditoría" as auditar
+  usecase "CU-11.2\nBloquear aporte al avance" as no_suma
+  usecase "CU-55\nExigir motivo" as motivo
+  usecase "CU-56\nImpedir revisión propia" as propia
+  usecase "CU-57\nInformar sin evidencias pendientes" as sin_pendientes
+}
+Delegado --> validar
+Coordinador --> validar
+Administrador --> validar
+Delegado --> anular
+Coordinador --> anular
+Administrador --> anular
+validar ..> act_buscar : <<include>>
+validar ..> trazabilidad : <<include>>
+validar ..> recalcular : <<include>>
+validar ..> auditar : <<include>>
+anular ..> act_buscar : <<include>>
+anular ..> recalc_anula : <<include>>
+anular ..> auditar : <<include>>
+no_suma ..> validar : <<extend>>
+motivo ..> validar : <<extend>>
+motivo ..> anular : <<extend>>
+propia ..> validar : <<extend>>
+propia ..> anular : <<extend>>
+sin_pendientes ..> validar : <<extend>>
+@enduml

@@ -1,0 +1,33 @@
+@startuml cu_detalle_g19
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #8E2B24
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+}
+skinparam ArrowFontSize 11
+
+left to right direction
+title Consultar auditoría y perfiles (G19 · EP-08): caso de uso detallado
+actor "Administrador" as Administrador
+rectangle "Consultar auditoría y perfiles" {
+  usecase "CU-30\nConsultar auditoría de cambios" as auditoria
+  usecase "CU-139\nConsultar perfiles y permisos" as perfiles
+  usecase "CU-29\nBuscar y filtrar" as buscar
+  usecase "CU-30.1\nBloqueo por alteración no autorizada" as inmutable
+  usecase "CU-26.1\nDenegar acceso por ámbito" as denegar
+}
+Administrador --> auditoria
+Administrador --> perfiles
+auditoria ..> buscar : <<include>>
+inmutable ..> auditoria : <<extend>>
+denegar ..> auditoria : <<extend>>
+@enduml

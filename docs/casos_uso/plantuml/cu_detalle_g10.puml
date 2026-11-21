@@ -1,0 +1,59 @@
+@startuml cu_detalle_g10
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #8E2B24
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+}
+skinparam ArrowFontSize 11
+
+left to right direction
+title Gestionar delegaciones (G10 · EP-08): caso de uso detallado
+actor "Coordinador" as Coordinador
+actor "Administrador" as Administrador
+rectangle "Gestionar delegaciones" {
+  usecase "CU-86\nRegistrar delegación" as del_reg
+  usecase "CU-87\nConsultar delegaciones" as del_con
+  usecase "CU-88\nModificar delegación" as del_mod
+  usecase "CU-89\nEliminar delegación" as del_eli
+  usecase "CU-90\nAsignar delegado" as delegado
+  usecase "CU-91\nValidar datos de delegación" as del_valid
+  usecase "CU-92\nValidar asignación" as asig_valid
+  usecase "CU-29\nBuscar y filtrar" as buscar
+  usecase "CU-45\nRegistrar en auditoría" as auditar
+  usecase "CU-69\nInformar error de validación" as error_valid
+  usecase "CU-85\nDesactivar en vez de eliminar" as desactivar
+  usecase "CU-70\nConsulta sin coincidencias" as sin_resultados
+}
+Coordinador --> del_reg
+Administrador --> del_reg
+Coordinador --> del_con
+Administrador --> del_con
+Coordinador --> del_mod
+Administrador --> del_mod
+Coordinador --> del_eli
+Administrador --> del_eli
+Coordinador --> delegado
+Administrador --> delegado
+del_reg ..> del_valid : <<include>>
+del_reg ..> auditar : <<include>>
+del_con ..> buscar : <<include>>
+del_mod ..> buscar : <<include>>
+del_mod ..> del_valid : <<include>>
+del_mod ..> auditar : <<include>>
+del_eli ..> buscar : <<include>>
+del_eli ..> auditar : <<include>>
+delegado ..> asig_valid : <<include>>
+delegado ..> auditar : <<include>>
+error_valid ..> del_valid : <<extend>>
+desactivar ..> del_eli : <<extend>>
+sin_resultados ..> buscar : <<extend>>
+@enduml

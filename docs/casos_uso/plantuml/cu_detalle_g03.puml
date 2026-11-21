@@ -1,0 +1,38 @@
+@startuml cu_detalle_g03
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #8E2B24
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+}
+skinparam ArrowFontSize 11
+
+left to right direction
+title Gestionar evidencias (G03 · EP-03): caso de uso detallado
+actor "Usuario" as Usuario
+rectangle "Gestionar evidencias" {
+  usecase "CU-09\nSubir evidencia" as evi_subir
+  usecase "CU-52\nVer evidencia" as evi_ver
+  usecase "CU-10.1\nBuscar actividad por código" as act_buscar
+  usecase "CU-09.1\nValidar archivo de evidencia" as evi_valid
+  usecase "CU-45\nRegistrar en auditoría" as auditar
+  usecase "CU-09.2\nRechazar carga inválida" as evi_invalida
+  usecase "CU-53\nBloquear carga de evidencia" as evi_bloqueo
+}
+Usuario --> evi_subir
+Usuario --> evi_ver
+evi_subir ..> act_buscar : <<include>>
+evi_subir ..> evi_valid : <<include>>
+evi_subir ..> auditar : <<include>>
+evi_ver ..> act_buscar : <<include>>
+evi_invalida ..> evi_valid : <<extend>>
+evi_bloqueo ..> evi_subir : <<extend>>
+@enduml
