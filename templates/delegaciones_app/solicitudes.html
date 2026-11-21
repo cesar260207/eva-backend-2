@@ -45,7 +45,7 @@
     </div>
     {% empty %}
     <div class="col-12">
-        <div class="alert alert-info">No hay tareas en el tubo de trabajo.</div>
+        <div class="panel">{% include 'includes/_estado_vacio.html' with titulo='No hay tareas en el tubo de trabajo.' %}</div>
     </div>
     {% endfor %}
 </div>

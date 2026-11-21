@@ -11,8 +11,8 @@
 </div>
 <div class="panel">
     <div class="list-help mb-3">Busca un registro por nombre o por un dato relacionado.{% if puede.add %} Usa «Agregar» para crear uno nuevo.{% endif %}</div>
-    <form method="get" class="row g-2 mb-3" role="search" aria-label="Buscar en {{ config.titulo }}">
-        <div class="col-md-9"><input class="form-control" type="search" name="q" value="{{ query }}" placeholder="Buscar en {{ config.titulo|lower }}"></div>
+    <form method="get" class="row g-2 mb-3 mx-0 filtros-caja" role="search" aria-label="Buscar en {{ config.titulo }}">
+        <div class="col-md-9"><input class="form-control" type="search" name="q" value="{{ query }}" aria-label="Buscar en {{ config.titulo|lower }}" placeholder="Buscar en {{ config.titulo|lower }}"></div>
         <div class="col-md-3 d-flex gap-2"><button class="btn btn-outline-sgr flex-grow-1" type="submit">Buscar</button>{% if query %}<a class="btn btn-light" href="{% url 'mantenedor_lista' config.slug %}" title="Limpiar búsqueda">Limpiar</a>{% endif %}</div>
     </form>
     {% if config.slug == 'organizaciones' %}
@@ -88,7 +88,7 @@
         <span class="small text-muted"><strong>{{ cantidad_resultados }}</strong> registro{{ cantidad_resultados|pluralize }} encontrado{{ cantidad_resultados|pluralize }}</span>
         {% if config.baja %}<span class="small text-muted">Los registros inactivos se conservan para mantener el historial.</span>{% endif %}
     </div>
-    <div class="table-responsive">
+    <div class="table-responsive tabla-fija">
         <table class="table align-middle">
             <thead>
                 <tr>
@@ -108,7 +108,7 @@
                             {% for accion in fila.acciones %}
                             <form method="post" action="{{ accion.url }}" class="d-flex gap-1 m-0"{% if accion.confirmar %} onsubmit="return confirm('{{ accion.confirmar|escapejs }}');"{% endif %}>
                                 {% csrf_token %}
-                                {% if accion.motivo %}<input class="form-control form-control-sm" name="motivo" placeholder="Motivo" required>{% endif %}
+                                {% if accion.motivo %}<input class="form-control form-control-sm" name="motivo" placeholder="Motivo" aria-label="Motivo" required>{% endif %}
                                 <button class="btn btn-sm btn-outline-sgr" type="submit">{{ accion.etiqueta }}</button>
                             </form>
                             {% endfor %}{% endif %}
@@ -121,7 +121,7 @@
                     </td>
                 </tr>
             {% empty %}
-                <tr><td colspan="{{ total_columnas }}"><div class="empty-state"><strong>No encontramos registros</strong><br><span>Prueba con otra búsqueda o crea el primer registro con el botón «Agregar».</span></div></td></tr>
+                <tr><td colspan="{{ total_columnas }}">{% if puede.add %}{% include 'includes/_estado_vacio.html' with titulo='No encontramos registros' texto='Prueba con otra búsqueda o crea el primer registro con el botón «Agregar».' %}{% else %}{% include 'includes/_estado_vacio.html' with titulo='No encontramos registros' texto='Prueba con otra búsqueda.' %}{% endif %}</td></tr>
             {% endfor %}
             </tbody>
         </table>

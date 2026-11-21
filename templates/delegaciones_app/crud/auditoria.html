@@ -9,8 +9,8 @@
     </div>
 </div>
 <div class="panel">
-    <form method="get" class="row g-2 mb-3">
-        <div class="col-md-3"><input class="form-control" type="search" name="q" value="{{ filtros.q }}" placeholder="Buscar por identificador o usuario"></div>
+    <form method="get" class="row g-2 mb-3 mx-0 filtros-caja" role="search" aria-label="Filtrar la auditoría">
+        <div class="col-md-3"><input class="form-control" type="search" name="q" value="{{ filtros.q }}" aria-label="Buscar por identificador o usuario" placeholder="Buscar por identificador o usuario"></div>
         <div class="col-md-2">
             <select class="form-select" name="evento" aria-label="Evento">
                 <option value="">Todos los eventos</option>
@@ -27,7 +27,7 @@
         <div class="col-md-2"><input class="form-control" type="date" name="hasta" value="{{ filtros.hasta }}" aria-label="Hasta"></div>
         <div class="col-md-1"><button class="btn btn-outline-sgr w-100" type="submit">Buscar</button></div>
     </form>
-    <div class="table-responsive">
+    <div class="table-responsive tabla-fija">
         <table class="table align-middle">
             <thead><tr><th>Fecha</th><th>Usuario</th><th>Evento</th><th>Entidad</th><th>Identificador</th><th>Valor anterior</th><th>Valor nuevo</th></tr></thead>
             <tbody>
@@ -42,7 +42,7 @@
                     <td class="small text-break">{% for campo, valor in evento.detalle_nuevo %}<div>{% if campo %}<span class="text-muted">{{ campo }}:</span> {% endif %}{{ valor }}</div>{% empty %}-{% endfor %}</td>
                 </tr>
             {% empty %}
-                <tr><td colspan="7" class="text-center py-4">No hay eventos para este criterio de búsqueda.</td></tr>
+                <tr><td colspan="7">{% include 'includes/_estado_vacio.html' with titulo='No hay eventos para este criterio de búsqueda.' %}</td></tr>
             {% endfor %}
             </tbody>
         </table>
