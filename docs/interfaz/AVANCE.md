@@ -168,3 +168,32 @@ Rama `feat/interfaz-ronda-2`, creada desde `main` en caf02d6 (PR #20). Mismo for
 6. **Límites:** en `views.py` cambiamos solo lo que permite la regla 8. Las cifras para el conteo salen del filtro y no se escriben dos veces en la plantilla; la cantidad de delegaciones es el largo de la lista de la vista.
 7. **No verificado:** el movimiento en un navegador real (las capturas son imágenes fijas; en ellas las cifras y la barra aparecen a mitad de la animación).
 8. **Commits:** `fix: población urbana y rural según el Censo 2024 del INE, con su fuente`; `feat: Territorio con esquema interactivo, cifras animadas y delegaciones enlazadas`; `test: pruebas de Territorio (censo, enlaces por perfil, ids y esquema)`; `docs: avance de la fase 1 de la segunda ronda`.
+
+## Ronda 2, fase 2. Portada y pie (21-11-2026)
+
+1. **Qué hicimos**
+   - Tarjetas de delegaciones de la portada: cada una lleva a su tarjeta en Territorio (`/territorio/#delegacion-…`). Con sesión, la tarjeta de la propia delegación (o todas, para la coordinación) agrega el enlace «Seguimiento territorial» a `delegacion_detalle`, con la misma condición del menú. Antes las seis enlazaban siempre al seguimiento: sin sesión llevaban al ingreso y, para un Profesional o Delegado, las otras cinco respondían 404 y quedaban en la auditoría como acceso denegado.
+   - Cifras: sin sesión, la portada ya no muestra cifras internas (tareas en el tubo de trabajo, tareas que requieren atención y cumplimiento promedio). En su lugar muestra 250.141 habitantes, la cantidad de delegaciones municipales activas y 12,0 % de población rural, con «Fuente: Censo de Población y Vivienda 2024, INE». Con sesión se ven las cifras internas como antes. En ambos casos hay 3 cifras con `data-contar`, así que la prueba existente no cambió.
+   - Menos repetición:
+     - sin sesión, los accesos rápidos son «Cómo funciona», «Delegaciones» y «Preguntas frecuentes» («Ingresar» y «Territorio» ya están en el hero y en el menú);
+     - con sesión quitamos el acceso «Ver resultados», que repetía el botón «Ver medición» del hero (los dos van a la misma pantalla);
+     - quitamos el botón «Ver contexto» de la sección de delegaciones, porque ahora cada tarjeta lleva a Territorio;
+     - en el pie, «Territorio» aparece una sola vez: sin sesión en «Secciones» y con sesión en «Ayuda».
+2. **Archivos cambiados:** `templates/delegaciones_app/index.html`, `templates/base.html` (solo el pie), `static/css/sgr.css` (tarjeta de delegación con dos enlaces: la tarjeta entera lleva a Territorio y el seguimiento va encima), `delegaciones_app/test_unit_interfaz.py`.
+3. **Pruebas:** 714 en total, 714 aprobadas, 0 fallidas (línea base 703). Cinco pruebas nuevas: sin sesión no hay cifras internas y sí la fuente; las cifras públicas de la portada son las mismas que entrega la vista de Territorio (así no se desalinean si cambian); ninguna tarjeta enlaza al seguimiento de una delegación ajena; los accesos rápidos sin sesión no repiten el hero; en el pie cada destino aparece una sola vez. No ajustamos ninguna prueba existente.
+4. **Qué mirar:** la portada sin sesión (cifras públicas y fuente), con `funcionario.centro` (solo Centro tiene «Seguimiento territorial») y con `coordinador.demo` (las seis lo tienen). Hacer clic en una tarjeta: abre Territorio con esa delegación marcada.
+5. **Límites:** la vista `index` no cambió. La población y la ruralidad de la portada quedan escritas una vez en la plantilla, porque la regla 8 solo permite cambiar la vista `institucional`; una prueba compara esos valores con los de Territorio.
+6. **Revisión general (punto 5.4), para que el grupo decida; no quitamos nada de esta lista:**
+
+   | Pantalla y archivo | Texto | Propuesta |
+   | --- | --- | --- |
+   | Panel del Coordinador (`panel_coordinador.html`) | Títulos «Mantenedores autorizados» y «Transacciones autorizadas» | Dejar «Mantenedores» y «Transacciones» |
+   | Auditoría (`crud/auditoria.html`) | «Los registros son de solo lectura: no se pueden modificar ni eliminar.» | Dejar solo «Historial de operaciones críticas.» |
+   | Alertas del panel (`_panel_alertas.html`) | «Revisa estas situaciones para saber qué requiere atención en tu ámbito.» (segunda línea bajo «Alertas en tu ámbito») | Quitar la frase; el título ya explica el filtro |
+   | Ficha personal (`ficha.html`) | «Un coordinador puede asignarlas desde Administración.» | Se puede dejar: dice a quién pedir las metas |
+   | Panel del Profesional (`panel_funcionario.html`) | «Actividades en tu ámbito» y «en tu ámbito» | Se quedan: explican el filtro, como «dentro de tu ámbito» de alertas |
+   | Territorio con sesión | «Ir a mi panel» en el hero y en la banda de cierre (además de «Mi panel» en el menú) | Lo pide el encargo; se puede dejar solo en la banda |
+
+   Las introducciones largas que quedan explican un cálculo o una regla (semáforo, medición, editar actividad) y ocupan una o dos líneas; no encontramos botones repetidos en una misma pantalla fuera de los ya corregidos.
+7. **No verificado:** nada pendiente de esta fase; la revisamos con capturas a 1280 px con y sin sesión.
+8. **Commits:** `feat: portada con cifras públicas sin sesión y delegaciones enlazadas a Territorio`; `fix: el pie muestra Territorio una sola vez`; `test: pruebas de la portada sin cifras internas y del pie sin enlaces repetidos`; `docs: avance de la fase 2 de la segunda ronda`.
