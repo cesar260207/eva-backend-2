@@ -1,0 +1,33 @@
+# Ejecuta las pruebas automáticas en cada pull request y en cada cambio de main (plan de mantención).
+# Usa SQLite: no necesita MySQL ni datos reales, y ninguna credencial del servidor.
+name: Pruebas
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    env:
+      DB_ENGINE: sqlite
+      SECRET_KEY: clave-solo-para-las-pruebas-de-github-actions
+      DEBUG: "False"
+      ALLOWED_HOSTS: localhost
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Dependencias del sistema (mysqlclient)
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libmysqlclient-dev
+      - name: Dependencias de Python
+        run: pip install -r requirements.txt
+      - name: Revisión de Django y migraciones al día
+        run: |
+          python manage.py check
+          python manage.py makemigrations --check --dry-run
+      - name: Pruebas
+        run: python manage.py test --parallel 4
