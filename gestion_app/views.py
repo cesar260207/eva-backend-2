@@ -9,14 +9,14 @@ from delegaciones_app import medicion
 from delegaciones_app.alertas import alertas_de
 from delegaciones_app.informes import (
     TIPOS_INFORME, filas_de_actividad_reciente, filas_de_actividades, filas_de_compromisos, filas_de_cumplimiento, filas_de_resumen,
-    filtrar_actividades, filtrar_compromisos, respuesta_csv,
+    filtrar_actividades, filtrar_compromisos, respuesta_csv, respuesta_excel,
 )
-from delegaciones_app.medicion import periodo_vigente, periodos_con_indicadores, promedio_general, resultados_por_delegacion
+from delegaciones_app.medicion import periodo_vigente, periodos_con_indicadores, promedio_general, resultados_por_delegacion, resultados_por_persona
 from delegaciones_app.crud import mantenedores_visibles
 from delegaciones_app.models import Actividad, Auditoria, Compromiso, Delegacion, Evidencia, Funcionario, MedicionDelegacion, Periodo
 from delegaciones_app.permisos import (
     DELEGADO, PERFIL_ADMINISTRADOR, PERFIL_COORDINADOR, PERFIL_DELEGADO, PERFILES, delegacion_propia, funcionario_de, perfil_de, puede_revisar,
-    roles_de,
+    puede_ver_todo, roles_de,
 )
 from delegaciones_app.views import _delegaciones_visibles
 from delegaciones_app.views import _actividades_autorizadas, _compromisos_autorizados
@@ -24,8 +24,10 @@ from delegaciones_app.views import _actividades_autorizadas, _compromisos_autori
 
 def _solo_su_delegacion(user, resultados):
     """Resultados por delegación que el usuario puede ver: un delegado ve solo los de su delegación."""
+    if puede_ver_todo(user):
+        return resultados
     propia = delegacion_propia(user)
-    return [fila for fila in resultados if fila['nombre'] == propia.nombre] if propia else resultados
+    return [fila for fila in resultados if fila['nombre'] == propia.nombre] if propia else []
 
 
 def _contexto_medicion(request):
@@ -40,7 +42,7 @@ def _contexto_medicion(request):
         'delegaciones': _solo_su_delegacion(request.user, resultados_por_delegacion(periodo, texto)),
         'hoy': timezone.localdate(),
         'esperado': periodo.porcentaje_esperado() if periodo else None,
-        'tope': periodo.obtener_parametro('maximo_cumplimiento', '150') if periodo else None,
+        'tope': periodo.obtener_parametro('maximo_cumplimiento', '120') if periodo else None,
     }
 
 
@@ -142,7 +144,14 @@ def dashboard(request):
 
 @login_required
 def semaforo(request):
-    return render(request, 'gestion_app/semaforo.html', _contexto_medicion(request))
+    contexto = _contexto_medicion(request)
+    if puede_ver_todo(request.user):
+        contexto['personas'] = resultados_por_persona(contexto['periodo'])
+    elif contexto['delegacion_propia']:
+        contexto['personas'] = resultados_por_persona(contexto['periodo'], contexto['delegacion_propia'])
+    else:
+        contexto['personas'] = []
+    return render(request, 'gestion_app/semaforo.html', contexto)
 
 
 @login_required
@@ -156,8 +165,10 @@ def resumen(request):
         'critico': min(delegaciones, key=lambda fila: fila['cumplimiento'], default={}),
         'alcanza_umbral': periodo.alcanza_umbral(promedio) if periodo else None,
         'mediciones_historicas': (
+            MedicionDelegacion.objects.select_related('delegacion')
+            if puede_ver_todo(request.user) else
             MedicionDelegacion.objects.select_related('delegacion').filter(delegacion=contexto['delegacion_propia'])
-            if contexto['delegacion_propia'] else MedicionDelegacion.objects.select_related('delegacion')
+            if contexto['delegacion_propia'] else MedicionDelegacion.objects.none()
         )[:12],
     })
     return render(request, 'gestion_app/resumen.html', contexto)
@@ -214,6 +225,9 @@ def informe(request):
     if formato == 'csv':
         Auditoria.registrar_evento(request.user, 'exportar', 'Informe', tipo, None, {'filtros': request.GET.urlencode(), 'filas': len(filas)})
         return respuesta_csv(f'informe_{tipo}_{timezone.localdate():%Y%m%d}.csv', columnas, filas)
+    if formato == 'excel':
+        Auditoria.registrar_evento(request.user, 'exportar', 'Informe', tipo, None, {'filtros': request.GET.urlencode(), 'filas': len(filas)})
+        return respuesta_excel(f'informe_{tipo}_{timezone.localdate():%Y%m%d}.xlsx', columnas, filas)
     parametros = request.GET.copy()
     parametros.pop('formato', None)
     return render(request, 'gestion_app/informe.html', {
@@ -236,4 +250,3 @@ def alertas(request):
         'dias_sin_registro': settings.ALERTA_DIAS_SIN_REGISTRO,
         'dias_alerta': settings.COMPROMISO_DIAS_ALERTA,
     })
-

@@ -291,7 +291,7 @@ class CoordinacionDeDelegadosTests(EscenarioBase, TestCase):
         respuesta = self.client.get(reverse('panel'))
         self.assertTemplateUsed(respuesta, 'gestion_app/panel_coordinador.html')
         filas = {fila['nombre']: fila['delegados'] for fila in respuesta.context['delegaciones']}
-        self.assertEqual(filas, {'Centro': 'delegado-sin', 'Rural': ''})
+        self.assertEqual(filas, {'Centro': 'delegado-base, delegado-sin', 'Rural': ''})
         self.assertContains(respuesta, reverse('delegados'))
         self.assertNotContains(respuesta, reverse('actividad_nueva'))
 

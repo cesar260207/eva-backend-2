@@ -2,6 +2,7 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -9,7 +10,7 @@ from django.utils import timezone
 
 from .forms import CompromisoForm
 from .informes import filas_de_compromisos, filas_de_resumen, filtrar_compromisos, resumen_por_responsable, situacion_de_plazo
-from .models import Compromiso, HistorialCompromiso
+from .models import Compromiso, HistorialCompromiso, Organizacion
 from .pruebas_base import EscenarioBase, crear_funcionario
 
 
@@ -80,6 +81,34 @@ class CompromisoFormUnitTests(CompromisoBase):
         """CU-02 Registro de compromisos ciudadanos (RF-017). Quien ve todo elige entre los funcionarios activos."""
         formulario = CompromisoForm(user=self.coordinador)
         self.assertIn(self.autor, formulario.fields['funcionario_responsable'].queryset)
+
+    def test_profesional_solo_puede_vincular_organizaciones_de_su_delegacion(self):
+        """CU-26.1 Denegar acceso por ámbito (RF-002). Las tareas solo pueden usar organizaciones propias."""
+        propia = Organizacion.objects.create(nombre='JJVV Centro', delegacion=self.centro)
+        ajena = Organizacion.objects.create(nombre='JJVV Rural', delegacion=self.rural)
+        formulario = CompromisoForm(user=self.usuario_autor)
+        self.assertIn(propia, formulario.fields['organizacion'].queryset)
+        self.assertNotIn(ajena, formulario.fields['organizacion'].queryset)
+        rechazado = CompromisoForm(self._datos(organizacion=ajena.pk), user=self.usuario_autor)
+        self.assertFalse(rechazado.is_valid())
+        self.assertIn('organizacion', rechazado.errors)
+
+    def test_coordinacion_no_asocia_organizacion_a_otra_delegacion(self):
+        """CU-02.1 Validar datos de compromiso (RF-017). La organización y la tarea pertenecen al mismo ámbito."""
+        ajena = Organizacion.objects.create(nombre='JJVV Rural', delegacion=self.rural)
+        formulario = CompromisoForm(self._datos(organizacion=ajena.pk), user=self.coordinador)
+        self.assertFalse(formulario.is_valid())
+        self.assertIn('organizacion', formulario.errors)
+
+    def test_profesional_sin_delegacion_no_puede_asignar_tareas_fuera_de_ambito(self):
+        """CU-26.1 Denegar acceso por ámbito (RF-017). Sin delegación, no hay opciones globales de tarea."""
+        sin_delegacion = crear_funcionario('agenda-sin-delegacion', 'funcionario', cargo=self.cargo)
+        formulario = CompromisoForm(user=sin_delegacion)
+        self.assertFalse(formulario.fields['delegacion'].queryset.exists())
+        self.assertFalse(formulario.fields['organizacion'].queryset.exists())
+        rechazada = CompromisoForm(self._datos(), user=sin_delegacion)
+        self.assertFalse(rechazada.is_valid())
+        self.assertIn('delegacion', rechazada.errors)
 
     def test_al_editar_se_oculta_el_estado_y_se_exige_la_version(self):
         """CU-13 Actualización de estados (RF-018). El estado cambia solo desde la agenda, con historial."""
@@ -394,20 +423,20 @@ class TuboDeTrabajoUnitTests(CompromisoBase):
         self.assertContains(self.client.get(reverse('compromiso_nuevo')), 'Agregar al tubo de trabajo')
 
     def test_solo_quien_puede_crear_ve_el_boton_agregar(self):
-        """CU-02 Registro de compromisos ciudadanos (RF-016). Administración, coordinación, delegados y funcionarios ven
-        «+ Agregar al tubo de trabajo»; verificador y consulta no."""
+        """CU-02 Registro de compromisos ciudadanos (RF-016). Los cuatro perfiles vigentes pueden crear tareas."""
         delegado = crear_funcionario('delegado-tubo', 'delegado', cargo=self.cargo, delegacion=self.centro)
-        consulta = crear_funcionario('consulta-tubo', 'consulta', cargo=self.cargo, delegacion=self.centro)
+        profesional = crear_funcionario('profesional-tubo', 'funcionario', cargo=self.cargo, delegacion=self.centro)
+        sin_perfil = User.objects.create_user('sin-perfil-tubo', password='clave-segura')
         boton = f'href="{reverse("compromiso_nuevo")}">+ Agregar al tubo de trabajo</a>'
-        casos = ((self.coordinador, True), (delegado, True), (self.usuario_autor, True), (self.usuario_verificador, False), (consulta, False))
+        casos = ((self.coordinador, True), (delegado, True), (self.usuario_autor, True), (self.usuario_verificador, True), (profesional, True), (sin_perfil, False))
         for usuario, ve_el_boton in casos:
             self.client.force_login(usuario)
             comprobar = self.assertContains if ve_el_boton else self.assertNotContains
             comprobar(self.client.get(reverse('agenda')), boton, msg_prefix=usuario.username)
 
-    def test_consulta_no_puede_agregar_tareas(self):
-        """CU-26.1 Denegar acceso por rol (RF-016). Aunque escriba la URL, una cuenta de consulta no agrega tareas."""
-        self.client.force_login(crear_funcionario('consulta-url', 'consulta', cargo=self.cargo, delegacion=self.centro))
+    def test_usuario_sin_perfil_no_puede_agregar_tareas(self):
+        """CU-26.1 Denegar acceso por rol (RF-016). Una cuenta sin rol vigente no agrega tareas."""
+        self.client.force_login(User.objects.create_user('sin-perfil-url', password='clave-segura'))
         self.assertRedirects(self.client.get(reverse('compromiso_nuevo')), reverse('inicio'))
         self.assertFalse(Compromiso.objects.exists())
 

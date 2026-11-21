@@ -10,10 +10,84 @@
     {% if puede.add %}<a class="btn btn-sgr" href="{% url 'mantenedor_nuevo' config.slug %}">Agregar</a>{% else %}<span class="badge badge-soft">Solo lectura para tu perfil</span>{% endif %}
 </div>
 <div class="panel">
-    <form method="get" class="row g-2 mb-3">
+    <div class="list-help mb-3"><strong>¿Qué puedes hacer aquí?</strong> Busca un registro por nombre o dato relacionado. Usa <strong>Agregar</strong> para crear uno nuevo y las acciones de cada fila para modificarlo o cambiar su estado.</div>
+    <form method="get" class="row g-2 mb-3" role="search" aria-label="Buscar en {{ config.titulo }}">
         <div class="col-md-9"><input class="form-control" type="search" name="q" value="{{ query }}" placeholder="Buscar en {{ config.titulo|lower }}"></div>
-        <div class="col-md-3"><button class="btn btn-outline-sgr w-100" type="submit">Buscar</button></div>
+        <div class="col-md-3 d-flex gap-2"><button class="btn btn-outline-sgr flex-grow-1" type="submit">Buscar</button>{% if query %}<a class="btn btn-light" href="{% url 'mantenedor_lista' config.slug %}" title="Limpiar búsqueda">Limpiar</a>{% endif %}</div>
     </form>
+    {% if config.slug == 'organizaciones' %}
+    <div class="filter-box mb-4">
+        <div class="section-label mb-2">Filtrar organizaciones</div>
+        <p class="small text-muted mb-3">Combina uno o varios filtros para encontrar rápidamente la organización que necesitas.</p>
+        <form method="get" class="row g-2 align-items-end" aria-label="Filtros de organizaciones">
+            <input type="hidden" name="q" value="{{ query }}">
+            <div class="col-md-4">
+                <label class="form-label small" for="filtro-tipo">Tipo de organización</label>
+                <select class="form-select" id="filtro-tipo" name="tipo">
+                    <option value="">Todos los tipos</option>
+                    {% for valor, etiqueta in tipos_organizacion %}<option value="{{ valor }}" {% if organizacion_filtros.tipo == valor %}selected{% endif %}>{{ etiqueta }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small" for="filtro-delegacion">Delegación</label>
+                <select class="form-select" id="filtro-delegacion" name="delegacion">
+                    <option value="">Todas las delegaciones</option>
+                    {% for delegacion in delegaciones_filtro %}<option value="{{ delegacion.pk }}" {% if organizacion_filtros.delegacion == delegacion.pk|stringformat:'s' %}selected{% endif %}>{{ delegacion.nombre }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small" for="filtro-verificada">Verificación</label>
+                <select class="form-select" id="filtro-verificada" name="verificada">
+                    <option value="">Todas</option>
+                    <option value="si" {% if organizacion_filtros.verificada == 'si' %}selected{% endif %}>Verificadas</option>
+                    <option value="no" {% if organizacion_filtros.verificada == 'no' %}selected{% endif %}>Pendientes</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small" for="orden-organizaciones">Ordenar</label>
+                <select class="form-select" id="orden-organizaciones" name="orden">
+                    {% for valor, etiqueta in ordenes %}<option value="{{ valor }}" {% if orden == valor %}selected{% endif %}>{{ etiqueta }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-2">
+                <button class="btn btn-outline-sgr flex-grow-1" type="submit">Aplicar</button>
+                <a class="btn btn-light" href="{% url 'mantenedor_lista' config.slug %}">Limpiar</a>
+            </div>
+        </form>
+        <div class="mt-3">
+            <a class="btn btn-sm btn-outline-sgr" href="{% url 'exportar_organizaciones' %}{% if querystring %}?{{ querystring }}{% endif %}">Exportar resultados filtrados</a>
+        </div>
+    </div>
+    {% elif config.slug == 'delegaciones' %}
+    <div class="filter-box mb-4">
+        <div class="section-label mb-2">Filtrar delegaciones</div>
+        <form method="get" class="row g-2 align-items-end">
+            <input type="hidden" name="q" value="{{ query }}">
+            <div class="col-md-4">
+                <label class="form-label small" for="filtro-estado">Estado</label>
+                <select class="form-select" id="filtro-estado" name="estado">
+                    <option value="">Todas</option>
+                    <option value="activas" {% if delegacion_estado == 'activas' %}selected{% endif %}>Activas</option>
+                    <option value="inactivas" {% if delegacion_estado == 'inactivas' %}selected{% endif %}>Inactivas</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small" for="orden-delegaciones">Ordenar</label>
+                <select class="form-select" id="orden-delegaciones" name="orden">
+                    {% for valor, etiqueta in ordenes %}<option value="{{ valor }}" {% if orden == valor %}selected{% endif %}>{{ etiqueta }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4 d-flex gap-2">
+                <button class="btn btn-outline-sgr flex-grow-1" type="submit">Aplicar</button>
+                <a class="btn btn-light" href="{% url 'mantenedor_lista' config.slug %}">Limpiar</a>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <span class="small text-muted"><strong>{{ cantidad_resultados }}</strong> registro{{ cantidad_resultados|pluralize }} encontrado{{ cantidad_resultados|pluralize }}</span>
+        {% if config.baja %}<span class="small text-muted">Los registros inactivos se conservan para mantener el historial.</span>{% endif %}
+    </div>
     <div class="table-responsive">
         <table class="table align-middle">
             <thead>
@@ -47,10 +121,21 @@
                     </td>
                 </tr>
             {% empty %}
-                <tr><td colspan="{{ total_columnas }}" class="text-center py-4">No hay registros para este criterio de búsqueda.</td></tr>
+                <tr><td colspan="{{ total_columnas }}"><div class="empty-state"><strong>No encontramos registros</strong><br><span>Prueba con otra búsqueda o crea el primer registro con el botón «Agregar».</span></div></td></tr>
             {% endfor %}
             </tbody>
         </table>
     </div>
+    {% if is_paginated %}
+    <nav class="mt-3" aria-label="Paginación de registros">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span class="small text-muted">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+            <div class="d-flex gap-2">
+                {% if page_obj.has_previous %}<a class="btn btn-sm btn-outline-sgr" href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.previous_page_number }}">Anterior</a>{% endif %}
+                {% if page_obj.has_next %}<a class="btn btn-sm btn-outline-sgr" href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_obj.next_page_number }}">Siguiente</a>{% endif %}
+            </div>
+        </div>
+    </nav>
+    {% endif %}
 </div>
 {% endblock %}

@@ -1,4 +1,4 @@
-"""Mantenedores de las ocho tablas maestras.
+"""Mantenedores de las doce tablas maestras.
 
 Cada mantenedor se describe una sola vez en MANTENEDORES (modelo, formulario, columnas, búsqueda).
 Las cuatro vistas genéricas (lista, nuevo, editar y eliminar) leen esa descripción, así
@@ -10,6 +10,7 @@ funcionarios y catálogo), si la fila tiene datos relacionados se desactiva en s
 historial, y la confirmación explica cuáles son esos datos.
 """
 import datetime
+import csv
 from dataclasses import dataclass
 from typing import Callable, Optional
 
@@ -18,16 +19,16 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import CASCADE, ProtectedError, Q
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
 from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 
 from .auditoria import cambios_de_formulario
-from .forms import CargoForm, CatalogoForm, DelegacionForm, FuncionarioForm, ItemMedibleForm, MetaForm, PeriodoForm, RolForm
-from .models import Auditoria, Cargo, Catalogo, Delegacion, Funcionario, Indicador, ItemMedible, Meta, Periodo, Rol
-from .permisos import PERFILES, ROLES_DEL_SISTEMA, PermisoRequeridoMixin, permiso_requerido
+from .forms import AjusteForm, AusenciaForm, CargoForm, CatalogoForm, DelegacionForm, FuncionarioForm, ItemMedibleForm, MetaForm, OrganizacionForm, ParametroVersionadoForm, PeriodoForm, RolForm
+from .models import Ajuste, Auditoria, Ausencia, Cargo, Catalogo, Delegacion, Funcionario, Indicador, ItemMedible, Meta, Organizacion, ParametroVersionado, Periodo, Rol
+from .permisos import PERFIL_DELEGADO, PERFILES, ROLES_DEL_SISTEMA, ROLES_RETIRADOS, PermisoRequeridoMixin, funcionario_de, permiso_requerido, puede_ver_todo, registrar_acceso_denegado
 
 
 @dataclass
@@ -105,6 +106,17 @@ def _eliminar_funcionario(funcionario):
 def _bloqueo_rol(rol, request):
     if rol.nombre_rol in ROLES_DEL_SISTEMA:
         return f'«{rol}» es un rol del sistema: los permisos lo consultan por su nombre y no se elimina.'
+    if rol.nombre_rol in ROLES_RETIRADOS:
+        return f'«{rol}» está reservado para la migración de datos y no se elimina manualmente.'
+
+
+def _organizaciones_visibles(user, registros):
+    if puede_ver_todo(user):
+        return registros
+    funcionario = funcionario_de(user)
+    if funcionario and funcionario.delegacion_id:
+        return registros.filter(delegacion_id=funcionario.delegacion_id)
+    return registros.none()
 
 
 def _advertencia_meta(meta):
@@ -132,7 +144,7 @@ MANTENEDORES = {mantenedor.slug: mantenedor for mantenedor in (
     Mantenedor(
         'delegaciones', 'Delegaciones', 'delegación', 'Unidades territoriales y su estado operativo.',
         Delegacion, DelegacionForm,
-        [('Nombre', 'nombre'), ('Ámbito', 'ambito'), ('Énfasis', lambda d: (d.enfasis or '')[:90])],
+        [('Nombre', 'nombre'), ('Ámbito', 'ambito'), ('Énfasis', lambda d: (d.enfasis or '')[:90]), ('Funcionarios', lambda d: d.funcionarios.count()), ('Organizaciones', lambda d: d.organizaciones.count())],
         ('nombre__icontains', 'ambito__icontains', 'enfasis__icontains'),
         baja='estado', cambiar_baja=_cambiar_delegacion,
     ),
@@ -144,7 +156,7 @@ MANTENEDORES = {mantenedor.slug: mantenedor for mantenedor in (
         baja='vigencia',
     ),
     Mantenedor(
-        'roles', 'Roles', 'rol', 'Funciones de los funcionarios en el flujo de trabajo (delegado, verificador, consulta...).',
+        'roles', 'Roles', 'rol', 'Funciones de los funcionarios en el flujo de trabajo (administrador, coordinador, delegado, funcionario).',
         Rol, RolForm,
         [('Rol', 'nombre_rol'), ('Funcionarios', lambda r: r.funcionarios.count())],
         ('nombre_rol__icontains',),
@@ -172,12 +184,26 @@ MANTENEDORES = {mantenedor.slug: mantenedor for mantenedor in (
         baja='activo', cambiar_baja=_cambiar_catalogo,
     ),
     Mantenedor(
+        'organizaciones', 'Organizaciones comunitarias', 'organización comunitaria', 'Registro territorial de organizaciones importadas y verificadas.',
+        Organizacion, OrganizacionForm,
+        [('Nombre', 'nombre'), ('Tipo', 'get_tipo_display'), ('Territorio', 'territorio'), ('Delegación', 'delegacion'), ('Verificada', 'verificada')],
+        ('nombre__icontains', 'territorio__icontains', 'personalidad_juridica__icontains', 'delegacion__nombre__icontains'),
+        baja='activa', select_related=('delegacion',),
+    ),
+    Mantenedor(
         'periodos', 'Períodos', 'período', 'Ventanas de medición y su umbral colectivo.',
         Periodo, PeriodoForm,
         [('Nombre', 'nombre'), ('Inicio', 'fecha_inicio'), ('Término', 'fecha_termino'), ('Días', 'dias_computables'), ('Umbral (%)', 'umbral_minimo'), ('Estado', 'get_estado_display')],
         ('nombre__icontains', 'estado__icontains'),
         acciones_fila=_acciones_periodo,
         ayuda='El término debe ser igual o posterior al inicio. El estado cambia con las acciones Iniciar, Cerrar y Reabrir de la lista.',
+    ),
+    Mantenedor(
+        'parametros', 'Parámetros del período', 'parámetro', 'Valores versionados que controlan reglas y cálculos.',
+        ParametroVersionado, ParametroVersionadoForm,
+        [('Período', 'periodo'), ('Clave', 'clave'), ('Valor', 'valor'), ('Descripción', 'descripcion')],
+        ('clave__icontains', 'valor__icontains', 'periodo__nombre__icontains'),
+        select_related=('periodo',),
     ),
     Mantenedor(
         'items', 'Ítems medibles', 'ítem medible', 'Ítems evaluados por cargo y período, con su ponderación.',
@@ -197,10 +223,67 @@ MANTENEDORES = {mantenedor.slug: mantenedor for mantenedor in (
         select_related=('item__periodo', 'funcionario__delegacion'),
         advertencia_eliminar=_advertencia_meta, despues_de_guardar=_generar_indicador,
     ),
+    Mantenedor(
+        'ajustes', 'Ajustes', 'ajuste', 'Felicitaciones y reclamos formales aplicables a funcionarios o delegaciones.',
+        Ajuste, AjusteForm,
+        [
+            ('Tipo', 'get_tipo_display'), ('Origen', 'get_origen_display'), ('Emisor', 'emisor'),
+            ('Funcionario', 'funcionario'), ('Delegación', 'delegacion'), ('Período', 'periodo'),
+            ('Fecha', 'fecha'), ('Estado', 'get_estado_display'),
+        ],
+        ('tipo__icontains', 'origen__icontains', 'emisor__icontains', 'funcionario__nombre__icontains', 'delegacion__nombre__icontains', 'periodo__nombre__icontains'),
+        select_related=('funcionario', 'delegacion', 'periodo'),
+    ),
+    Mantenedor(
+        'ausencias', 'Ausencias', 'ausencia', 'Períodos de ausencia que ajustan el avance esperado.',
+        Ausencia, AusenciaForm,
+        [
+            ('Funcionario', 'funcionario'), ('Período', 'periodo'), ('Tipo', 'tipo'),
+            ('Desde', 'desde'), ('Hasta', 'hasta'), ('Observación', 'observacion'),
+        ],
+        ('funcionario__nombre__icontains', 'periodo__nombre__icontains', 'tipo__icontains', 'observacion__icontains'),
+        select_related=('funcionario', 'periodo'),
+    ),
 )}
 
 
 # Utilidades de presentación y auditoría
+
+def exportar_organizaciones(request):
+    if not request.user.has_perm('delegaciones_app.view_organizacion'):
+        registrar_acceso_denegado(request, 'Organizacion', request.path, 'permiso insuficiente')
+        raise Http404('Mantenedor no encontrado.')
+    registros = _organizaciones_visibles(request.user, Organizacion.objects.select_related('delegacion')).order_by('nombre')
+    query = request.GET.get('q', '').strip()
+    if query:
+        filtros = Q()
+        for campo in MANTENEDORES['organizaciones'].busqueda:
+            filtros |= Q(**{campo: query})
+        registros = registros.filter(filtros).distinct()
+    tipo = request.GET.get('tipo', '').strip()
+    delegacion = request.GET.get('delegacion', '').strip()
+    verificada = request.GET.get('verificada', '').strip()
+    orden = request.GET.get('orden', '').strip()
+    if tipo:
+        registros = registros.filter(tipo=tipo)
+    if delegacion:
+        registros = registros.filter(delegacion_id=delegacion)
+    if verificada in ('si', 'no'):
+        registros = registros.filter(verificada=verificada == 'si')
+    if orden in ('nombre', '-nombre', 'territorio', '-territorio'):
+        registros = registros.order_by(orden)
+    respuesta = HttpResponse(content_type='text/csv; charset=utf-8')
+    respuesta['Content-Disposition'] = 'attachment; filename="organizaciones_filtradas.csv"'
+    respuesta.write('\ufeff')
+    escritor = csv.writer(respuesta)
+    escritor.writerow(['Nombre', 'Tipo', 'Territorio', 'Delegación', 'Verificada', 'Domicilio'])
+    for organizacion in registros:
+        escritor.writerow([
+            organizacion.nombre, organizacion.get_tipo_display(), organizacion.territorio,
+            organizacion.delegacion.nombre if organizacion.delegacion else '', 'Sí' if organizacion.verificada else 'No',
+            organizacion.domicilio,
+        ])
+    return respuesta
 
 def _texto(objeto, acceso):
     valor = acceso(objeto) if callable(acceso) else getattr(objeto, acceso)
@@ -261,8 +344,19 @@ class MantenedorMixin(PermisoRequeridoMixin):
     def get_permiso_requerido(self):
         return self.config.permiso(self.accion)
 
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and not request.user.has_perm(self.get_permiso_requerido()):
+            registrar_acceso_denegado(request, self.config.modelo.__name__, self.config.slug, 'permiso insuficiente')
+            raise Http404('Mantenedor no encontrado.')
+        return super().dispatch(request, *args, **kwargs)
+
     def get_queryset(self):
-        return self.config.consulta()
+        registros = self.config.consulta()
+        if not registros.ordered:
+            registros = registros.order_by('pk')
+        if self.config.slug == 'organizaciones':
+            registros = _organizaciones_visibles(self.request.user, registros)
+        return registros
 
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)
@@ -278,21 +372,54 @@ class MantenedorMixin(PermisoRequeridoMixin):
 
 class MantenedorLista(MantenedorMixin, ListView):
     template_name = 'delegaciones_app/crud/lista.html'
+    paginate_by = 50
 
     def get_queryset(self):
         registros = super().get_queryset()
         self.query = self.request.GET.get('q', '').strip()
+        self.organizacion_filtros = {
+            'tipo': self.request.GET.get('tipo', '').strip(),
+            'delegacion': self.request.GET.get('delegacion', '').strip(),
+            'verificada': self.request.GET.get('verificada', '').strip(),
+        }
+        self.delegacion_estado = self.request.GET.get('estado', '').strip()
+        self.orden = self.request.GET.get('orden', '').strip()
         if self.query:
             filtros = Q()
             for campo in self.config.busqueda:
                 filtros |= Q(**{campo: self.query})
             registros = registros.filter(filtros).distinct()
+        if self.config.slug == 'organizaciones':
+            if self.organizacion_filtros['tipo']:
+                registros = registros.filter(tipo=self.organizacion_filtros['tipo'])
+            if self.organizacion_filtros['delegacion']:
+                registros = registros.filter(delegacion_id=self.organizacion_filtros['delegacion'])
+            if self.organizacion_filtros['verificada'] in ('si', 'no'):
+                registros = registros.filter(verificada=self.organizacion_filtros['verificada'] == 'si')
+        elif self.config.slug == 'delegaciones' and self.delegacion_estado in ('activas', 'inactivas'):
+            registros = registros.filter(estado=self.delegacion_estado == 'activas')
+        if self.orden in ('nombre', '-nombre', 'territorio', '-territorio'):
+            campo = 'territorio' if self.config.slug == 'organizaciones' and self.orden.lstrip('-') == 'territorio' else 'nombre'
+            registros = registros.order_by(('-' if self.orden.startswith('-') else '') + campo)
         return registros
 
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)
         config = self.config
         contexto['query'] = self.query
+        contexto['cantidad_resultados'] = contexto['paginator'].count if contexto.get('paginator') else len(contexto['object_list'])
+        contexto['orden'] = self.orden
+        contexto['delegacion_estado'] = self.delegacion_estado
+        querystring = self.request.GET.copy()
+        querystring.pop('page', None)
+        contexto['querystring'] = querystring.urlencode()
+        if config.slug == 'organizaciones':
+            contexto['organizacion_filtros'] = self.organizacion_filtros
+            contexto['tipos_organizacion'] = Organizacion.TIPOS
+            contexto['delegaciones_filtro'] = Delegacion.objects.filter(estado=True).order_by('nombre')
+            contexto['ordenes'] = (('nombre', 'Nombre A-Z'), ('-nombre', 'Nombre Z-A'), ('territorio', 'Territorio A-Z'), ('-territorio', 'Territorio Z-A'))
+        if config.slug == 'delegaciones':
+            contexto['ordenes'] = (('nombre', 'Nombre A-Z'), ('-nombre', 'Nombre Z-A'))
         contexto['columnas'] = [etiqueta for etiqueta, _ in config.columnas]
         contexto['total_columnas'] = len(config.columnas) + 1 + bool(config.baja)
         contexto['filas'] = [
@@ -318,6 +445,10 @@ class MantenedorFormularioMixin(MantenedorMixin):
         kwargs = super().get_form_kwargs()
         if self.config.con_actor:
             kwargs['actor'] = self.request.user
+        if self.config.slug == 'organizaciones':
+            kwargs['user'] = self.request.user
+        if self.config.slug in ('ajustes', 'ausencias'):
+            kwargs['user'] = self.request.user
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -327,6 +458,15 @@ class MantenedorFormularioMixin(MantenedorMixin):
 
     def form_valid(self, form):
         editando = form.instance.pk is not None
+        if isinstance(form.instance, (Ajuste, Ausencia)) and not form.instance.pk:
+            actor = funcionario_de(self.request.user)
+            if actor is None:
+                messages.error(self.request, 'No se encontró un funcionario asociado a tu cuenta.')
+                return redirect(self.get_success_url())
+            if isinstance(form.instance, Ajuste) and not form.instance.pk:
+                form.instance.informado_por = actor
+            elif isinstance(form.instance, Ausencia) and not form.instance.pk:
+                form.instance.registrada_por = actor
         anterior, nuevo = cambios_de_formulario(form, getattr(form, 'campos_sin_auditar', ()))
         with transaction.atomic():
             respuesta = super().form_valid(form)
@@ -345,6 +485,16 @@ class MantenedorNuevo(MantenedorFormularioMixin, CreateView):
 class MantenedorEditar(MantenedorFormularioMixin, UpdateView):
     accion = 'change'
     accion_titulo = 'Modificar'
+
+    def get_object(self, queryset=None):
+        if self.config.slug == 'organizaciones':
+            pk = self.kwargs.get(self.pk_url_kwarg)
+            registro = get_object_or_404(self.config.consulta(), pk=pk)
+            if not _organizaciones_visibles(self.request.user, self.config.consulta()).filter(pk=registro.pk).exists():
+                registrar_acceso_denegado(self.request, 'Organizacion', str(pk), 'fuera del ámbito')
+                raise Http404('Organización no encontrada.')
+            return registro
+        return super().get_object(queryset)
 
 
 class MantenedorEliminar(MantenedorMixin, DeleteView):
@@ -464,7 +614,7 @@ class PeriodoAccion(PermisoRequeridoMixin, View):
 
 
 def mantenedores_visibles(user):
-    """Tarjetas de los ocho mantenedores con lo que el usuario puede hacer en cada uno según sus permisos."""
+    """Tarjetas de los doce mantenedores con lo que el usuario puede hacer en cada uno según sus permisos."""
     return [
         {'slug': m.slug, 'titulo': m.titulo, 'descripcion': m.descripcion, 'permitido': user.has_perm(m.permiso('view')), 'puede': m.permisos_de(user)}
         for m in MANTENEDORES.values()
@@ -476,7 +626,7 @@ PERMISOS_DE_MANTENEDORES = tuple(m.permiso('view') for m in MANTENEDORES.values(
 
 @permiso_requerido(*PERMISOS_DE_MANTENEDORES)
 def indice(request):
-    """Índice de los ocho mantenedores; los que el usuario no puede usar aparecen deshabilitados."""
+    """Índice de los doce mantenedores; los que el usuario no puede usar aparecen deshabilitados."""
     return render(request, 'delegaciones_app/mantenedores.html', {
         'tarjetas': mantenedores_visibles(request.user),
         'puede_auditar': request.user.has_perm('delegaciones_app.view_auditoria'),

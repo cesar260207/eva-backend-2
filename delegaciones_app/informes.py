@@ -182,3 +182,31 @@ def respuesta_csv(nombre_archivo, columnas, filas):
     escritor.writerow(columnas)
     escritor.writerows(filas)
     return respuesta
+
+
+def respuesta_excel(nombre_archivo, columnas, filas):
+    """Libro Excel institucional con encabezado y fecha de emisión."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+
+    libro = Workbook()
+    hoja = libro.active
+    hoja.title = 'Informe'
+    hoja.append(['Fecha de emisión', timezone.localdate().strftime('%d-%m-%Y')])
+    hoja.append([])
+    hoja.append(columnas)
+    for celda in hoja[3]:
+        celda.font = Font(bold=True)
+    for fila in filas:
+        hoja.append(list(fila))
+    hoja.freeze_panes = 'A4'
+    hoja.auto_filter.ref = hoja.dimensions
+    for columna in hoja.columns:
+        ancho = min(max(len(str(celda.value or '')) for celda in columna) + 2, 45)
+        hoja.column_dimensions[columna[0].column_letter].width = ancho
+    respuesta = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    respuesta['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
+    libro.save(respuesta)
+    return respuesta

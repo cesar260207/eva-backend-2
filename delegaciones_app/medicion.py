@@ -8,7 +8,8 @@ from decimal import Decimal
 from django.db.models import Count, Max
 from django.utils import timezone
 
-from .models import Compromiso, Delegacion, Evidencia, Indicador, Meta, Periodo
+from .models import Compromiso, Delegacion, Evidencia, Funcionario, Indicador, Meta, Periodo
+from .reglas import porcentaje_esperado_ajustado
 
 # Código del semáforo (RN-008) -> etiqueta y clase de Bootstrap.
 COLORES = {'verde': ('Verde', 'success'), 'ambar': ('Ámbar', 'warning'), 'rojo': ('Rojo', 'danger')}
@@ -32,12 +33,19 @@ def _numero(valor):
     return format(Decimal(valor).normalize(), 'f')
 
 
+def _semaforo(cumplimiento, esperado):
+    if cumplimiento >= esperado:
+        return 'verde'
+    if cumplimiento >= esperado * Decimal('0.6'):
+        return 'ambar'
+    return 'rojo'
+
+
 def resultados_por_delegacion(periodo, texto=''):
     """Una fila por delegación activa con metas en el período."""
     if periodo is None:
         return []
     hoy = timezone.localdate()
-    esperado = periodo.porcentaje_esperado()
     delegaciones = Delegacion.objects.filter(estado=True, funcionarios__metas__item__periodo=periodo).distinct()
     if texto:
         delegaciones = delegaciones.filter(nombre__icontains=texto)
@@ -45,9 +53,13 @@ def resultados_por_delegacion(periodo, texto=''):
     for delegacion in delegaciones:
         indicadores = delegacion.ultimos_indicadores(periodo)
         cumplimiento = Delegacion.promedio_ponderado(indicadores)
+        equipo = list(Funcionario.objects.filter(
+            delegacion=delegacion, estado=True, metas__item__periodo=periodo,
+        ).distinct())
+        esperado = _esperado_equipo(equipo, periodo)
         ultimo_calculo = max((timezone.localtime(i.fecha_calculo).date() for i in indicadores), default=None)
         if indicadores:
-            codigo = periodo.calcular_semaforo(cumplimiento)
+            codigo = _semaforo(cumplimiento, esperado)
             etiqueta, clase = COLORES[codigo]
         else:
             codigo = None
@@ -64,6 +76,26 @@ def resultados_por_delegacion(periodo, texto=''):
             'ultimos_datos': ultimo_calculo,
             'dias_desde_registro': (hoy - ultimo_calculo).days if ultimo_calculo else None,
             'detalle': [f'{i.meta.item.nombre}: {_numero(i.avance)} de {_numero(i.meta.valor_objetivo)} {i.meta.unidad}' for i in indicadores],
+        })
+    return resultados
+
+
+def resultados_por_persona(periodo, delegacion=None):
+    """Semáforo individual para el equipo del Delegado o la vista global de Coordinación."""
+    if periodo is None:
+        return []
+    funcionarios = Funcionario.objects.filter(estado=True, metas__item__periodo=periodo).distinct()
+    if delegacion is not None:
+        funcionarios = funcionarios.filter(delegacion=delegacion)
+    resultados = []
+    for funcionario in funcionarios.select_related('delegacion'):
+        ficha = ficha_personal(funcionario, periodo)
+        resultados.append({
+            'funcionario': funcionario,
+            'cumplimiento': ficha['cumplimiento_total'],
+            'estado': ficha['estado_total'],
+            'estado_class': ficha['estado_total_class'],
+            'diferencia': ficha['diferencia_total'],
         })
     return resultados
 
@@ -101,8 +133,8 @@ def _formula(meta, indicador, tope):
 
 def ficha_personal(funcionario, periodo):
     """Metas del funcionario en el período con su avance, cumplimiento, semáforo y detalle (CU-06, CU-17, CU-07.3)."""
-    esperado = periodo.porcentaje_esperado()
-    tope = Decimal(periodo.obtener_parametro('maximo_cumplimiento', '150'))
+    esperado = porcentaje_esperado_ajustado(funcionario, periodo)
+    tope = Decimal(periodo.obtener_parametro('maximo_cumplimiento', '120'))
     metas = list(Meta.objects.filter(funcionario=funcionario, item__periodo=periodo).select_related('item', 'funcionario').order_by('item__nombre'))
     ultimos = {}
     for indicador in Indicador.objects.filter(meta__in=metas, periodo=periodo).select_related('meta').order_by('fecha_calculo', 'pk'):
@@ -119,7 +151,7 @@ def ficha_personal(funcionario, periodo):
             fila.update(avance=0, cumplimiento=Decimal('0.00'), ponderacion=Decimal('0.00'), estado='Sin cálculo', estado_class='secondary',
                         diferencia=None, desviacion=False, cumplida=False, formula=[])
         else:
-            codigo = periodo.calcular_semaforo(indicador.cumplimiento)
+            codigo = _semaforo(indicador.cumplimiento, esperado)
             etiqueta, clase = COLORES[codigo]
             fila.update(
                 avance=indicador.avance, cumplimiento=indicador.cumplimiento, ponderacion=indicador.ponderacion,
@@ -131,12 +163,19 @@ def ficha_personal(funcionario, periodo):
         filas.append(fila)
     indicadores = list(ultimos.values())
     total = Delegacion.promedio_ponderado(indicadores)
-    etiqueta, clase = COLORES[periodo.calcular_semaforo(total)] if indicadores else ('Sin cálculo', 'secondary')
+    etiqueta, clase = COLORES[_semaforo(total, esperado)] if indicadores else ('Sin cálculo', 'secondary')
     return {
         'filas': filas, 'esperado': esperado, 'tope': tope, 'cumplimiento_total': total,
         'estado_total': etiqueta, 'estado_total_class': clase,
         'diferencia_total': (total - esperado).quantize(Decimal('0.01')) if indicadores else None,
     }
+
+
+def _esperado_equipo(funcionarios, periodo):
+    if not funcionarios:
+        return periodo.porcentaje_esperado()
+    valores = [porcentaje_esperado_ajustado(funcionario, periodo) for funcionario in funcionarios]
+    return (sum(valores) / len(valores)).quantize(Decimal('0.01'))
 
 
 def resumen_de_evidencias(funcionario, periodo):
@@ -188,4 +227,3 @@ def actividad_reciente(actividades, periodo=None, hoy=None):
             'promedio_diario': (Decimal(fila['cantidad']) / dias).quantize(Decimal('0.01')) if dias else None,
         })
     return resultados
-

@@ -33,10 +33,10 @@ def peticion(usuario, metodo='get', ruta='/prueba/'):
 class RolesUnitTests(TestCase):
     """CU-26 Administración de delegaciones, usuarios y roles (RF-002): cómo se determinan los roles de un usuario."""
 
-    def test_existen_los_seis_roles_del_sistema(self):
+    def test_existen_solo_los_cuatro_roles_vigentes(self):
         """CU-26 Administración de usuarios y roles (RF-002). La migración crea los roles que consultan los permisos."""
         self.assertEqual(set(Rol.objects.values_list('nombre_rol', flat=True)), set(ROLES_DEL_SISTEMA))
-        self.assertEqual(len(ROLES_DEL_SISTEMA), 6)
+        self.assertEqual(len(ROLES_DEL_SISTEMA), 4)
 
     def test_un_anonimo_no_tiene_roles(self):
         """CU-26.1 Denegar acceso por ámbito (RF-002). Sin sesión no hay permisos."""
@@ -45,9 +45,9 @@ class RolesUnitTests(TestCase):
 
     def test_los_roles_salen_del_funcionario(self):
         """CU-26 Administración de usuarios y roles (RF-002). Un usuario con dos roles tiene ambos."""
-        usuario = crear_funcionario('doble-rol', 'funcionario', 'verificador')
-        self.assertEqual(roles_de(usuario), {'funcionario', 'verificador'})
-        self.assertTrue(tiene_rol(usuario, 'verificador', 'administrador'))
+        usuario = crear_funcionario('doble-rol', 'funcionario', 'delegado')
+        self.assertEqual(roles_de(usuario), {'funcionario', 'delegado'})
+        self.assertTrue(tiene_rol(usuario, 'delegado', 'administrador'))
         self.assertFalse(tiene_rol(usuario, 'administrador', 'coordinador'))
 
     def test_un_funcionario_inactivo_no_aporta_roles(self):
@@ -77,7 +77,7 @@ class RolesUnitTests(TestCase):
 
     def test_solo_administracion_y_coordinacion_ven_todo(self):
         """CU-29.1 Restricción de búsqueda por ámbito (RF-032). El resto queda limitado a su ámbito."""
-        for rol, esperado in (('administrador', True), ('coordinador', True), ('delegado', False), ('verificador', False), ('funcionario', False), ('consulta', False)):
+        for rol, esperado in (('administrador', True), ('coordinador', True), ('delegado', False), ('funcionario', False)):
             self.assertEqual(puede_ver_todo(crear_funcionario(f'ver-{rol}', rol)), esperado, rol)
 
     def test_funcionario_de_devuelve_su_funcionario(self):
@@ -91,7 +91,7 @@ class RolesUnitTests(TestCase):
         """CU-26 Administración de usuarios y roles (RF-002). El procesador de contexto lo calcula."""
         self.assertTrue(procesador_permisos(peticion(crear_funcionario('adm-menu', 'administrador')))['puede_administrar'])
         self.assertTrue(procesador_permisos(peticion(crear_funcionario('coord-menu', 'coordinador')))['puede_administrar'])
-        self.assertFalse(procesador_permisos(peticion(crear_funcionario('func-menu', 'funcionario')))['puede_administrar'])
+        self.assertTrue(procesador_permisos(peticion(crear_funcionario('func-menu', 'funcionario')))['puede_administrar'])
 
 
 class DecoradorRolUnitTests(TestCase):
@@ -169,9 +169,9 @@ class AlcanceUnitTests(EscenarioBase, TestCase):
         self.assertEqual(self._codigos(self.usuario_autor), {'Centro'})
         self.assertEqual(self._folios(self.usuario_autor), {'AL-C'})
 
-    def test_un_verificador_sin_delegacion_revisa_todas(self):
+    def test_un_delegado_revisa_solo_su_delegacion(self):
         """CU-11 Validación de actividades (RF-013). Puede revisar actividades de cualquier delegación."""
-        self.assertEqual(self._codigos(self.usuario_verificador), {'Centro', 'Rural'})
+        self.assertEqual(self._codigos(self.usuario_verificador), {'Centro'})
 
     def test_un_funcionario_sin_delegacion_solo_ve_lo_que_registro(self):
         """CU-29.1 Restricción de búsqueda por ámbito (RF-032). Sin delegación, solo sus propias actividades."""
@@ -302,11 +302,11 @@ class AuditoriaUnitTests(TestCase):
 
 
 class MantenedoresUnitTests(TestCase):
-    """CU-04, CU-26, CU-27 y CU-28 (RF-001 a RF-007): descripción de los ocho mantenedores y sus reglas de baja."""
+    """CU-04, CU-26, CU-27 y CU-28 (RF-001 a RF-007): descripción de los doce mantenedores y sus reglas de baja."""
 
-    def test_son_exactamente_ocho_mantenedores(self):
+    def test_son_exactamente_doce_mantenedores(self):
         """CU-26 Administración de delegaciones, usuarios y roles (RF-001). Las ocho tablas maestras."""
-        self.assertEqual(set(crud.MANTENEDORES), {'delegaciones', 'cargos', 'roles', 'funcionarios', 'catalogo', 'periodos', 'items', 'metas'})
+        self.assertEqual(set(crud.MANTENEDORES), {'delegaciones', 'cargos', 'roles', 'funcionarios', 'catalogo', 'organizaciones', 'periodos', 'parametros', 'items', 'metas', 'ajustes', 'ausencias'})
 
     def test_cada_mantenedor_apunta_a_un_modelo_y_un_formulario_coherentes(self):
         """CU-26 Administración de delegaciones, usuarios y roles (RF-001). La consulta se arma sin error."""

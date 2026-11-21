@@ -7,6 +7,7 @@
         <h1 class="page-title mb-4">{{ titulo }}</h1>
         <div class="panel">
             <p>{{ pregunta }} <strong>{{ objeto }}</strong>?</p>
+            <p class="small text-muted">Revisa esta acción antes de continuar. Si el registro tiene información relacionada, el sistema puede desactivarlo en lugar de eliminarlo para conservar el historial.</p>
             {% if bloqueo %}<div class="alert alert-danger">{{ bloqueo }}</div>{% endif %}
             {% if advertencia %}<div class="alert alert-warning">{{ advertencia }}</div>{% endif %}
             <form method="post" class="d-flex justify-content-end gap-2">

@@ -10,6 +10,7 @@
     <a href="{% url 'actividad_nueva' %}" class="btn btn-sgr">+ Nueva actividad</a>
 </div>
 <div class="panel">
+    <div class="list-help mb-3"><strong>Flujo recomendado:</strong> registra la actividad, adjunta la evidencia y revisa el estado. Usa los filtros para encontrar rápidamente un registro existente.</div>
     <form class="filtros mb-3" method="get">
         <div class="filtro-texto"><label class="form-label small mb-1" for="q">Buscar</label><input class="form-control" id="q" name="q" value="{{ query }}" placeholder="Código, solicitud o ítem"></div>
         <div><label class="form-label small mb-1" for="delegacion">Delegación</label><select class="form-select" id="delegacion" name="delegacion">{% if delegaciones_filtro|length > 1 %}<option value="">Todas</option>{% endif %}{% for d in delegaciones_filtro %}<option value="{{ d.pk }}" {% if filtros.delegacion == d.pk|stringformat:'s' %}selected{% endif %}>{{ d.nombre }}</option>{% endfor %}</select></div>
@@ -17,7 +18,7 @@
         <div><label class="form-label small mb-1" for="periodo">Período</label><select class="form-select" id="periodo" name="periodo"><option value="">Todos</option>{% for p in periodos_filtro %}<option value="{{ p.pk }}" {% if filtros.periodo == p.pk|stringformat:'s' %}selected{% endif %}>{{ p.nombre }}</option>{% endfor %}</select></div>
         <div><label class="form-label small mb-1" for="desde">Desde</label><input class="form-control" type="date" id="desde" name="desde" value="{{ filtros.desde }}"></div>
         <div><label class="form-label small mb-1" for="hasta">Hasta</label><input class="form-control" type="date" id="hasta" name="hasta" value="{{ filtros.hasta }}"></div>
-        <div class="acciones"><button class="btn btn-outline-sgr" type="submit">Filtrar</button>{% if filtrado %}<a class="btn btn-link" href="{% url 'actividades' %}">Limpiar</a>{% endif %}</div>
+        <div class="acciones"><button class="btn btn-outline-sgr" type="submit">Filtrar</button>{% if filtrado %}<a class="btn btn-link" href="{% url 'actividades' %}">Limpiar filtros</a>{% endif %}</div>
         <div class="acciones"><a class="btn btn-link" href="{% url 'informe' %}?tipo=actividades&{{ filtros.urlencode }}">Generar informe</a></div>
     </form>
     <div class="table-responsive">
@@ -31,7 +32,7 @@
                     <td class="col-texto">{{ actividad.solicitud_problema|truncatechars:70 }}</td>
                     <td>{{ actividad.funcionario_autor.nombre }}</td>
                     <td>{{ actividad.delegacion }}</td>
-                    <td><span class="badge badge-soft">{{ actividad.get_estado_display }}</span></td>
+                    <td><span class="badge badge-soft">{{ actividad.get_estado_display }}</span><div class="small text-muted mt-1">{% if actividad.estado == 'aprobada' %}Lista para medir{% elif actividad.estado == 'pendiente' %}Esperando revisión{% elif actividad.estado == 'rechazada' %}Requiere corrección{% else %}En preparación{% endif %}</div></td>
                     <td>
                         {% if actividad.total_evidencias %}
                         <span class="badge badge-success-soft">Con evidencia ({{ actividad.total_evidencias }})</span>
