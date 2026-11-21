@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.core.validators import FileExtensionValidator, MinValueValidator
 from django.db import models, transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from datetime import datetime, time, timedelta
@@ -285,10 +285,16 @@ class Actividad(VersionOptimistaMixin, models.Model):
 				raise ValidationError({'fecha': f'La fecha de la actividad debe estar dentro del período «{periodo}».'})
 			if self.fecha:
 				fecha = timezone.localtime(self.fecha).date()
-				validar_fecha_actividad(fecha, periodo)
+				# Regla 4: el cierre semanal impide ingresar actividades de una semana anterior, pero no corregir
+				# una ya registrada (por ejemplo, una rechazada) mientras no se cambie el día de su fecha.
+				validar_fecha_actividad(fecha, periodo, cierre_semanal=self._state.adding or self._cambia_el_dia(fecha))
 				if self._state.adding and self.funcionario_autor_id:
 					validar_limite_diario(self.funcionario_autor, fecha, periodo)
 		self.cuenta_puntaje, self.motivo_sin_puntaje = evaluar_puntaje(self)
+
+	def _cambia_el_dia(self, fecha):
+		guardada = Actividad.objects.filter(pk=self.pk).values_list('fecha', flat=True).first()
+		return guardada is None or timezone.localtime(guardada).date() != fecha
 
 	def save(self, *args, **kwargs):
 		self.generar_codigo_verificador()
@@ -527,11 +533,23 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 			return 'La tarea está vencida sin realizarse: se conserva con su historial de seguimiento.'
 		return None
 
+	def save(self, *args, **kwargs):
+		super().save(*args, **kwargs)
+		self.actualizar_indicadores()
+
 	def delete(self, *args, **kwargs):
 		motivo = self.motivo_no_eliminable()
 		if motivo:
 			raise ValidationError(motivo)
-		return super().delete(*args, **kwargs)
+		resultado = super().delete(*args, **kwargs)
+		self.actualizar_indicadores()
+		return resultado
+
+	def actualizar_indicadores(self):
+		"""Ítem tipo «tubo»: crear, cambiar de estado o eliminar una tarea cambia el porcentaje realizado de su delegación."""
+		if not self.item_id or self.item.tipo_calculo != 'tubo':
+			return []
+		return Indicador.recalcular(Meta.objects.filter(item_id=self.item_id, funcionario__delegacion_id=self.delegacion_id))
 
 	def registrar_historial(self, autor, estado_anterior, observacion=None):
 		HistorialCompromiso.objects.create(
@@ -881,6 +899,12 @@ class Indicador(ControlPeriodoCerradoMixin, models.Model):
 		indicador.save()
 		return indicador
 
+	@classmethod
+	def recalcular(cls, metas):
+		"""CU-06.1: un Indicador nuevo para cada meta afectada; las de un período cerrado quedan congeladas (RN-013)."""
+		metas = metas.select_related('funcionario', 'item__periodo')
+		return [cls.generar(meta) for meta in metas if meta.item.periodo.estado != 'cerrado']
+
 	def calcular_avance(self):
 		"""RN-003 y RN-009: actividades aprobadas del ítem en el período que tienen una validación aprobada.
 
@@ -917,12 +941,13 @@ class Indicador(ControlPeriodoCerradoMixin, models.Model):
 		felicitaciones = aplicados.filter(tipo='felicitacion')
 		reclamos = aplicados.filter(tipo='reclamo')
 		if self.meta.funcionario_id:
-			felicitaciones = felicitaciones.filter(funcionario=self.meta.funcionario).union(
-				aplicados.filter(tipo='felicitacion', delegacion=self.meta.funcionario.delegacion)
-			)
-			reclamos = reclamos.filter(funcionario=self.meta.funcionario).union(
-				aplicados.filter(tipo='reclamo', delegacion=self.meta.funcionario.delegacion)
-			)
+			# Regla 8: cuentan los ajustes del funcionario y los de su delegación, si tiene una (sin delegación,
+			# delegacion=None traería los ajustes dirigidos a cualquier otra persona).
+			destinatario = Q(funcionario=self.meta.funcionario)
+			if self.meta.funcionario.delegacion_id:
+				destinatario |= Q(delegacion_id=self.meta.funcionario.delegacion_id)
+			felicitaciones = felicitaciones.filter(destinatario)
+			reclamos = reclamos.filter(destinatario)
 		cantidad_felicitaciones = min(felicitaciones.count(), int(self.periodo.obtener_parametro('max_felicitaciones', '3')))
 		self.ajuste = (
 			Decimal(cantidad_felicitaciones) * Decimal(self.periodo.obtener_parametro('valor_felicitacion', '10'))
@@ -985,6 +1010,27 @@ class Ajuste(ControlPeriodoCerradoMixin, models.Model):
 		if self.tipo == 'felicitacion' and not self.emisor.strip():
 			raise ValidationError({'emisor': 'Indica quién emitió la felicitación.'})
 
+	def save(self, *args, **kwargs):
+		super().save(*args, **kwargs)
+		if self.estado in ('aplicado', 'rechazado'):
+			self.actualizar_indicadores()
+
+	def delete(self, *args, **kwargs):
+		aplicado = self.estado == 'aplicado'
+		resultado = super().delete(*args, **kwargs)
+		if aplicado:
+			self.actualizar_indicadores()
+		return resultado
+
+	def actualizar_indicadores(self):
+		"""Regla 8: al aplicar o rechazar el ajuste se recalculan las metas de su destinatario (funcionario o delegación)."""
+		metas = Meta.objects.filter(item__periodo_id=self.periodo_id)
+		if self.funcionario_id:
+			metas = metas.filter(funcionario_id=self.funcionario_id)
+		else:
+			metas = metas.filter(funcionario__delegacion_id=self.delegacion_id)
+		return Indicador.recalcular(metas)
+
 
 class Ausencia(ControlPeriodoCerradoMixin, models.Model):
 	TIPOS = [
@@ -993,6 +1039,7 @@ class Ausencia(ControlPeriodoCerradoMixin, models.Model):
 		('administrativo', 'Administrativo'),
 		('compensatorio', 'Compensatorio'),
 		('dia_libre', 'Día libre'),
+		('emergencia', 'Emergencia'),
 	]
 	funcionario = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='ausencias')
 	periodo = models.ForeignKey(Periodo, on_delete=models.PROTECT, related_name='ausencias')
@@ -1012,6 +1059,19 @@ class Ausencia(ControlPeriodoCerradoMixin, models.Model):
 			).exclude(pk=self.pk)
 			if solapada.exists():
 				raise ValidationError('La ausencia se superpone con otra ausencia existente.')
+
+	def save(self, *args, **kwargs):
+		super().save(*args, **kwargs)
+		self.actualizar_indicadores()
+
+	def delete(self, *args, **kwargs):
+		resultado = super().delete(*args, **kwargs)
+		self.actualizar_indicadores()
+		return resultado
+
+	def actualizar_indicadores(self):
+		"""Regla 9: la ausencia cambia lo esperado al día del funcionario; se recalculan sus metas del período."""
+		return Indicador.recalcular(Meta.objects.filter(item__periodo_id=self.periodo_id, funcionario_id=self.funcionario_id))
 
 
 class CasoSocial(models.Model):

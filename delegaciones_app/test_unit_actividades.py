@@ -1,15 +1,16 @@
 """Pruebas unitarias del registro de actividades, la carga de evidencias y su validación (EP-01 y EP-03)."""
-from datetime import datetime
+from datetime import date, datetime
 
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
 from .forms import ActividadForm, EvidenciaForm
 from .informes import filtrar_actividades
 from .models import Actividad, Cargo, Catalogo, Evidencia, Indicador, ItemMedible, Meta, Organizacion, Validacion, validar_tamano_evidencia
-from .pruebas_base import EscenarioBase, crear_funcionario
+from .pruebas_base import EscenarioBase, crear_funcionario, fijar_hoy
 
 
 class ActividadUnitTests(EscenarioBase, TestCase):
@@ -17,6 +18,8 @@ class ActividadUnitTests(EscenarioBase, TestCase):
 
     def setUp(self):
         self.crear_escenario()
+        # La fecha válida es el 10 de septiembre: el viernes 11 su semana sigue abierta (regla 4).
+        self.hoy = fijar_hoy(self, date(2026, 9, 11))
 
     def _datos(self, **cambios):
         datos = {
@@ -62,6 +65,7 @@ class ActividadUnitTests(EscenarioBase, TestCase):
     def test_los_limites_del_periodo_son_validos(self):
         """CU-01.1 Validar campos de actividad (RF-010). El primer y el último día del período se aceptan."""
         for dia in (datetime(2026, 9, 1, 0, 0), datetime(2026, 9, 30, 23, 59)):
+            self.hoy.return_value = dia.date()
             self.autor.registrar_actividad(self._datos(fecha=timezone.make_aware(dia), solicitud_problema=f'Día {dia:%d}'))
         self.assertEqual(Actividad.objects.count(), 2)
 
@@ -220,6 +224,33 @@ class ActividadFormUnitTests(EscenarioBase, TestCase):
         formulario = ActividadForm(self._datos(fecha='ayer a las diez'), user=self.usuario_autor)
         self.assertFalse(formulario.is_valid())
         self.assertIn('fecha', formulario.errors)
+
+    def test_no_se_ingresa_una_actividad_de_una_semana_cerrada(self):
+        """CU-01.1 Validar campos de actividad (RF-010). Regla 4: no se ingresan actividades de una semana anterior."""
+        antigua = self.fecha_valida - timezone.timedelta(days=14)
+        formulario = ActividadForm(self._datos(fecha=antigua.strftime('%Y-%m-%dT%H:%M')), user=self.usuario_autor)
+        self.assertFalse(formulario.is_valid())
+        self.assertIn('cierre semanal', str(formulario.errors['fecha']))
+
+    def test_corregir_una_actividad_rechazada_antigua_la_devuelve_a_pendiente(self):
+        """CU-01.1 Validar campos de actividad (RF-010). Regla 4: el cierre semanal no impide corregir una actividad rechazada de hace dos semanas."""
+        antigua = self.fecha_valida - timezone.timedelta(days=14)
+        actividad = self.nueva_actividad(fecha=antigua, estado='rechazada')
+        self.client.force_login(self.usuario_autor)
+        respuesta = self.client.post(reverse('actividad_editar', args=[actividad.codigo_verificador]), self._datos(
+            fecha=timezone.localtime(antigua).strftime('%Y-%m-%dT%H:%M'), solicitud_problema='Solicitud corregida', version=actividad.version,
+        ))
+        self.assertRedirects(respuesta, reverse('actividad_detalle', args=[actividad.codigo_verificador]))
+        actividad.refresh_from_db()
+        self.assertEqual((actividad.estado, actividad.solicitud_problema), ('pendiente', 'Solicitud corregida'))
+
+    def test_al_corregir_no_se_mueve_la_fecha_a_una_semana_cerrada(self):
+        """CU-01.1 Validar campos de actividad (RF-010). Regla 4: cambiar el día de la fecha a una semana anterior es un ingreso nuevo y se rechaza."""
+        actividad = self.nueva_actividad(fecha=self.fecha_valida, estado='rechazada')
+        antigua = self.fecha_valida - timezone.timedelta(days=14)
+        formulario = ActividadForm(self._datos(fecha=antigua.strftime('%Y-%m-%dT%H:%M'), version=actividad.version), instance=actividad, user=self.usuario_autor)
+        self.assertFalse(formulario.is_valid())
+        self.assertIn('cierre semanal', str(formulario.errors['fecha']))
 
     def test_un_telefono_invalido_se_informa_en_el_formulario(self):
         """CU-01.2 Gestionar error de validación (RF-010). El error del teléfono aparece en su campo."""

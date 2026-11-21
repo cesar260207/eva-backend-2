@@ -6,9 +6,14 @@ from django.db.models import Count
 from django.utils import timezone
 
 
+def fecha_de_hoy():
+	"""Fecha local que usa el cierre semanal; las pruebas con fechas fijas la reemplazan (pruebas_base.fijar_hoy)."""
+	return timezone.localdate()
+
+
 def semana_abierta(fecha, hoy=None):
 	"""Devuelve si una fecha de actividad todavía pertenece a una semana abierta."""
-	hoy = hoy or timezone.localdate()
+	hoy = hoy or fecha_de_hoy()
 	if fecha > hoy:
 		return False
 	lunes_actual = hoy - timedelta(days=hoy.weekday())
@@ -17,11 +22,12 @@ def semana_abierta(fecha, hoy=None):
 	return fecha >= lunes_actual
 
 
-def validar_fecha_actividad(fecha, periodo):
-	hoy = timezone.localdate()
+def validar_fecha_actividad(fecha, periodo, cierre_semanal=True):
+	"""Regla 4: el cierre semanal solo se aplica a los ingresos (cierre_semanal=False al corregir sin cambiar la fecha)."""
+	hoy = fecha_de_hoy()
 	if fecha > hoy:
 		raise ValidationError({'fecha': 'La fecha de la actividad no puede estar en el futuro.'})
-	if not semana_abierta(fecha, hoy):
+	if cierre_semanal and not semana_abierta(fecha, hoy):
 		raise ValidationError({'fecha': 'El cierre semanal impide registrar una actividad de una semana anterior.'})
 	if not periodo.fecha_inicio <= fecha <= periodo.fecha_termino:
 		raise ValidationError({'fecha': f'La fecha debe estar dentro del período «{periodo}».'})
@@ -58,7 +64,7 @@ def dias_ausencia(funcionario, periodo, hasta=None):
 	for ausencia in funcionario.ausencias.filter(desde__lte=hasta, hasta__gte=desde):
 		inicio = max(desde, ausencia.desde)
 		termino = min(hasta, ausencia.hasta)
-		dias.update(desde + timedelta(days=i) for i in range((termino - inicio).days + 1))
+		dias.update(inicio + timedelta(days=i) for i in range((termino - inicio).days + 1))
 	return len(dias)
 
 

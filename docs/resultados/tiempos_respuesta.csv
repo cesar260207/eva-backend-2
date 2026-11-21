@@ -1,0 +1,13 @@
+perfil,pagina,url,llamadas,promedio_ms,maximo_ms,limite_rnf002_ms,cumple
+Profesional,Panel del perfil,/gestion/panel/,20,45.1,50.8,5000,sí
+Profesional,Lista de actividades,/actividades/,20,17.9,20.7,2000,sí
+Profesional,Formulario de actividad,/actividad/nueva/,20,20.5,21.7,2000,sí
+Profesional,Detalle de actividad,/actividad/EVD-DEMO-0001/,20,17.9,37.3,2000,sí
+Profesional,Ficha personal,/gestion/mi-ficha/,20,16.1,17.4,5000,sí
+Delegado,Semáforo,/gestion/semaforo/,20,22.9,24.1,5000,sí
+Delegado,Tubo de trabajo,/agenda/,20,21.6,28.4,2000,sí
+Coordinador,Cumplimiento general,/gestion/,20,13.7,16.4,5000,sí
+Coordinador,Resumen por delegación,/gestion/resumen/,20,15.9,18.5,5000,sí
+Coordinador,Lista de ajustes,/administracion/ajustes/,20,10.2,12.7,2000,sí
+Coordinador,Informes,/gestion/informes/,20,13.0,15.1,5000,sí
+Administrador,Consulta de auditoría,/administracion/auditoria/,20,5.7,9.8,2000,sí

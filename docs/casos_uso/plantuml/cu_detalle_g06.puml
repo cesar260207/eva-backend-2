@@ -1,0 +1,57 @@
+@startuml cu_detalle_g06
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #8E2B24
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+}
+skinparam ArrowFontSize 11
+
+left to right direction
+title Gestionar ajustes de puntaje (G06 · EP-02): caso de uso detallado
+actor "Delegado" as Delegado
+actor "Coordinador" as Coordinador
+actor "Administrador" as Administrador
+rectangle "Gestionar ajustes de puntaje" {
+  usecase "CU-64\nInformar felicitación o reclamo" as aj_inf
+  usecase "CU-65\nConsultar ajustes" as aj_con
+  usecase "CU-66\nModificar ajuste" as aj_mod
+  usecase "CU-67\nAplicar o rechazar ajuste" as aj_dec
+  usecase "CU-68\nValidar datos de ajuste" as aj_valid
+  usecase "CU-29\nBuscar y filtrar" as buscar
+  usecase "CU-45\nRegistrar en auditoría" as auditar
+  usecase "CU-69\nInformar error de validación" as error_valid
+  usecase "CU-28.1\nRestricción por período cerrado" as periodo_cerrado
+  usecase "CU-70\nConsulta sin coincidencias" as sin_resultados
+}
+Delegado --> aj_inf
+Administrador --> aj_inf
+Delegado --> aj_con
+Coordinador --> aj_con
+Administrador --> aj_con
+Coordinador --> aj_mod
+Administrador --> aj_mod
+Coordinador --> aj_dec
+Administrador --> aj_dec
+aj_inf ..> aj_valid : <<include>>
+aj_inf ..> auditar : <<include>>
+aj_con ..> buscar : <<include>>
+aj_mod ..> buscar : <<include>>
+aj_mod ..> aj_valid : <<include>>
+aj_mod ..> auditar : <<include>>
+aj_dec ..> buscar : <<include>>
+aj_dec ..> auditar : <<include>>
+error_valid ..> aj_valid : <<extend>>
+periodo_cerrado ..> aj_inf : <<extend>>
+periodo_cerrado ..> aj_mod : <<extend>>
+periodo_cerrado ..> aj_dec : <<extend>>
+sin_resultados ..> buscar : <<extend>>
+@enduml

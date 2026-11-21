@@ -1,0 +1,24 @@
+digraph G {
+rankdir=LR; newrank=true; nodesep=0.22; ranksep=0.75; splines=true; pad=0.25;
+graph [fontname="DejaVu Sans", fontsize=15, labelloc=t, labeljust=l];
+node [fontname="DejaVu Sans", fontsize=11];
+edge [fontname="DejaVu Sans", fontsize=9, color="#333333", fontcolor="#444444"];
+subgraph cluster_s { label=<<b>Gestionar atenciones sociales (G08 · EP-01)</b>>; color="#333333"; penwidth=1.4; margin=14;
+"social" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Registrar atención social</b><br/><font point-size="9" color="#555555">CU-03</font>>];
+"social_valid" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Validar datos de atención social<br/><font point-size="9" color="#555555">CU-76</font>>];
+"auditar" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Registrar en auditoría<br/><font point-size="9" color="#555555">CU-45</font>>];
+"error_valid" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Informar error de validación<br/><font point-size="9" color="#555555">CU-69</font>>];
+"tres" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Rechazar por máximo de tres gestiones<br/><font point-size="9" color="#555555">CU-77</font>>];
+}
+"A_Profesional" [shape=none, image="cu_v2/dot/_actor.png", labelloc=b, imagepos=tc, height=1.05, width=1.2, fixedsize=true, label=<<b>Profesional</b>>, fontsize=11];
+"A_Administrador" [shape=none, image="cu_v2/dot/_actor.png", labelloc=b, imagepos=tc, height=1.05, width=1.2, fixedsize=true, label=<<b>Administrador</b>>, fontsize=11];
+{rank=same; "A_Profesional"; "A_Administrador";}
+label=<<font point-size="10" color="#444444">Rojo: caso de detalle · Gris: incluido (siempre ocurre) · Café: extensión (solo si se cumple su condición) · Triángulo: herencia</font>>; labelloc=b; labeljust=r;
+{rank=same; "social";}
+"A_Profesional" -> "social" [arrowhead=none, penwidth=1.1, weight=3];
+"A_Administrador" -> "social" [arrowhead=none, penwidth=1.1, weight=3];
+"social" -> "social_valid" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"social" -> "auditar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"social" -> "tres" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"social_valid" -> "error_valid" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»"];
+}

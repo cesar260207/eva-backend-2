@@ -36,6 +36,15 @@ desplegable en una instancia AWS EC2.
 - Gestión de usuarios propia: crear cuentas, asignar perfil (grupo) y roles, activar o desactivar,
   desde el mantenedor «Funcionarios y usuarios». Django Admin no está instalado ni publicado.
 - Variables de entorno para toda configuración sensible (nunca escritas en el código).
+- Reglas de la reunión de octubre 2026 ([docs/REQUERIMIENTOS_V2.md](docs/REQUERIMIENTOS_V2.md)): actividades sin
+  puntaje cuando son gestión interna, gestión previa o no tienen nombre y teléfono del contacto; máximo de 7
+  ingresos diarios; cierre semanal al registrar; tope de 120 % por ítem; felicitaciones y reclamos que informa el
+  delegado y aplica o rechaza la coordinación desde la lista de ajustes; ausencias que el delegado registra desde
+  el semáforo; atención social por etapas; comentarios en las actividades.
+- El semáforo se recalcula al aprobar una actividad, al decidir un ajuste, al registrar o borrar una ausencia y al
+  cambiar una tarea del tubo de un ítem tipo «tubo».
+- Carga de la Matriz SGR (13 cargos y sus ítems) e importación de las organizaciones comunitarias del municipio,
+  con comandos que no publican datos personales.
 
 ### Nombres en la interfaz
 
@@ -132,6 +141,21 @@ python manage.py runserver
 `calcular_indicadores` crea el indicador de cada meta de los períodos abiertos; se
 repite cuando se cargan metas o actividades directamente en la base.
 
+`seed_demo` crea dos períodos: julio-septiembre 2026 y el trimestre que incluye la fecha actual. En este
+último carga los 13 cargos de la matriz (`data/matriz_cargos.json`), el ítem «Atención de casos sociales» con
+una meta de 2 para `funcionario.centro` (aprobar una actividad cambia el semáforo de rojo a ámbar), y ejemplos
+ficticios de organización, felicitación por decidir, ausencia y atención social.
+
+Datos del municipio (nunca se suben a GitHub; se copian al servidor por `scp`):
+
+```bash
+# Matriz SGR: del Excel a data/matriz_cargos.json (sin nombres de personas) y luego a un período
+python manage.py generar_matriz "<ruta>/MATRIZ SGR TRIMESTRE.xlsx"
+python manage.py cargar_matriz data/matriz_cargos.json --periodo "Trimestre octubre-diciembre 2026"
+# Organizaciones comunitarias: asigna la delegación por territorio y el tipo por el nombre
+python manage.py importar_organizaciones "<ruta>/organizaciones_comunitarias.xlsx"
+```
+
 `makemigrations` se usa durante el desarrollo cuando cambian los modelos; al
 instalar o desplegar se aplican las migraciones versionadas con `migrate`.
 
@@ -200,6 +224,11 @@ Los datos son sinteticos y solo sirven para demostracion academica.
   y cumplimiento (pantalla, imprimir y CSV).
 - `/gestion/alertas/`: alertas según tu rol y tu ámbito.
 - `/territorio/`: contexto institucional.
+- `/ajustes/nuevo/`: informar una felicitación o un reclamo (Delegado; también en el menú del usuario).
+  La coordinación los aplica o rechaza desde `/administracion/ajustes/`.
+- `/ausencias/nuevo/`: registrar una ausencia (Delegado, desde el botón del semáforo).
+- `/casos-sociales/nuevo/`: registrar una atención social (Profesional; también en el menú del usuario).
+- `/actividad/<código>/comentario/`: comentar una actividad (botón «Comentar» del detalle).
 
 ## Roles de trabajo y flujo
 
@@ -368,13 +397,77 @@ Las pruebas están en `delegaciones_app`:
 `plan_pruebas` ejecuta todo y escribe `PLAN_DE_PRUEBAS.md`: cobertura por caso de uso y por
 requisito, la tabla CP, CU, RF, método de prueba y resultado, y las fichas de login.
 
+Cobertura del código y tiempos de respuesta (herramientas de desarrollo, no se instalan en el servidor):
+
+```bash
+pip install -r requirements-dev.txt
+coverage run manage.py test && coverage report   # configuración en .coveragerc
+python scripts/medir_tiempos.py                  # escribe docs/resultados/tiempos_respuesta.csv
+```
+
+GitHub Actions (`.github/workflows/pruebas.yml`) ejecuta `check`, revisa que no falten migraciones y corre
+las pruebas en cada pull request. Los resultados medidos están en [docs/RESULTADOS.md](docs/RESULTADOS.md).
+
+## Preguntas pendientes para el municipio
+
+La matriz SGR y el documento de requerimientos de octubre 2026 no coinciden en algunos valores. El sistema
+deja cada valor como parámetro versionado del período (mantenedor «Parámetros del período») y usa el del
+documento de octubre hasta que el municipio confirme:
+
+| Tema | Matriz SGR | Documento de octubre | Valor en el sistema | Parámetro |
+|---|---|---|---|---|
+| Tope del cumplimiento de cada ítem | 150 % | 120 % (regla 7) | 120 % | `maximo_cumplimiento` |
+| Valor de un reclamo | -20 % en la hoja RECLAMOS y en «Coordinador DISERCO» y «Gestor social 1»; -30 % en las demás hojas de cargo | No lo fija | -30 % | `valor_reclamo` |
+| Ponderaciones de «Planificación y control» | Suman 85 % | No lo fija | Se cargan como están; para iniciar el período el sistema exige 100 % por cargo | Ítems medibles |
+| Meta del ítem «Emergencia» | En varias hojas coincide con el avance (por ejemplo, 304) | No lo fija | Se carga como está | Ítems medibles y metas |
+| Felicitación dirigida a un gestor | No lo distingue | No valen las del usuario al gestor por mensaje; las informa el delegado | Se acepta para cualquier funcionario si tiene respaldo formal y la informa el delegado | Ajustes |
+| Organizaciones sin delegación | 2 del territorio «ALFALFARES» y 22 sin territorio | No lo fija | Quedan sin delegación y sin verificar, para asignar a mano | Organizaciones |
+
+`cargar_matriz` crea estos parámetros con los valores de la tabla, pero no pisa un valor que la
+coordinación ya haya definido en el período.
+
 ## Alcance y requisitos pendientes
 
-Todos los casos de uso de la especificación detallada (CU-01 a CU-30, con sus extensiones) tienen pruebas. Entre los requisitos
-funcionales no están implementados: RF-015 (atención social por etapas), RF-020 (el cierre de un
-compromiso no alimenta el indicador), RF-025 (incentivos y penalizaciones), RF-031 (vista global
-por cargos) y RF-035 (comentarios). El detalle de cada uno está en [MODELO_DATOS.md](MODELO_DATOS.md)
-y en la sección 4 de [PLAN_DE_PRUEBAS.md](PLAN_DE_PRUEBAS.md).
+Todos los casos de uso de la especificación detallada (CU-01 a CU-30, con sus extensiones) tienen pruebas, y
+`test_casos_de_uso.py` comprueba que los actores de los cuadros de casos de uso coinciden con los permisos
+reales (184 de 184 combinaciones de perfil y pantalla). Con los requerimientos de octubre quedaron
+implementados RF-015 (atención social), RF-020 (el ítem tipo «tubo» mide las tareas realizadas), RF-025
+(felicitaciones y reclamos) y RF-035 (comentarios). Sigue pendiente RF-031 (vista global por cargos). El
+detalle está en [docs/REQUERIMIENTOS_V2.md](docs/REQUERIMIENTOS_V2.md) y en la sección 4 de
+[PLAN_DE_PRUEBAS.md](PLAN_DE_PRUEBAS.md).
+
+## Documentación
+
+| Documento | Contenido |
+|---|---|
+| [docs/REQUERIMIENTOS_V2.md](docs/REQUERIMIENTOS_V2.md) | Requerimientos v2: los de octubre 2026 como RF y RNF, con criterio de aceptación y prueba |
+| [docs/CASOS_DE_USO.md](docs/CASOS_DE_USO.md) | 19 gestiones de alto nivel y sus casos de detalle, cuadros y trazabilidad |
+| [docs/DIAGRAMA_CLASES.md](docs/DIAGRAMA_CLASES.md) | Diagrama de clases desde los modelos reales, con las clases nuevas de octubre |
+| [docs/diagramas/](docs/diagramas/) | Diagramas del informe que cambiaron: requerimientos, entidad-relación, paquetes y trazabilidad |
+| [MODELO_DATOS.md](MODELO_DATOS.md) | Modelo de datos y justificación de cada modelo nuevo |
+| [docs/BACKLOG_SPRINT.md](docs/BACKLOG_SPRINT.md) | Sprint backlog repriorizado por los requerimientos de octubre |
+| [docs/PLAN_MANTENCION.md](docs/PLAN_MANTENCION.md) | Mantención correctiva, preventiva, adaptativa y perfectiva, con roles, recursos y calendario |
+| [docs/NORMATIVAS_Y_ESTANDARES.md](docs/NORMATIVAS_Y_ESTANDARES.md) | Leyes 19.628 y 21.719, OWASP Top 10, ISO/IEC 25010 y estándares de código |
+| [docs/RESULTADOS.md](docs/RESULTADOS.md) | Resultados medidos (pruebas, cobertura, requerimientos, tiempos) con CSV para gráficos |
+| [docs/DEMO_EXPOSICION.md](docs/DEMO_EXPOSICION.md) | Guía de la exposición: flujos en vivo, guion y estructura |
+| [docs/PREGUNTAS_DEFENSA.md](docs/PREGUNTAS_DEFENSA.md) | Preguntas probables de la defensa con su respuesta |
+
+## Autoría de los commits
+
+El historial de `main` incluye 9 commits firmados como «Tu Nombre <tu@email.com>», una firma genérica de Git
+que no identifica a un integrante. Como la evaluación considera los aportes de cada uno, aquí queda quién los hizo:
+
+| Commit | Fecha | Descripción | Autor real |
+|---|---|---|---|
+| 5bce630 | 2026-09-23 | Initial project upload | [COMPLETAR POR EL GRUPO] |
+| 25431ec | 2026-09-26 | feat: integra modelos relacionales, migraciones y mejoras de administración | [COMPLETAR POR EL GRUPO] |
+| c42daec | 2026-09-26 | fix: mejora busqueda, historico y archivos estaticos | [COMPLETAR POR EL GRUPO] |
+| 7271a86 | 2026-09-26 | Arreglo de Errores y Dependencias | [COMPLETAR POR EL GRUPO] |
+| 647d6f0 | 2026-09-26 | corrigiendo las rutas | [COMPLETAR POR EL GRUPO] |
+| dfc310e | 2026-09-27 | Mudanza de base de datos | [COMPLETAR POR EL GRUPO] |
+| ffbb5e2 | 2026-11-09 | Actualizar proyecto SGR y mejorar usabilidad (llegó con el pull request #16) | [COMPLETAR POR EL GRUPO] |
+| 7b1a99f | 2026-11-12 | Completar permisos operativos por perfil (llegó con el pull request #16) | [COMPLETAR POR EL GRUPO] |
+| d279465 | 2026-11-20 | fix: tilde mal codificada en un comentario de settings.py | [COMPLETAR POR EL GRUPO] |
 
 ## Despliegue en AWS EC2
 
@@ -445,7 +538,7 @@ El `.env` nunca se sube a Git. Para la recuperación de contraseña se agregan l
 **Actualizar un servidor ya desplegado** (por ejemplo, para la Evaluación Sumativa 3):
 
 ```bash
-mysqldump -u gestion_user -p gestion_laserena > respaldo_$(date +%F).sql
+mysqldump --no-tablespaces -u gestion_user -p gestion_laserena > ~/respaldo_$(date +%F).sql   # debe terminar en «Dump completed»
 git pull
 source venv/bin/activate && pip install -r requirements.txt
 nano .env                                  # agregar EMAIL_BACKEND, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD...
@@ -465,8 +558,16 @@ Qué hacen las migraciones de perfiles y permisos de la Evaluación Sumativa 3:
 | `0018_perfiles_por_jerarquia` | Renombra Supervisor a Coordinador y Administrativo a Funcionario, crea Delegado y mueve allí a los delegados y verificadores | Sí: grupos y asignaciones de usuarios |
 | `0019_eliminar_actividad_solo_coordinacion` | Da al Coordinador el permiso `delete_actividad` | Sí: una fila de `auth_group_permissions` |
 | `0020_nombres_legibles_de_modelos` | Nombres legibles de cinco modelos | No: solo textos, sin SQL |
-| `0024_migrar_roles_obsoletos` | Mueve `verificador` a `delegado`, mueve usuarios de `consulta` al perfil y rol Profesional y elimina los roles retirados | Sí: usuarios, perfiles y roles |
+| `0021_reglas_sgr` | Crea las tablas de Organizacion, Ajuste, Ausencia, CasoSocial y Comentario; agrega a Actividad `tipo_accion`, `gestion_interna`, `cuenta_puntaje`, `motivo_sin_puntaje` y `organizacion`; a Compromiso `item`, `solicitante_telefono`, `organizacion` y `gestion_interna`; a ItemMedible `tipo_calculo` | No mueve filas: tablas y columnas nuevas con valores por defecto (las actividades existentes quedan como «ejecución», sin gestión interna y con puntaje) |
+| `0022_consolidar_perfiles` | Renombra el perfil (grupo) Funcionario a **Profesional**; si ya existían los dos, mueve los usuarios al Profesional y elimina el perfil Funcionario | Sí: `auth_group` y `auth_user_groups` |
+| `0023_ajuste_emisor_ajuste_origen_and_more` | Emisor y origen del ajuste; datos de registro de la organización (socios, fechas, número de registro) | No: columnas nuevas |
+| `0024_migrar_roles_obsoletos` | Mueve `verificador` a `delegado`, mueve usuarios de `consulta` al perfil y rol Profesional y **elimina los roles** `verificador` y `consulta` | Sí: `funcionario_rol`, `auth_user_groups` y `rol` (no se revierte) |
 | `0025_permisos_perfiles_operativos` | Asigna a cada perfil permisos para los mantenedores y operaciones que le corresponden | Sí: grupos y permisos |
+| `0026_alter_ajuste_respaldo` | El respaldo del ajuste acepta solo JPG, PNG o PDF de hasta 5 MB | No: solo la validación |
+| `0027_delegado_ve_ajustes` | Da al Delegado `view_ajuste` para consultar los ajustes de su delegación | Sí: una fila en `auth_group_permissions` (se revierte) |
+| `0028_ausencia_emergencia_delegado_ve_ausencias` | Agrega el tipo de ausencia «Emergencia» y da al Delegado `view_ausencia` | Sí: una fila en `auth_group_permissions` (se revierte); el tipo nuevo solo cambia las opciones del campo |
+
+En un servidor que ya está en `f910537` (PR #16), `migrate --plan` debe listar solo la `0027` y la `0028`.
 
 ### 6. Migraciones, datos demo y estaticos
 

@@ -1,0 +1,22 @@
+digraph G {
+rankdir=LR; newrank=true; nodesep=0.22; ranksep=0.75; splines=true; pad=0.25;
+graph [fontname="DejaVu Sans", fontsize=15, labelloc=t, labeljust=l];
+node [fontname="DejaVu Sans", fontsize=11];
+edge [fontname="DejaVu Sans", fontsize=9, color="#333333", fontcolor="#444444"];
+subgraph cluster_s { label=<<b>Consultar auditoría y perfiles (G19 · EP-08)</b>>; color="#333333"; penwidth=1.4; margin=14;
+"auditoria" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Consultar auditoría de cambios</b><br/><font point-size="9" color="#555555">CU-30</font>>];
+"perfiles" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Consultar perfiles y permisos</b><br/><font point-size="9" color="#555555">CU-139</font>>];
+"buscar" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Buscar y filtrar<br/><font point-size="9" color="#555555">CU-29</font>>];
+"inmutable" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Bloqueo por alteración no autorizada<br/><font point-size="9" color="#555555">CU-30.1</font>>];
+"denegar" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Denegar acceso por ámbito<br/><font point-size="9" color="#555555">CU-26.1</font>>];
+}
+"A_Administrador" [shape=none, image="cu_v2/dot/_actor.png", labelloc=b, imagepos=tc, height=1.05, width=1.2, fixedsize=true, label=<<b>Administrador</b>>, fontsize=11];
+{rank=same; "A_Administrador";}
+label=<<font point-size="10" color="#444444">Rojo: caso de detalle · Gris: incluido (siempre ocurre) · Café: extensión (solo si se cumple su condición) · Triángulo: herencia</font>>; labelloc=b; labeljust=r;
+{rank=same; "auditoria"; "perfiles";}
+"A_Administrador" -> "auditoria" [arrowhead=none, penwidth=1.1, weight=3];
+"auditoria" -> "buscar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Administrador" -> "perfiles" [arrowhead=none, penwidth=1.1, weight=3];
+"auditoria" -> "inmutable" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"auditoria" -> "denegar" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+}

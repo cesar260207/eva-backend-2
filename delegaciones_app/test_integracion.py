@@ -22,10 +22,10 @@ from django.views import View
 from .crud import MANTENEDORES
 from .informes import filtrar_actividades, filtrar_compromisos
 from .models import validar_tamano_evidencia
-from .pruebas_base import crear_funcionario
+from .pruebas_base import crear_funcionario, fijar_hoy
 from .permisos import RolRequeridoMixin, asignar_perfil, roles_de, rol_requerido, tiene_rol
 from .models import (
-	Actividad, Auditoria, Cargo, Catalogo, Comentario, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
+	Actividad, Ajuste, Auditoria, Ausencia, Cargo, Catalogo, Comentario, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
 	HistorialCompromiso, Indicador, ItemMedible, MedicionDelegacion, Meta, ParametroVersionado, Periodo,
 	Rol, UsuarioMaestro, Validacion,
 )
@@ -169,10 +169,10 @@ class MedicionTests(TestCase):
 		meta.actualizar_valor_objetivo(4)
 		self.assertEqual(Meta.objects.get(pk=meta.pk).valor_objetivo, 4)
 
-	def test_rn005_tope_por_defecto_150_y_ponderado(self):
+	def test_rn005_tope_por_defecto_120_y_ponderado(self):
 		indicador = self._indicador(avance=20, ponderador=50)
-		self.assertEqual(indicador.cumplimiento, Decimal('150'))
-		self.assertEqual(indicador.ponderacion, Decimal('75.00'))
+		self.assertEqual(indicador.cumplimiento, Decimal('120'))
+		self.assertEqual(indicador.ponderacion, Decimal('60.00'))
 
 	def test_rn005_tope_configurable_por_parametro(self):
 		ParametroVersionado.objects.create(periodo=self.periodo, clave='maximo_cumplimiento', valor='120')
@@ -221,13 +221,19 @@ class OperacionTests(TestCase):
 		self.periodo = Periodo.objects.create(nombre='Septiembre 2026', fecha_inicio=date(2026, 9, 1), fecha_termino=date(2026, 9, 30))
 		self.item = ItemMedible.objects.create(cargo=self.cargo, periodo=self.periodo, nombre='Atencion territorial', ponderacion=100)
 		self.catalogo = Catalogo.objects.create(codigo='AT-OPER', nombre='Operativo en terreno', tipo='atencion')
+		# Las actividades son del 10 y 11 de septiembre: el viernes 11 su semana sigue abierta (regla 4).
+		fijar_hoy(self, date(2026, 9, 11))
 
 	def _funcionario(self, username):
 		usuario = User.objects.create_user(username, password='clave-segura')
 		return Funcionario.objects.create(usuario=usuario, identificador_institucional=username, nombre=username, cargo=self.cargo, delegacion=self.centro)
 
 	def _actividad(self, dia=10, **cambios):
-		datos = {'item': self.item, 'catalogo': self.catalogo, 'fecha': timezone.make_aware(datetime(2026, 9, dia, 10, 0)), 'solicitud_problema': 'Consulta vecinal', 'accion': 'Orientacion'}
+		# Regla 2: sin nombre y teléfono del usuario la actividad no puntúa.
+		datos = {
+			'item': self.item, 'catalogo': self.catalogo, 'fecha': timezone.make_aware(datetime(2026, 9, dia, 10, 0)), 'solicitud_problema': 'Consulta vecinal',
+			'accion': 'Orientacion', 'contacto_nombre': 'Vecina de prueba', 'contacto_telefono': '912345678',
+		}
 		datos.update(cambios)
 		return self.autor.registrar_actividad(datos)
 
@@ -972,7 +978,7 @@ class BaseOperacion(TestCase):
 	def _datos_actividad(self, **cambios):
 		datos = {
 			'delegacion': self.centro.pk, 'item': self.item.pk, 'catalogo': self.catalogo.pk, 'fecha': '2026-09-01T10:00',
-			'solicitud_problema': 'Solicitud corregida', 'accion': 'Accion', 'contacto_nombre': '', 'contacto_telefono': '',
+			'solicitud_problema': 'Solicitud corregida', 'accion': 'Accion', 'contacto_nombre': '', 'contacto_telefono': '', 'tipo_accion': 'ejecucion',
 		}
 		datos.update(cambios)
 		return datos
@@ -1019,10 +1025,202 @@ class ComentarioAccesoTests(BaseOperacion):
 		self.assertEqual(json.loads(evento.valor_nuevo)['motivo'], 'funcionario no asociado')
 
 
+class AccesosOctubreTests(BaseOperacion):
+	"""CU-24, CU-64 y CU-03 (RF-015, RF-025, RF-035). Las pantallas de octubre tienen acceso solo para quien tiene el permiso."""
+
+	def setUp(self):
+		super().setUp()
+		self.administrador = crear_funcionario('admin-op', 'administrador', cargo=self.cargo)
+
+	def _ve(self, usuario, url, texto):
+		self.client.force_login(usuario)
+		return texto in self.client.get(url).content.decode()
+
+	def test_informar_ajuste_esta_en_el_menu_del_delegado_y_del_administrador(self):
+		"""CU-64 Informar felicitación o reclamo (RF-025). El enlace depende del permiso add_ajuste."""
+		esperados = {self.verificador: True, self.administrador: True, self.coordinador: False, self.funcionario: False}
+		for usuario, esperado in esperados.items():
+			with self.subTest(usuario=usuario.username):
+				self.assertEqual(self._ve(usuario, reverse('actividades'), reverse('ajuste_nuevo')), esperado)
+				self.assertEqual(self.client.get(reverse('ajuste_nuevo')).status_code, 200 if esperado else 404)
+
+	def test_registrar_atencion_social_esta_en_el_menu_del_profesional_y_del_administrador(self):
+		"""CU-03 Registrar atención social (RF-015). El enlace depende del permiso add_casosocial."""
+		esperados = {self.funcionario: True, self.administrador: True, self.coordinador: False, self.verificador: False}
+		for usuario, esperado in esperados.items():
+			with self.subTest(usuario=usuario.username):
+				self.assertEqual(self._ve(usuario, reverse('actividades'), reverse('caso_social_nuevo')), esperado)
+				self.assertEqual(self.client.get(reverse('caso_social_nuevo')).status_code, 200 if esperado else 404)
+
+	def test_comentar_esta_en_el_detalle_para_quien_tiene_el_permiso(self):
+		"""CU-24 Comentar actividad (RF-035). El botón aparece con add_comentario; la coordinación no comenta."""
+		actividad = self._actividad()
+		detalle, comentar = reverse('actividad_detalle', args=[actividad.codigo_verificador]), reverse('comentario_nuevo', args=[actividad.codigo_verificador])
+		esperados = {self.funcionario: True, self.verificador: True, self.administrador: True, self.coordinador: False}
+		for usuario, esperado in esperados.items():
+			with self.subTest(usuario=usuario.username):
+				self.assertEqual(self._ve(usuario, detalle, comentar), esperado)
+
+	def test_el_comentario_guardado_se_ve_en_el_detalle(self):
+		"""CU-24 Comentar actividad (RF-035). Tras comentar, el comentario aparece en el detalle, también para la coordinación."""
+		actividad = self._actividad()
+		self.client.force_login(self.verificador)
+		respuesta = self.client.post(reverse('comentario_nuevo', args=[actividad.codigo_verificador]), {'contenido': 'Revisar con la junta de vecinos'})
+		detalle = reverse('actividad_detalle', args=[actividad.codigo_verificador])
+		self.assertRedirects(respuesta, detalle)
+		self.assertContains(self.client.get(detalle), 'Revisar con la junta de vecinos')
+		self.assertTrue(self._ve(self.coordinador, detalle, 'Revisar con la junta de vecinos'))
+
+
+class DecidirAjusteTests(BaseOperacion):
+	"""CU-67 Aplicar o rechazar ajuste y CU-65 Consultar ajustes (RF-025, RF-036). Regla 8: la coordinación decide desde la lista."""
+
+	def setUp(self):
+		super().setUp()
+		self.lista = reverse('mantenedor_lista', args=['ajustes'])
+
+	def _ajuste(self, funcionario=None, **cambios):
+		datos = {'tipo': 'felicitacion', 'emisor': 'Junta de vecinos', 'periodo': self.periodo, 'informado_por': self.verificador.funcionario}
+		datos.update(cambios)
+		return Ajuste.objects.create(funcionario=(funcionario or self.funcionario).funcionario, **datos)
+
+	def _decidir(self, ajuste, decision, usuario=None):
+		self.client.force_login(usuario or self.coordinador)
+		return self.client.post(reverse('ajuste_decidir', args=[ajuste.pk, decision]))
+
+	def test_la_lista_muestra_aplicar_y_rechazar_con_confirmacion_a_la_coordinacion(self):
+		"""CU-67 Aplicar o rechazar ajuste (RF-025). Los botones son POST y piden confirmación."""
+		ajuste = self._ajuste()
+		self.client.force_login(self.coordinador)
+		respuesta = self.client.get(self.lista)
+		for decision in ('aplicar', 'rechazar'):
+			self.assertContains(respuesta, f'action="{reverse("ajuste_decidir", args=[ajuste.pk, decision])}"')
+		self.assertContains(respuesta, 'return confirm(', count=2)
+
+	def test_aplicar_cambia_el_estado_y_queda_en_la_auditoria(self):
+		"""CU-67 Aplicar o rechazar ajuste (RF-025, RF-036). Guarda quién y cuándo, y vuelve a la lista."""
+		ajuste = self._ajuste()
+		self.assertRedirects(self._decidir(ajuste, 'aplicar'), self.lista)
+		ajuste.refresh_from_db()
+		self.assertEqual((ajuste.estado, ajuste.aplicado_por), ('aplicado', self.coordinador.funcionario))
+		self.assertIsNotNone(ajuste.aplicado_en)
+		self.assertTrue(Auditoria.objects.filter(evento='aplicar_ajuste', entidad='Ajuste', identificador_registro=str(ajuste.pk)).exists())
+
+	def test_rechazar_cambia_el_estado_y_queda_en_la_auditoria(self):
+		"""CU-67 Aplicar o rechazar ajuste (RF-025, RF-036). El ajuste rechazado no cuenta en el cumplimiento."""
+		ajuste = self._ajuste(tipo='reclamo')
+		self.assertRedirects(self._decidir(ajuste, 'rechazar'), self.lista)
+		ajuste.refresh_from_db()
+		self.assertEqual(ajuste.estado, 'rechazado')
+		self.assertTrue(Auditoria.objects.filter(evento='rechazar_ajuste', entidad='Ajuste', identificador_registro=str(ajuste.pk)).exists())
+
+	def test_un_ajuste_ya_decidido_no_muestra_botones_ni_se_vuelve_a_decidir(self):
+		"""CU-67 Aplicar o rechazar ajuste (RF-025). Solo se decide un ajuste «informado»."""
+		ajuste = self._ajuste(estado='aplicado')
+		self.client.force_login(self.coordinador)
+		self.assertNotContains(self.client.get(self.lista), reverse('ajuste_decidir', args=[ajuste.pk, 'rechazar']))
+		self.assertEqual(self._decidir(ajuste, 'rechazar').status_code, 404)
+		ajuste.refresh_from_db()
+		self.assertEqual(ajuste.estado, 'aplicado')
+
+	def test_por_get_no_se_decide(self):
+		"""CU-67 Aplicar o rechazar ajuste (RF-025). Un enlace (GET) no cambia el estado."""
+		ajuste = self._ajuste()
+		self.client.force_login(self.coordinador)
+		self.assertRedirects(self.client.get(reverse('ajuste_decidir', args=[ajuste.pk, 'aplicar'])), self.lista)
+		ajuste.refresh_from_db()
+		self.assertEqual(ajuste.estado, 'informado')
+
+	def test_con_el_periodo_cerrado_no_se_decide(self):
+		"""CU-67 Aplicar o rechazar ajuste (RF-025, RN-013). Sin botones y, por POST, un mensaje en vez de un error."""
+		ajuste = self._ajuste()
+		Periodo.objects.filter(pk=self.periodo.pk).update(estado='cerrado')
+		self.client.force_login(self.coordinador)
+		self.assertNotContains(self.client.get(self.lista), reverse('ajuste_decidir', args=[ajuste.pk, 'aplicar']))
+		# Sin abrir la lista al comprobar la redirección, para que el mensaje quede para la siguiente página.
+		self.assertRedirects(self._decidir(ajuste, 'aplicar'), self.lista, fetch_redirect_response=False)
+		self.assertContains(self.client.get(self.lista), 'está cerrado')
+		ajuste.refresh_from_db()
+		self.assertEqual(ajuste.estado, 'informado')
+
+	def test_el_delegado_ve_los_ajustes_de_su_delegacion_pero_no_los_decide(self):
+		"""CU-65 Consultar ajustes (RF-025, RF-002). Sin botones; la decisión le responde 404 y queda auditada."""
+		propio = self._ajuste(emisor='Vecino Centro')
+		rural = crear_funcionario('rural-op', 'funcionario', cargo=self.cargo, delegacion=self.rural)
+		self._ajuste(funcionario=rural, emisor='Vecino Rural', informado_por=self.coordinador.funcionario)
+		self.client.force_login(self.verificador)
+		respuesta = self.client.get(self.lista)
+		self.assertContains(respuesta, 'Vecino Centro')
+		self.assertNotContains(respuesta, 'Vecino Rural')
+		self.assertNotContains(respuesta, reverse('ajuste_decidir', args=[propio.pk, 'aplicar']))
+		self.assertEqual(self._decidir(propio, 'aplicar', usuario=self.verificador).status_code, 404)
+		self.assertTrue(Auditoria.objects.filter(evento='acceso_denegado', entidad='Ajuste', identificador_registro=str(propio.pk)).exists())
+
+	def test_el_profesional_no_ve_la_lista_de_ajustes(self):
+		"""CU-65 Consultar ajustes (RF-002). El Profesional no tiene view_ajuste."""
+		self.client.force_login(self.funcionario)
+		self.assertEqual(self.client.get(self.lista).status_code, 404)
+
+
+class AusenciaDesdeSemaforoTests(BaseOperacion):
+	"""CU-71 Registrar ausencia y CU-72 Consultar ausencias (RF-026, RF-027). Regla 9: el delegado ingresa las ausencias desde el semáforo."""
+
+	def setUp(self):
+		super().setUp()
+		fijar_hoy(self, date(2026, 9, 15))
+		self.de_rural = crear_funcionario('rural-ausencia', 'funcionario', cargo=self.cargo, delegacion=self.rural)
+
+	def _ausencia(self, funcionario, tipo='licencia', desde=date(2026, 9, 7), hasta=date(2026, 9, 8)):
+		return Ausencia.objects.create(funcionario=funcionario.funcionario, periodo=self.periodo, tipo=tipo, desde=desde, hasta=hasta, registrada_por=self.verificador.funcionario)
+
+	def test_el_boton_del_semaforo_es_solo_del_delegado(self):
+		"""CU-71 Registrar ausencia (RF-027). Regla 9: el botón aparece al Delegado y no a los demás perfiles."""
+		administrador = crear_funcionario('admin-ausencia', 'administrador', cargo=self.cargo)
+		esperados = {self.verificador: True, self.coordinador: False, self.funcionario: False, administrador: False}
+		for usuario, esperado in esperados.items():
+			with self.subTest(usuario=usuario.username):
+				self.client.force_login(usuario)
+				self.assertEqual(reverse('ausencia_nueva') in self.client.get(reverse('semaforo')).content.decode(), esperado)
+
+	def test_el_delegado_registra_una_emergencia_y_vuelve_al_semaforo(self):
+		"""CU-71 Registrar ausencia (RF-026). El tipo «Emergencia» de la matriz se acepta y queda auditado."""
+		self.client.force_login(self.verificador)
+		respuesta = self.client.post(reverse('ausencia_nueva'), {
+			'funcionario': self.funcionario.funcionario.pk, 'periodo': self.periodo.pk, 'tipo': 'emergencia',
+			'desde': '2026-09-14', 'hasta': '2026-09-15', 'observacion': 'Emergencia familiar',
+		})
+		self.assertRedirects(respuesta, reverse('semaforo'))
+		ausencia = Ausencia.objects.get(funcionario=self.funcionario.funcionario)
+		self.assertEqual((ausencia.tipo, ausencia.get_tipo_display(), ausencia.registrada_por), ('emergencia', 'Emergencia', self.verificador.funcionario))
+		self.assertTrue(Auditoria.objects.filter(entidad='Ausencia', evento='crear', identificador_registro=str(ausencia.pk)).exists())
+
+	def test_el_delegado_ve_solo_las_ausencias_de_su_equipo(self):
+		"""CU-72 Consultar ausencias (RF-002, RF-026). La lista del Delegado se limita a su delegación y no permite editar."""
+		self._ausencia(self.funcionario)
+		self._ausencia(self.de_rural, tipo='vacaciones')
+		self.client.force_login(self.verificador)
+		respuesta = self.client.get(reverse('mantenedor_lista', args=['ausencias']))
+		self.assertContains(respuesta, self.funcionario.funcionario.nombre)
+		self.assertNotContains(respuesta, self.de_rural.funcionario.nombre)
+		self.assertNotContains(respuesta, 'Modificar')
+
+
 class ActividadVistasTests(BaseOperacion):
 	"""CU-01, CU-01.1, CU-01.2, CU-10, CU-10.1, CU-10.2 (RF-009 a RF-011). Registro, consulta, modificación y eliminación de actividades."""
 
+	def test_el_formulario_permite_marcar_gestion_interna(self):
+		"""CU-01 Registro de actividades (RF-009, RF-022). Regla 1: la casilla del formulario deja la actividad como «otra gestión»."""
+		fijar_hoy(self, date(2026, 9, 1))
+		self.client.force_login(self.funcionario)
+		self.assertContains(self.client.get(reverse('actividad_nueva')), 'name="gestion_interna"')
+		self.client.post(reverse('actividad_nueva'), self._datos_actividad(
+			solicitud_problema='Pedido del delegado', contacto_nombre='Delegado Centro', contacto_telefono='912345678', gestion_interna='on',
+		))
+		actividad = Actividad.objects.get(solicitud_problema='Pedido del delegado')
+		self.assertEqual((actividad.gestion_interna, actividad.cuenta_puntaje), (True, False))
+
 	def test_registrar_actividad_genera_codigo_y_auditoria(self):
+		fijar_hoy(self, date(2026, 9, 1))  # el formulario usa el 1 de septiembre (regla 4)
 		self.client.force_login(self.funcionario)
 		respuesta = self.client.post(reverse('actividad_nueva'), self._datos_actividad(solicitud_problema='Consulta vecinal', contacto_nombre='Organizacion demo'))
 		actividad = Actividad.objects.get(solicitud_problema='Consulta vecinal')
@@ -1430,7 +1628,7 @@ class MedicionVistasTests(BaseOperacion):
 		self.assertEqual((filas['Rural']['cumplimiento'], filas['Rural']['estado']), (Decimal('25.00'), 'Rojo'))
 		self.assertEqual(respuesta.context['periodo'], self.periodo)
 		self.assertContains(respuesta, 'Septiembre 2026')
-		self.assertContains(respuesta, 'Tope: 150 %')
+		self.assertContains(respuesta, 'Tope: 120 %')
 		self.assertEqual(filas['Centro']['detalle'], ['Atencion territorial: 1 de 1 actividades'])
 
 	def test_las_barras_de_progreso_no_usan_coma_decimal(self):
@@ -1535,12 +1733,18 @@ class SeedDemoTests(TestCase):
 		cargar_demo()
 		filas = contar_filas()
 		esperadas = {
-			'Delegacion': 6, 'Funcionario': 9, 'FuncionarioRol': 10, 'UsuarioMaestro': 1, 'Periodo': 1, 'ParametroVersionado': 1,
-			'ItemMedible': 1, 'Meta': 6, 'Catalogo': 5, 'Indicador': 6, 'Compromiso': 8, 'HistorialCompromiso': 8,
+			# Dos períodos: julio-septiembre 2026 y el trimestre de la fecha actual, cada uno con sus 5 parámetros.
+			'Delegacion': 6, 'Funcionario': 9, 'FuncionarioRol': 9, 'UsuarioMaestro': 1, 'Periodo': 2, 'ParametroVersionado': 10,
+			# Julio-septiembre: un ítem por cargo (delegados y Profesional). Trimestre actual: el ítem del Profesional
+			# y los 79 ítems de los 13 cargos de la matriz (data/matriz_cargos.json).
+			'ItemMedible': 82, 'Meta': 7, 'Catalogo': 5, 'Indicador': 7, 'Compromiso': 8, 'HistorialCompromiso': 8,
 			'Actividad': 1, 'Evidencia': 1, 'Validacion': 1, 'MedicionDelegacion': 6,
+			# Ejemplos ficticios de las reglas de octubre.
+			'Organizacion': 7, 'Ajuste': 1, 'Ausencia': 1, 'CasoSocial': 1,
 		}
 		for modelo, total in esperadas.items():
-			self.assertEqual(filas[modelo], total, modelo)
+			with self.subTest(modelo=modelo):
+				self.assertEqual(filas[modelo], total, modelo)
 
 	def test_cuentas_demo_y_delegados_inactivos(self):
 		cargar_demo()
@@ -1564,12 +1768,24 @@ class SeedDemoTests(TestCase):
 	def test_la_demo_se_ve_en_la_aplicacion(self):
 		cargar_demo()
 		self.assertTrue(self.client.login(username='coordinador.demo', password=CLAVE_DEMO))
-		respuesta = self.client.get(reverse('dashboard'))
+		julio = Periodo.objects.get(nombre='Trimestre julio-septiembre 2026')
+		respuesta = self.client.get(reverse('dashboard'), {'periodo': julio.pk})
 		filas = {fila['nombre']: fila for fila in respuesta.context['delegaciones']}
 		self.assertEqual(len(filas), 6)
 		self.assertEqual((filas['Centro']['cumplimiento'], filas['Rural']['cumplimiento']), (Decimal('10.00'), Decimal('0.00')))
 		self.assertContains(self.client.get(reverse('agenda')), 'LS-2026-014')
 		self.assertEqual(self.client.get(reverse('actividades')).status_code, 200)
+
+	def test_por_defecto_se_ve_el_trimestre_actual_con_la_meta_de_la_demostracion(self):
+		"""Sin CU (datos de demostración). Como en el servidor: el trimestre actual, con meta 2 para funcionario.centro y una felicitación por decidir."""
+		cargar_demo()
+		self.assertTrue(self.client.login(username='coordinador.demo', password=CLAVE_DEMO))
+		periodo = self.client.get(reverse('dashboard')).context['periodo']
+		self.assertNotEqual(periodo.nombre, 'Trimestre julio-septiembre 2026')
+		self.assertTrue(periodo.fecha_inicio <= timezone.localdate() <= periodo.fecha_termino)
+		meta = Meta.objects.get(item__periodo=periodo, funcionario__usuario__username='funcionario.centro')
+		self.assertEqual((meta.item.nombre, meta.valor_objetivo), ('Atención de casos sociales', 2))
+		self.assertContains(self.client.get(reverse('mantenedor_lista', args=['ajustes'])), 'Aplicar')
 
 	def test_convive_con_datos_ya_migrados_sin_duplicarlos(self):
 		cargo = Cargo.objects.create(nombre='Sin cargo asignado')
@@ -1585,9 +1801,10 @@ class SeedDemoTests(TestCase):
 
 		self.assertEqual(Funcionario.objects.get(pk=migrado.pk).cargo, cargo)
 		self.assertTrue(User.objects.get(pk=usuario.pk).check_password('clave-previa'))
-		self.assertEqual(Meta.objects.filter(funcionario=migrado).count(), 1)
-		self.assertEqual(ItemMedible.objects.filter(cargo=cargo).count(), 1)
-		self.assertEqual((Funcionario.objects.count(), Meta.objects.count(), Periodo.objects.count()), (9, 6, 1))
+		# En julio-septiembre se reutilizan la meta y el ítem migrados; el trimestre actual agrega los suyos.
+		self.assertEqual(Meta.objects.filter(funcionario=migrado, item__periodo=periodo).count(), 1)
+		self.assertEqual(ItemMedible.objects.filter(cargo=cargo, periodo=periodo).count(), 1)
+		self.assertEqual((Funcionario.objects.count(), Meta.objects.count(), Periodo.objects.count()), (9, 7, 2))
 
 
 class AuditoriaTests(BaseOperacion):
@@ -1613,7 +1830,7 @@ class AuditoriaTests(BaseOperacion):
 	def test_un_acceso_denegado_por_rol_queda_registrado(self):
 		self.client.force_login(self.funcionario)
 		self.client.get(reverse('mantenedor_lista', args=['catalogo']))
-		evento = self._evento('acceso_denegado', 'Acceso').get()
+		evento = self._evento('acceso_denegado', 'Catalogo').get()
 		self.assertEqual(evento.funcionario, self.funcionario.funcionario)
 		self.assertEqual(json.loads(evento.valor_nuevo)['motivo'], 'permiso insuficiente')
 
@@ -1884,7 +2101,7 @@ class FichaPersonalTests(BaseOperacion):
 			Validacion(evidencia=self._evidencia(extra), funcionario_verificador=self.verificador.funcionario).aprobar_evidencia()
 		Indicador.generar(self.meta)
 		fila = self._ficha().context['filas'][0]
-		self.assertEqual(fila['cumplimiento'], Decimal('150.00'))
+		self.assertEqual(fila['cumplimiento'], Decimal('120.00'))
 		self.assertIn('se aplica el tope', fila['formula'][1])
 
 	def test_una_meta_sin_calculo_se_informa_sin_formula(self):

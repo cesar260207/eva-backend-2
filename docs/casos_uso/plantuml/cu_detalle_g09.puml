@@ -1,0 +1,58 @@
+@startuml cu_detalle_g09
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #8E2B24
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+}
+skinparam ArrowFontSize 11
+
+left to right direction
+title Gestionar organizaciones comunitarias (G09 · EP-01): caso de uso detallado
+actor "Usuario" as Usuario
+actor "Delegado" as Delegado
+actor "Coordinador" as Coordinador
+actor "Administrador" as Administrador
+rectangle "Gestionar organizaciones comunitarias" {
+  usecase "CU-78\nRegistrar organización" as org_reg
+  usecase "CU-79\nConsultar organizaciones" as org_con
+  usecase "CU-80\nModificar organización" as org_mod
+  usecase "CU-81\nEliminar organización" as org_eli
+  usecase "CU-82\nExportar organizaciones" as org_exp
+  usecase "CU-83\nImportar organizaciones" as org_imp
+  usecase "CU-84\nValidar datos de organización" as org_valid
+  usecase "CU-29\nBuscar y filtrar" as buscar
+  usecase "CU-45\nRegistrar en auditoría" as auditar
+  usecase "CU-69\nInformar error de validación" as error_valid
+  usecase "CU-85\nDesactivar en vez de eliminar" as desactivar
+  usecase "CU-70\nConsulta sin coincidencias" as sin_resultados
+}
+Administrador --> org_reg
+Usuario --> org_con
+Delegado --> org_mod
+Coordinador --> org_mod
+Administrador --> org_mod
+Administrador --> org_eli
+Usuario --> org_exp
+Administrador --> org_imp
+org_reg ..> org_valid : <<include>>
+org_reg ..> auditar : <<include>>
+org_con ..> buscar : <<include>>
+org_mod ..> buscar : <<include>>
+org_mod ..> org_valid : <<include>>
+org_mod ..> auditar : <<include>>
+org_eli ..> buscar : <<include>>
+org_eli ..> auditar : <<include>>
+org_exp ..> buscar : <<include>>
+error_valid ..> org_valid : <<extend>>
+desactivar ..> org_eli : <<extend>>
+sin_resultados ..> buscar : <<extend>>
+@enduml

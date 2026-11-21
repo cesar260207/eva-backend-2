@@ -1,0 +1,43 @@
+@startuml cu_detalle_g01
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #8E2B24
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+}
+skinparam ArrowFontSize 11
+
+left to right direction
+title Gestionar acceso al sistema (G01 · EP-08): caso de uso detallado
+actor "Usuario" as Usuario
+actor "Servidor de correo" as Servidor_de_correo
+rectangle "Gestionar acceso al sistema" {
+  usecase "CU-32\nIniciar sesión" as login
+  usecase "CU-33\nCerrar sesión" as logout
+  usecase "CU-34\nRecuperar contraseña" as recuperar
+  usecase "CU-35\nRestablecer contraseña" as restablecer
+  usecase "CU-36\nValidar credenciales" as cred
+  usecase "CU-37\nEnviar enlace por correo" as enviar_enlace
+  usecase "CU-38\nValidar enlace de recuperación" as validar_enlace
+  usecase "CU-39\nInformar credenciales incorrectas" as cred_mal
+  usecase "CU-40\nInformar enlace vencido" as enlace_vencido
+}
+Usuario --> login
+Usuario --> logout
+Usuario --> recuperar
+recuperar --> Servidor_de_correo
+Usuario --> restablecer
+login ..> cred : <<include>>
+recuperar ..> enviar_enlace : <<include>>
+restablecer ..> validar_enlace : <<include>>
+cred_mal ..> cred : <<extend>>
+enlace_vencido ..> validar_enlace : <<extend>>
+@enduml

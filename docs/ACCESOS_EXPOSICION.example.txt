@@ -1,0 +1,30 @@
+ACCESOS PARA LA EXPOSICIÓN DEL SGR (PLANTILLA)
+
+Copiar este archivo como ACCESOS_EXPOSICION.txt en la raíz del proyecto y completar las
+contraseñas a mano. ACCESOS_EXPOSICION.txt está en .gitignore: nunca se sube a GitHub.
+Esta plantilla no lleva contraseñas.
+
+Servidor
+  URL: http://3.225.119.192   (con http; https todavía no está activo)
+
+Usuarios de demostración
+  Perfil          Usuario               Delegación   Contraseña
+  Administrador   admin.demo            -            <COMPLETAR>
+  Coordinador     coordinador.demo      -            <COMPLETAR>
+  Delegado        delegado.demo         Centro       <COMPLETAR>
+  Profesional     funcionario.centro    Centro       <COMPLETAR>
+
+Datos de la demostración
+  Período: Trimestre octubre-diciembre 2026 (abierto)
+  Ítem: Atención de casos sociales (cargo Profesional SGR, ponderación 100)
+  Meta: valor objetivo 2 para Funcionario Centro (funcionario.centro)
+
+Lista para probar el día antes
+  [ ] El servidor responde en http://3.225.119.192.
+  [ ] admin.demo entra y ve «Administración» y «Consultar auditoría».
+  [ ] coordinador.demo entra y ve la lista de ajustes con «Aplicar» y «Rechazar».
+  [ ] delegado.demo entra y ve las actividades de Centro.
+  [ ] funcionario.centro entra, ve «Registrar actividad con evidencia» y no entra a la auditoría.
+  [ ] El semáforo de Centro está en rojo para «Trimestre octubre-diciembre 2026».
+  [ ] No quedan actividades de ensayo aprobadas.
+  [ ] Hay un archivo JPG o PDF de menos de 5 MB para subir como evidencia.

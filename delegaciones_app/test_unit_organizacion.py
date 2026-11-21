@@ -629,3 +629,79 @@ class ValidacionRespaldoAjusteTests(SimpleTestCase):
         with self.assertRaises(ValidationError):
             for validar in Ajuste._meta.get_field('respaldo').validators:
                 validar(archivo)
+
+
+class ImportarOrganizacionesTests(TestCase):
+    """CU-83 Importar organizaciones (requerimientos de octubre 2026). El Excel del municipio se asigna a delegaciones y tipos."""
+
+    ENCABEZADOS = ['Organizaciones', 'Domicilio legal', 'Territ. deleg.', 'Socios activos']
+
+    def setUp(self):
+        import shutil
+        import tempfile
+        from pathlib import Path
+
+        self.carpeta = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.carpeta, ignore_errors=True)
+        for nombre in ('Las Compañías', 'La Pampa', 'La Antena', 'Avenida del Mar', 'Centro', 'Rural'):
+            Delegacion.objects.create(nombre=nombre)
+
+    def _importar(self, filas):
+        from io import StringIO
+
+        from django.core.management import call_command
+        from openpyxl import Workbook
+
+        libro = Workbook()
+        libro.active.append(self.ENCABEZADOS)
+        for fila in filas:
+            libro.active.append(fila)
+        archivo = self.carpeta / 'organizaciones.xlsx'
+        libro.save(archivo)
+        call_command('importar_organizaciones', str(archivo), '--anonimizar', stdout=StringIO())
+
+    def _organizacion(self, nombre):
+        from .models import Organizacion
+
+        return Organizacion.objects.get(nombre=nombre)
+
+    def test_los_territorios_del_excel_se_asignan_a_su_delegacion(self):
+        """CU-83 Importar organizaciones (requerimientos de octubre 2026). CIAS, PAMPA, ANTENA y AV DEL MAR corresponden a delegaciones del sistema."""
+        esperadas = {'CIAS': 'Las Compañías', 'PAMPA': 'La Pampa', 'ANTENA': 'La Antena', 'AV DEL MAR': 'Avenida del Mar', ' centro ': 'Centro', 'RURAL': 'Rural'}
+        self._importar([[f'Organización {territorio.strip()}', 'Calle 1', territorio, 10] for territorio in esperadas])
+        for territorio, delegacion in esperadas.items():
+            with self.subTest(territorio=territorio):
+                organizacion = self._organizacion(f'Organización {territorio.strip()}')
+                self.assertEqual((organizacion.delegacion.nombre, organizacion.verificada), (delegacion, True))
+
+    def test_un_territorio_desconocido_queda_sin_delegacion_para_revisar(self):
+        """CU-83 Importar organizaciones (requerimientos de octubre 2026). ALFALFARES o sin territorio: sin delegación, no verificada y con observación."""
+        self._importar([['Agrupación Alfalfares', 'Calle 2', 'ALFALFARES', 5], ['Agrupación sin territorio', 'Calle 3', None, 5]])
+        alfalfares = self._organizacion('Agrupación Alfalfares')
+        self.assertEqual((alfalfares.delegacion, alfalfares.verificada), (None, False))
+        self.assertIn('«ALFALFARES»', alfalfares.observaciones)
+        self.assertIn('«sin dato»', self._organizacion('Agrupación sin territorio').observaciones)
+
+    def test_el_tipo_se_deduce_del_nombre(self):
+        """CU-83 Importar organizaciones (requerimientos de octubre 2026). Tipos del documento de octubre; lo demás es funcional (Ley 19.418)."""
+        esperados = {
+            'JUNTA DE VECINOS N° 5 LAS ROSAS': 'junta_vecinos', 'CLUB ADULTO MAYOR LOS AROMOS': 'adulto_mayor',
+            'CLUB DEPORTIVO ESTRELLA': 'deportiva', 'CONJUNTO FOLCLÓRICO RAÍCES': 'cultural', 'CENTRO DE MADRES ESPERANZA': 'cultural',
+            'COMITÉ DE ALLEGADOS VILLA SUR': 'comite', 'COMITE DE SEGURIDAD EL FARO': 'comite',
+            'COMITÉ DE VIVIENDA NUEVO AMANECER': 'funcional', 'COMITE AGUA POTABLE RURAL EL ROMERO': 'funcional',
+            'ORGANIZACIÓN VECINAL PARTE ALTA': 'funcional', 'AGRUPACIÓN DE MUJERES EMPRENDEDORAS': 'funcional',
+        }
+        self._importar([[nombre, 'Calle 4', 'CENTRO', 1] for nombre in esperados])
+        for nombre, tipo in esperados.items():
+            with self.subTest(nombre=nombre):
+                self.assertEqual(self._organizacion(nombre).tipo, tipo)
+
+    def test_repetir_la_importacion_no_duplica_y_anonimiza_domicilios(self):
+        """CU-83 Importar organizaciones (requerimientos de octubre 2026). La importación se repite sin duplicar y --anonimizar oculta el domicilio."""
+        from .models import Organizacion
+
+        fila = [['CLUB DEPORTIVO ESTRELLA', 'Calle real 123', 'CIAS', 20]]
+        self._importar(fila)
+        self._importar(fila)
+        self.assertEqual(Organizacion.objects.count(), 1)
+        self.assertEqual(self._organizacion('CLUB DEPORTIVO ESTRELLA').domicilio, 'Domicilio anonimizado')

@@ -1,0 +1,44 @@
+digraph G {
+rankdir=LR; newrank=true; nodesep=0.22; ranksep=0.75; splines=true; pad=0.25;
+graph [fontname="DejaVu Sans", fontsize=15, labelloc=t, labeljust=l];
+node [fontname="DejaVu Sans", fontsize=11];
+edge [fontname="DejaVu Sans", fontsize=9, color="#333333", fontcolor="#444444"];
+subgraph cluster_s { label=<<b>Validar actividades (G04 · EP-03)</b>>; color="#333333"; penwidth=1.4; margin=14;
+"validar" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Aprobar o rechazar actividad</b><br/><font point-size="9" color="#555555">CU-11</font>>];
+"anular" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Anular aprobación</b><br/><font point-size="9" color="#555555">CU-54</font>>];
+"act_buscar" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Buscar actividad por código<br/><font point-size="9" color="#555555">CU-10.1</font>>];
+"trazabilidad" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Registrar trazabilidad de decisión<br/><font point-size="9" color="#555555">CU-11.1</font>>];
+"recalcular" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Recalcular indicadores automáticamente<br/><font point-size="9" color="#555555">CU-06.1</font>>];
+"recalc_anula" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Recalcular por anulación de registro<br/><font point-size="9" color="#555555">CU-07.2</font>>];
+"auditar" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Registrar en auditoría<br/><font point-size="9" color="#555555">CU-45</font>>];
+"no_suma" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Bloquear aporte al avance<br/><font point-size="9" color="#555555">CU-11.2</font>>];
+"motivo" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Exigir motivo<br/><font point-size="9" color="#555555">CU-55</font>>];
+"propia" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Impedir revisión propia<br/><font point-size="9" color="#555555">CU-56</font>>];
+"sin_pendientes" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Informar sin evidencias pendientes<br/><font point-size="9" color="#555555">CU-57</font>>];
+}
+"A_Delegado" [shape=none, image="cu_v2/dot/_actor.png", labelloc=b, imagepos=tc, height=1.05, width=1.2, fixedsize=true, label=<<b>Delegado</b>>, fontsize=11];
+"A_Coordinador" [shape=none, image="cu_v2/dot/_actor.png", labelloc=b, imagepos=tc, height=1.05, width=1.2, fixedsize=true, label=<<b>Coordinador</b>>, fontsize=11];
+"A_Administrador" [shape=none, image="cu_v2/dot/_actor.png", labelloc=b, imagepos=tc, height=1.05, width=1.2, fixedsize=true, label=<<b>Administrador</b>>, fontsize=11];
+{rank=same; "A_Delegado"; "A_Coordinador"; "A_Administrador";}
+label=<<font point-size="10" color="#444444">Rojo: caso de detalle · Gris: incluido (siempre ocurre) · Café: extensión (solo si se cumple su condición) · Triángulo: herencia</font>>; labelloc=b; labeljust=r;
+{rank=same; "validar"; "anular";}
+"A_Delegado" -> "validar" [arrowhead=none, penwidth=1.1, weight=3];
+"A_Coordinador" -> "validar" [arrowhead=none, penwidth=1.1, weight=3];
+"A_Administrador" -> "validar" [arrowhead=none, penwidth=1.1, weight=3];
+"validar" -> "act_buscar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"validar" -> "trazabilidad" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"validar" -> "recalcular" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"validar" -> "auditar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Delegado" -> "anular" [arrowhead=none, penwidth=1.1, weight=3];
+"A_Coordinador" -> "anular" [arrowhead=none, penwidth=1.1, weight=3];
+"A_Administrador" -> "anular" [arrowhead=none, penwidth=1.1, weight=3];
+"anular" -> "act_buscar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"anular" -> "recalc_anula" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"anular" -> "auditar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"validar" -> "no_suma" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"validar" -> "motivo" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"anular" -> "motivo" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"validar" -> "propia" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"anular" -> "propia" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"validar" -> "sin_pendientes" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+}

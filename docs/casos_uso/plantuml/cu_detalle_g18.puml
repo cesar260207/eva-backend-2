@@ -1,0 +1,35 @@
+@startuml cu_detalle_g18
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #8E2B24
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+}
+skinparam ArrowFontSize 11
+
+left to right direction
+title Generar informes (G18 · EP-06): caso de uso detallado
+actor "Usuario" as Usuario
+rectangle "Generar informes" {
+  usecase "CU-20\nGenerar informe" as informe
+  usecase "CU-20.1\nConsolidar datos filtrados" as inf_cons
+  usecase "CU-20.2\nRestringir por ámbito de permisos" as inf_ambito
+  usecase "CU-137\nImprimir informe" as imprimir
+  usecase "CU-138\nExportar informe" as exportar
+  usecase "CU-70\nConsulta sin coincidencias" as sin_resultados
+}
+Usuario --> informe
+informe ..> inf_cons : <<include>>
+informe ..> inf_ambito : <<include>>
+imprimir ..> informe : <<extend>>
+exportar ..> informe : <<extend>>
+sin_resultados ..> inf_cons : <<extend>>
+@enduml

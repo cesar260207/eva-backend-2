@@ -1,0 +1,53 @@
+@startuml cu_detalle_g14
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #8E2B24
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+}
+skinparam ArrowFontSize 11
+
+left to right direction
+title Gestionar catálogo (G14 · EP-08): caso de uso detallado
+actor "Coordinador" as Coordinador
+actor "Administrador" as Administrador
+rectangle "Gestionar catálogo" {
+  usecase "CU-112\nRegistrar elemento de catálogo" as cat_reg
+  usecase "CU-113\nConsultar elementos del catálogo" as cat_con
+  usecase "CU-114\nModificar elemento de catálogo" as cat_mod
+  usecase "CU-115\nEliminar elemento de catálogo" as cat_eli
+  usecase "CU-116\nValidar datos de catálogo" as cat_valid
+  usecase "CU-29\nBuscar y filtrar" as buscar
+  usecase "CU-45\nRegistrar en auditoría" as auditar
+  usecase "CU-27.1\nRestringir elemento duplicado" as cat_error
+  usecase "CU-85\nDesactivar en vez de eliminar" as desactivar
+  usecase "CU-70\nConsulta sin coincidencias" as sin_resultados
+}
+Coordinador --> cat_reg
+Administrador --> cat_reg
+Coordinador --> cat_con
+Administrador --> cat_con
+Coordinador --> cat_mod
+Administrador --> cat_mod
+Coordinador --> cat_eli
+Administrador --> cat_eli
+cat_reg ..> cat_valid : <<include>>
+cat_reg ..> auditar : <<include>>
+cat_con ..> buscar : <<include>>
+cat_mod ..> buscar : <<include>>
+cat_mod ..> cat_valid : <<include>>
+cat_mod ..> auditar : <<include>>
+cat_eli ..> buscar : <<include>>
+cat_eli ..> auditar : <<include>>
+cat_error ..> cat_valid : <<extend>>
+desactivar ..> cat_eli : <<extend>>
+sin_resultados ..> buscar : <<extend>>
+@enduml

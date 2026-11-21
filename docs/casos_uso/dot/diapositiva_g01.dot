@@ -1,0 +1,32 @@
+digraph G {
+rankdir=LR; newrank=true; nodesep=0.22; ranksep=0.75; splines=true; pad=0.25;
+graph [fontname="DejaVu Sans", fontsize=15, labelloc=t, labeljust=l];
+node [fontname="DejaVu Sans", fontsize=11];
+edge [fontname="DejaVu Sans", fontsize=9, color="#333333", fontcolor="#444444"];
+subgraph cluster_s { label=<<b>Gestionar acceso al sistema (G01 · EP-08)</b>>; color="#333333"; penwidth=1.4; margin=14;
+"login" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Iniciar sesión</b><br/><font point-size="9" color="#555555">CU-32</font>>];
+"logout" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Cerrar sesión</b><br/><font point-size="9" color="#555555">CU-33</font>>];
+"recuperar" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Recuperar contraseña</b><br/><font point-size="9" color="#555555">CU-34</font>>];
+"restablecer" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Restablecer contraseña</b><br/><font point-size="9" color="#555555">CU-35</font>>];
+"cred" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Validar credenciales<br/><font point-size="9" color="#555555">CU-36</font>>];
+"enviar_enlace" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Enviar enlace por correo<br/><font point-size="9" color="#555555">CU-37</font>>];
+"validar_enlace" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Validar enlace de recuperación<br/><font point-size="9" color="#555555">CU-38</font>>];
+"cred_mal" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Informar credenciales incorrectas<br/><font point-size="9" color="#555555">CU-39</font>>];
+"enlace_vencido" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Informar enlace vencido<br/><font point-size="9" color="#555555">CU-40</font>>];
+}
+"A_Usuario" [shape=none, image="cu_v2/dot/_actor.png", labelloc=b, imagepos=tc, height=1.05, width=1.2, fixedsize=true, label=<<b>Usuario<br/>(cualquier perfil)</b>>, fontsize=11];
+"A_Servidor de correo" [shape=none, image="cu_v2/dot/_actor.png", labelloc=b, imagepos=tc, height=1.05, width=1.2, fixedsize=true, label=<<b>Servidor de correo</b>>, fontsize=11];
+{rank=same; "A_Usuario"; "A_Servidor de correo";}
+label=<<font point-size="10" color="#444444">Rojo: caso de detalle · Gris: incluido (siempre ocurre) · Café: extensión (solo si se cumple su condición) · Triángulo: herencia</font>>; labelloc=b; labeljust=r;
+{rank=same; "login"; "logout"; "recuperar"; "restablecer";}
+"A_Usuario" -> "login" [arrowhead=none, penwidth=1.1, weight=3];
+"login" -> "cred" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Usuario" -> "logout" [arrowhead=none, penwidth=1.1, weight=3];
+"A_Usuario" -> "recuperar" [arrowhead=none, penwidth=1.1, weight=3];
+"A_Servidor de correo" -> "recuperar" [arrowhead=none, penwidth=1.1, weight=3];
+"recuperar" -> "enviar_enlace" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Usuario" -> "restablecer" [arrowhead=none, penwidth=1.1, weight=3];
+"restablecer" -> "validar_enlace" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"cred" -> "cred_mal" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»"];
+"validar_enlace" -> "enlace_vencido" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»"];
+}

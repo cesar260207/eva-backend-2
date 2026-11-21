@@ -1,0 +1,11 @@
+regla,descripcion,estado,requerimiento
+1,Usuario delegado: otra gestión sin puntaje,Implementada,RF-040
+2,Sin nombre y teléfono no puntúa,Implementada,RF-041
+3,Máximo 7 ingresos diarios,Implementada,RF-042
+4,Cierre semanal el martes,Implementada,RF-043
+5,Gestiones previas sin puntaje,Implementada,RF-044
+6,No ingresar solo por puntaje,Política de uso (no es función del sistema),"Apoyada por RF-042, RF-045 y la auditoría"
+7,Tope de 120 % por ítem,Implementada,RF-045
+8,Felicitaciones y reclamos con respaldo,Implementada,RF-046
+9,Ausencias ingresadas por el delegado en el semáforo,Implementada,RF-047
+10,Puntaje de equipo,Implementada (resumen por delegación),RF-048

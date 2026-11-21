@@ -17,6 +17,7 @@ CATALOGO_CU = {
     'CU-01': 'Registro de actividades', 'CU-01.1': 'Validar campos de actividad', 'CU-01.2': 'Gestionar error de validación',
     'CU-02': 'Registro de compromisos ciudadanos', 'CU-02.1': 'Validar datos de compromiso', 'CU-02.2': 'Bloquear guardado por campos faltantes',
     'CU-02.3': 'Destacar compromiso vencido',
+    'CU-03': 'Registrar atención social',
     'CU-04': 'Administración de funciones por cargo', 'CU-04.1': 'Validar reglas de configuración', 'CU-04.2': 'Bloquear guardado por ponderación inválida',
     'CU-05': 'Definición de metas', 'CU-05.1': 'Validar parámetros de meta', 'CU-05.2': 'Bloquear guardado por valor inválido', 'CU-05.3': 'Notificar período cerrado',
     'CU-06': 'Seguimiento de avance', 'CU-06.1': 'Recalcular indicadores automáticamente', 'CU-06.2': 'Destacar meta cumplida',
@@ -33,12 +34,17 @@ CATALOGO_CU = {
     'CU-18': 'Resumen ejecutivo', 'CU-18.1': 'Consolidar datos de delegación', 'CU-18.2': 'Navegar al detalle de gestión',
     'CU-20': 'Generación de informes', 'CU-20.1': 'Consolidar datos filtrados', 'CU-20.2': 'Restringir por ámbito de permisos',
     'CU-23': 'Trabajo colaborativo en línea', 'CU-23.1': 'Controlar conflicto de concurrencia',
+    'CU-24': 'Comentar actividad',
     'CU-25': 'Modificar parámetros',
     'CU-26': 'Administración de delegaciones, usuarios y roles', 'CU-26.1': 'Denegar acceso por ámbito',
     'CU-27': 'Administración de catálogos', 'CU-27.1': 'Restringir elemento duplicado',
     'CU-28': 'Administración de períodos', 'CU-28.1': 'Restricción por período cerrado',
     'CU-29': 'Búsqueda y filtros', 'CU-29.1': 'Restricción de búsqueda por ámbito',
     'CU-30': 'Auditoría de cambios', 'CU-30.1': 'Bloqueo por alteración no autorizada',
+    'CU-64': 'Informar felicitación o reclamo',
+    'CU-65': 'Consultar ajustes', 'CU-67': 'Aplicar o rechazar ajuste',
+    'CU-71': 'Registrar ausencia', 'CU-72': 'Consultar ausencias', 'CU-131': 'Cargar matriz de cargos',
+    'CU-83': 'Importar organizaciones',
 }
 
 CATALOGO_RF = {
@@ -57,15 +63,12 @@ CATALOGO_RF = {
 CODIGO_DE_MODULO = {
     'test_integracion': 'INT', 'test_unit_autenticacion': 'LOGIN', 'test_unit_organizacion': 'ORG', 'test_unit_actividades': 'ACT',
     'test_unit_medicion': 'MED', 'test_unit_compromisos': 'COM', 'test_unit_transversal': 'TRA', 'test_unit_plan_pruebas': 'PLAN', 'test_unit_alertas': 'ALE', 'test_unit_seguridad': 'SEG', 'test_unit_delegaciones': 'DEL',
+    'test_casos_de_uso': 'CUS',
 }
 
 # Estado de los requisitos que no están completos en el sistema (se declara aquí para que el plan lo diga con claridad).
 OBSERVACIONES_RF = {
-    15: 'No implementado: no existe el registro de atenciones sociales por etapas.',
-    20: 'No implementado: cerrar un compromiso no alimenta el indicador del ítem; solo cuentan las actividades aprobadas.',
-    25: 'No implementado: el campo ajuste del indicador se guarda pero no entra al cálculo.',
-    31: 'No implementado: no hay vista global por cargos.',
-    35: 'No implementado: no hay observaciones o comentarios asociados a registros.',
+    31: 'No implementado: no hay vista global por cargos (postergado en el backlog).',
 }
 
 # Responsable de ejecutar las pruebas de cada caso de uso (familia del CU) y de los casos de login.

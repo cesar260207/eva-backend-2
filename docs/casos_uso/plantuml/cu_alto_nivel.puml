@@ -1,0 +1,83 @@
+@startuml cu_alto_nivel
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #8E2B24
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+}
+skinparam ArrowFontSize 11
+
+left to right direction
+title Casos de uso de alto nivel del SGR (una gestión por cada épica o parte de ella)
+actor "Usuario\n(cualquier perfil)" as Usuario
+actor "Profesional" as Profesional
+actor "Delegado" as Delegado
+actor "Coordinador" as Coordinador
+actor "Administrador" as Administrador
+actor "Servidor de correo" as Servidor_de_correo
+rectangle "Sistema de Gestión de Resultados (SGR)" {
+  usecase "Gestionar acceso al sistema\n(G01 · EP-08)" as G01
+  usecase "Gestionar actividades\n(G02 · EP-01)" as G02
+  usecase "Gestionar evidencias\n(G03 · EP-03)" as G03
+  usecase "Validar actividades\n(G04 · EP-03)" as G04
+  usecase "Gestionar tubo de trabajo\n(G05 · EP-04)" as G05
+  usecase "Gestionar ajustes de puntaje\n(G06 · EP-02)" as G06
+  usecase "Gestionar ausencias\n(G07 · EP-02)" as G07
+  usecase "Gestionar atenciones sociales\n(G08 · EP-01)" as G08
+  usecase "Gestionar organizaciones comunitarias\n(G09 · EP-01)" as G09
+  usecase "Gestionar delegaciones\n(G10 · EP-08)" as G10
+  usecase "Gestionar cargos\n(G11 · EP-08)" as G11
+  usecase "Gestionar roles\n(G12 · EP-08)" as G12
+  usecase "Gestionar funcionarios y usuarios\n(G13 · EP-08)" as G13
+  usecase "Gestionar catálogo\n(G14 · EP-08)" as G14
+  usecase "Gestionar períodos y parámetros\n(G15 · EP-08)" as G15
+  usecase "Gestionar ítems medibles y metas\n(G16 · EP-02)" as G16
+  usecase "Consultar resultados\n(G17 · EP-05)" as G17
+  usecase "Generar informes\n(G18 · EP-06)" as G18
+  usecase "Consultar auditoría y perfiles\n(G19 · EP-08)" as G19
+}
+Profesional -up-|> Usuario
+Delegado -up-|> Usuario
+Coordinador -up-|> Usuario
+Administrador -up-|> Usuario
+Usuario --> G01
+G01 --> Servidor_de_correo
+Usuario --> G02
+Usuario --> G03
+Delegado --> G04
+Coordinador --> G04
+Administrador --> G04
+Usuario --> G05
+Delegado --> G06
+Coordinador --> G06
+Administrador --> G06
+Delegado --> G07
+Coordinador --> G07
+Administrador --> G07
+Profesional --> G08
+Administrador --> G08
+Usuario --> G09
+Coordinador --> G10
+Administrador --> G10
+Coordinador --> G11
+Administrador --> G11
+Administrador --> G12
+Administrador --> G13
+Coordinador --> G14
+Administrador --> G14
+Coordinador --> G15
+Administrador --> G15
+Coordinador --> G16
+Administrador --> G16
+Usuario --> G17
+Usuario --> G18
+Administrador --> G19
+@enduml

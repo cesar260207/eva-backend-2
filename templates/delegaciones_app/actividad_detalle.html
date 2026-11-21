@@ -12,6 +12,7 @@
         <span class="badge badge-soft fs-6">{{ actividad.get_estado_display }}</span>
         {% if puede_modificar %}<a class="btn btn-outline-sgr" href="{% url 'actividad_editar' actividad.codigo_verificador %}">Modificar actividad</a>{% endif %}
         {% if puede_subir_evidencia %}<a class="btn btn-sgr" href="{% url 'evidencia_subir' actividad.codigo_verificador %}">Subir evidencia</a>{% endif %}
+        {% if puede_comentar %}<a class="btn btn-outline-sgr" href="{% url 'comentario_nuevo' actividad.codigo_verificador %}">Comentar</a>{% endif %}
     </div>
 </div>
 <div class="row g-4">
@@ -52,6 +53,19 @@
                 <textarea class="form-control mb-3" name="motivo" rows="2" placeholder="Motivo de la anulación (obligatorio)" required></textarea>
                 <button class="btn btn-outline-danger" type="submit">Anular aprobación</button>
             </form>
+        </div>
+        {% endif %}
+        {% if comentarios is not None %}
+        <div class="panel mt-4">
+            <div class="section-label mb-3">Comentarios ({{ comentarios|length }})</div>
+            {% for comentario in comentarios %}
+            <div class="evidencia-item">
+                <div class="small text-muted">{{ comentario.autor.nombre }} · {{ comentario.creado|date:'d-m-Y H:i' }}</div>
+                <p class="mb-0">{{ comentario.contenido }}</p>
+            </div>
+            {% empty %}
+            <p class="small text-muted mb-0">Todavía no hay comentarios.</p>
+            {% endfor %}
         </div>
         {% endif %}
     </div>

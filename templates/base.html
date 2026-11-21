@@ -44,6 +44,8 @@
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><a class="dropdown-item" href="{% url 'ficha_personal' %}">Mi ficha</a></li>
                             <li><a class="dropdown-item" href="{% url 'institucional' %}">Territorio</a></li>
+                            {% if perms.delegaciones_app.add_ajuste %}<li><a class="dropdown-item" href="{% url 'ajuste_nuevo' %}">Informar felicitación o reclamo</a></li>{% endif %}
+                            {% if perms.delegaciones_app.add_casosocial %}<li><a class="dropdown-item" href="{% url 'caso_social_nuevo' %}">Registrar atención social</a></li>{% endif %}
                             <li><hr class="dropdown-divider"></li>
                             <li><form method="post" action="{% url 'logout' %}" class="m-0">{% csrf_token %}<button class="dropdown-item" type="submit">Salir</button></form></li>
                         </ul>

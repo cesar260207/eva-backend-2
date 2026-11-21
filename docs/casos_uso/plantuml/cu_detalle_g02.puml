@@ -1,0 +1,80 @@
+@startuml cu_detalle_g02
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #8E2B24
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+}
+skinparam ArrowFontSize 11
+
+left to right direction
+title Gestionar actividades (G02 · EP-01): caso de uso detallado
+actor "Usuario" as Usuario
+actor "Profesional" as Profesional
+actor "Delegado" as Delegado
+actor "Coordinador" as Coordinador
+actor "Administrador" as Administrador
+rectangle "Gestionar actividades" {
+  usecase "CU-01\nRegistrar actividad" as act_reg
+  usecase "CU-41\nConsultar actividades" as act_con
+  usecase "CU-42\nModificar actividad" as act_mod
+  usecase "CU-43\nEliminar actividad" as act_eli
+  usecase "CU-24\nComentar actividad" as comentar
+  usecase "CU-01.1\nValidar campos de actividad" as act_valid
+  usecase "CU-10\nGenerar código verificador" as codigo
+  usecase "CU-44\nEvaluar puntaje" as puntaje
+  usecase "CU-10.1\nBuscar actividad por código" as act_buscar
+  usecase "CU-45\nRegistrar en auditoría" as auditar
+  usecase "CU-01.2\nGestionar error de validación" as act_error
+  usecase "CU-46\nRechazar por cierre semanal" as cierre_semanal
+  usecase "CU-47\nRechazar por tope diario" as tope_diario
+  usecase "CU-48\nRegistrar sin puntaje" as sin_puntaje
+  usecase "CU-49\nVincular tarea del tubo de trabajo" as vincular
+  usecase "CU-50\nBloquear cambios a la actividad" as act_bloqueo
+  usecase "CU-51\nDevolver a revisión" as devolver
+  usecase "CU-23.1\nControlar conflicto de concurrencia" as concurrencia
+  usecase "CU-10.2\nConsulta sin coincidencias" as act_sin
+  usecase "CU-26.1\nDenegar acceso por ámbito" as denegar
+}
+Usuario --> act_reg
+Usuario --> act_con
+Usuario --> act_mod
+Coordinador --> act_eli
+Administrador --> act_eli
+Profesional --> comentar
+Delegado --> comentar
+Administrador --> comentar
+act_reg ..> act_valid : <<include>>
+act_reg ..> codigo : <<include>>
+act_reg ..> puntaje : <<include>>
+act_reg ..> auditar : <<include>>
+act_con ..> act_buscar : <<include>>
+act_mod ..> act_buscar : <<include>>
+act_mod ..> act_valid : <<include>>
+act_mod ..> puntaje : <<include>>
+act_mod ..> auditar : <<include>>
+act_eli ..> act_buscar : <<include>>
+act_eli ..> auditar : <<include>>
+comentar ..> act_buscar : <<include>>
+comentar ..> auditar : <<include>>
+act_error ..> act_valid : <<extend>>
+cierre_semanal ..> act_valid : <<extend>>
+tope_diario ..> act_valid : <<extend>>
+sin_puntaje ..> puntaje : <<extend>>
+vincular ..> act_reg : <<extend>>
+vincular ..> act_mod : <<extend>>
+act_bloqueo ..> act_mod : <<extend>>
+act_bloqueo ..> act_eli : <<extend>>
+devolver ..> act_mod : <<extend>>
+concurrencia ..> act_mod : <<extend>>
+act_sin ..> act_buscar : <<extend>>
+denegar ..> act_buscar : <<extend>>
+@enduml

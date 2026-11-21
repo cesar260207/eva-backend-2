@@ -1,0 +1,77 @@
+@startuml cu_detalle_g05
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #8E2B24
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+}
+skinparam ArrowFontSize 11
+
+left to right direction
+title Gestionar tubo de trabajo (G05 · EP-04): caso de uso detallado
+actor "Usuario" as Usuario
+actor "Coordinador" as Coordinador
+actor "Administrador" as Administrador
+rectangle "Gestionar tubo de trabajo" {
+  usecase "CU-02\nRegistrar compromiso" as tarea_reg
+  usecase "CU-12\nConsultar agenda compartida" as tarea_agenda
+  usecase "CU-14\nSeguimiento de compromisos" as tarea_seg
+  usecase "CU-58\nModificar tarea" as tarea_mod
+  usecase "CU-13\nActualizar estado de la tarea" as tarea_estado
+  usecase "CU-59\nEliminar tarea" as tarea_eli
+  usecase "CU-02.1\nValidar datos de compromiso" as tarea_valid
+  usecase "CU-60\nGenerar folio" as folio
+  usecase "CU-13.1\nRegistrar historial de cambio de estado" as historial
+  usecase "CU-12.1\nFiltrar agenda compartida" as tarea_filtrar
+  usecase "CU-14.1\nClasificar compromisos por vencimiento" as clasificar
+  usecase "CU-45\nRegistrar en auditoría" as auditar
+  usecase "CU-02.2\nBloquear guardado por campos faltantes" as tarea_falta
+  usecase "CU-61\nAsignar responsable" as asignar
+  usecase "CU-15\nReasignar responsable" as reasignar
+  usecase "CU-62\nRechazar por no ser responsable" as no_responsable
+  usecase "CU-13.2\nReflejar cierre de compromiso" as cierre_tarea
+  usecase "CU-02.3\nDestacar compromiso vencido" as vencido
+  usecase "CU-63\nConservar tarea vencida" as conservar
+  usecase "CU-12.2\nConsulta sin coincidencias en agenda" as tarea_sin
+}
+Usuario --> tarea_reg
+Usuario --> tarea_agenda
+Usuario --> tarea_seg
+Usuario --> tarea_mod
+Usuario --> tarea_estado
+Coordinador --> tarea_eli
+Administrador --> tarea_eli
+tarea_reg ..> tarea_valid : <<include>>
+tarea_reg ..> folio : <<include>>
+tarea_reg ..> historial : <<include>>
+tarea_reg ..> auditar : <<include>>
+tarea_agenda ..> tarea_filtrar : <<include>>
+tarea_agenda ..> clasificar : <<include>>
+tarea_seg ..> tarea_filtrar : <<include>>
+tarea_seg ..> clasificar : <<include>>
+tarea_mod ..> tarea_filtrar : <<include>>
+tarea_mod ..> tarea_valid : <<include>>
+tarea_mod ..> auditar : <<include>>
+tarea_estado ..> tarea_filtrar : <<include>>
+tarea_estado ..> historial : <<include>>
+tarea_estado ..> auditar : <<include>>
+tarea_eli ..> tarea_filtrar : <<include>>
+tarea_eli ..> auditar : <<include>>
+tarea_falta ..> tarea_valid : <<extend>>
+asignar ..> tarea_reg : <<extend>>
+reasignar ..> tarea_mod : <<extend>>
+no_responsable ..> tarea_mod : <<extend>>
+no_responsable ..> tarea_estado : <<extend>>
+cierre_tarea ..> tarea_estado : <<extend>>
+vencido ..> clasificar : <<extend>>
+conservar ..> tarea_eli : <<extend>>
+tarea_sin ..> tarea_filtrar : <<extend>>
+@enduml

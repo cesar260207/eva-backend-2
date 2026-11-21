@@ -1,0 +1,91 @@
+@startuml cu_detalle_g16
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #8E2B24
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+}
+skinparam ArrowFontSize 11
+
+left to right direction
+title Gestionar ítems medibles y metas (G16 · EP-02): caso de uso detallado
+actor "Coordinador" as Coordinador
+actor "Administrador" as Administrador
+rectangle "Gestionar ítems medibles y metas" {
+  usecase "CU-04\nRegistrar ítem medible" as item_reg
+  usecase "CU-128\nConsultar ítems medibles" as item_con
+  usecase "CU-129\nModificar ítem medible" as item_mod
+  usecase "CU-130\nEliminar ítem medible" as item_eli
+  usecase "CU-131\nCargar matriz de cargos" as matriz
+  usecase "CU-05\nRegistrar meta" as meta_reg
+  usecase "CU-132\nConsultar metas" as meta_con
+  usecase "CU-133\nModificar meta" as meta_mod
+  usecase "CU-134\nEliminar meta" as meta_eli
+  usecase "CU-04.1\nValidar reglas de configuración" as item_valid
+  usecase "CU-05.1\nValidar parámetros de meta" as meta_valid
+  usecase "CU-06.1\nRecalcular indicadores automáticamente" as recalcular
+  usecase "CU-29\nBuscar y filtrar" as buscar
+  usecase "CU-45\nRegistrar en auditoría" as auditar
+  usecase "CU-04.2\nBloquear guardado por ponderación inválida" as item_error
+  usecase "CU-05.2\nBloquear guardado por valor inválido" as meta_error
+  usecase "CU-28.1\nRestricción por período cerrado" as periodo_cerrado
+  usecase "CU-05.3\nNotificar período cerrado" as meta_cerrado
+  usecase "CU-127\nImpedir eliminación con datos relacionados" as protegido
+  usecase "CU-135\nAdvertir indicadores asociados" as meta_ind
+  usecase "CU-70\nConsulta sin coincidencias" as sin_resultados
+}
+Coordinador --> item_reg
+Administrador --> item_reg
+Coordinador --> item_con
+Administrador --> item_con
+Coordinador --> item_mod
+Administrador --> item_mod
+Coordinador --> item_eli
+Administrador --> item_eli
+Administrador --> matriz
+Coordinador --> meta_reg
+Administrador --> meta_reg
+Coordinador --> meta_con
+Administrador --> meta_con
+Coordinador --> meta_mod
+Administrador --> meta_mod
+Coordinador --> meta_eli
+Administrador --> meta_eli
+item_reg ..> item_valid : <<include>>
+item_reg ..> auditar : <<include>>
+item_con ..> buscar : <<include>>
+item_mod ..> buscar : <<include>>
+item_mod ..> item_valid : <<include>>
+item_mod ..> auditar : <<include>>
+item_eli ..> buscar : <<include>>
+item_eli ..> auditar : <<include>>
+meta_reg ..> meta_valid : <<include>>
+meta_reg ..> recalcular : <<include>>
+meta_reg ..> auditar : <<include>>
+meta_con ..> buscar : <<include>>
+meta_mod ..> buscar : <<include>>
+meta_mod ..> meta_valid : <<include>>
+meta_mod ..> recalcular : <<include>>
+meta_mod ..> auditar : <<include>>
+meta_eli ..> buscar : <<include>>
+meta_eli ..> auditar : <<include>>
+item_error ..> item_valid : <<extend>>
+meta_error ..> meta_valid : <<extend>>
+periodo_cerrado ..> item_reg : <<extend>>
+periodo_cerrado ..> item_mod : <<extend>>
+periodo_cerrado ..> item_eli : <<extend>>
+meta_cerrado ..> meta_reg : <<extend>>
+meta_cerrado ..> meta_mod : <<extend>>
+meta_cerrado ..> meta_eli : <<extend>>
+protegido ..> item_eli : <<extend>>
+meta_ind ..> meta_eli : <<extend>>
+sin_resultados ..> buscar : <<extend>>
+@enduml

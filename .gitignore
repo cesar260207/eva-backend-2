@@ -29,3 +29,15 @@ docs/evaluacion/
 # Django build
 /staticfiles/
 /media/
+
+# Datos del cliente (Excel y Word con datos personales): se quedan solo en el computador
+data/*.xlsx
+docs/requerimientos/
+
+# Contraseñas de la exposición: el grupo las completa a mano y nunca se suben (la plantilla es docs/ACCESOS_EXPOSICION.example.txt)
+ACCESOS_EXPOSICION.txt
+
+# Cobertura de pruebas
+.coverage
+.coverage.*
+htmlcov/

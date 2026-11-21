@@ -1,0 +1,53 @@
+@startuml cu_detalle_g07
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #8E2B24
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+}
+skinparam ArrowFontSize 11
+
+left to right direction
+title Gestionar ausencias (G07 · EP-02): caso de uso detallado
+actor "Delegado" as Delegado
+actor "Coordinador" as Coordinador
+actor "Administrador" as Administrador
+rectangle "Gestionar ausencias" {
+  usecase "CU-71\nRegistrar ausencia" as au_reg
+  usecase "CU-72\nConsultar ausencias" as au_con
+  usecase "CU-73\nModificar ausencia" as au_mod
+  usecase "CU-74\nValidar datos de ausencia" as au_valid
+  usecase "CU-29\nBuscar y filtrar" as buscar
+  usecase "CU-45\nRegistrar en auditoría" as auditar
+  usecase "CU-69\nInformar error de validación" as error_valid
+  usecase "CU-75\nRechazar ausencia superpuesta" as superpuesta
+  usecase "CU-28.1\nRestricción por período cerrado" as periodo_cerrado
+  usecase "CU-70\nConsulta sin coincidencias" as sin_resultados
+}
+Delegado --> au_reg
+Administrador --> au_reg
+Delegado --> au_con
+Coordinador --> au_con
+Administrador --> au_con
+Coordinador --> au_mod
+Administrador --> au_mod
+au_reg ..> au_valid : <<include>>
+au_reg ..> auditar : <<include>>
+au_con ..> buscar : <<include>>
+au_mod ..> buscar : <<include>>
+au_mod ..> au_valid : <<include>>
+au_mod ..> auditar : <<include>>
+error_valid ..> au_valid : <<extend>>
+superpuesta ..> au_valid : <<extend>>
+periodo_cerrado ..> au_reg : <<extend>>
+periodo_cerrado ..> au_mod : <<extend>>
+sin_resultados ..> buscar : <<extend>>
+@enduml

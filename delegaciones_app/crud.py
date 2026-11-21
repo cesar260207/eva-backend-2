@@ -140,6 +140,41 @@ def _acciones_periodo(periodo):
     return [accion('reabrir', 'Reabrir', motivo=True)]
 
 
+def _acciones_ajuste(ajuste):
+    """Regla 8: la coordinación aplica o rechaza el ajuste informado (no si su período está cerrado)."""
+    if ajuste.estado != 'informado' or ajuste.periodo.estado == 'cerrado':
+        return []
+    return [
+        {'url': reverse('ajuste_decidir', args=[ajuste.pk, 'aplicar']), 'etiqueta': 'Aplicar',
+         'confirmar': f'¿Aplicar este ajuste? La {ajuste.get_tipo_display().lower()} contará en el cumplimiento.'},
+        {'url': reverse('ajuste_decidir', args=[ajuste.pk, 'rechazar']), 'etiqueta': 'Rechazar',
+         'confirmar': '¿Rechazar este ajuste? No contará en el cumplimiento.'},
+    ]
+
+
+def _ajustes_visibles(user, registros):
+    """El delegado ve los ajustes de su delegación (a ella o a sus funcionarios) y los que él informó."""
+    if puede_ver_todo(user):
+        return registros
+    funcionario = funcionario_de(user)
+    if funcionario is None:
+        return registros.none()
+    propios = Q(informado_por=funcionario) | Q(funcionario=funcionario)
+    if funcionario.delegacion_id:
+        propios |= Q(delegacion_id=funcionario.delegacion_id) | Q(funcionario__delegacion_id=funcionario.delegacion_id)
+    return registros.filter(propios)
+
+
+def _ausencias_visibles(user, registros):
+    """Regla 9: el delegado ve las ausencias de los funcionarios de su delegación."""
+    if puede_ver_todo(user):
+        return registros
+    funcionario = funcionario_de(user)
+    if funcionario is None or not funcionario.delegacion_id:
+        return registros.none()
+    return registros.filter(funcionario__delegacion_id=funcionario.delegacion_id)
+
+
 MANTENEDORES = {mantenedor.slug: mantenedor for mantenedor in (
     Mantenedor(
         'delegaciones', 'Delegaciones', 'delegación', 'Unidades territoriales y su estado operativo.',
@@ -233,6 +268,7 @@ MANTENEDORES = {mantenedor.slug: mantenedor for mantenedor in (
         ],
         ('tipo__icontains', 'origen__icontains', 'emisor__icontains', 'funcionario__nombre__icontains', 'delegacion__nombre__icontains', 'periodo__nombre__icontains'),
         select_related=('funcionario', 'delegacion', 'periodo'),
+        acciones_fila=_acciones_ajuste,
     ),
     Mantenedor(
         'ausencias', 'Ausencias', 'ausencia', 'Períodos de ausencia que ajustan el avance esperado.',
@@ -356,6 +392,10 @@ class MantenedorMixin(PermisoRequeridoMixin):
             registros = registros.order_by('pk')
         if self.config.slug == 'organizaciones':
             registros = _organizaciones_visibles(self.request.user, registros)
+        elif self.config.slug == 'ajustes':
+            registros = _ajustes_visibles(self.request.user, registros)
+        elif self.config.slug == 'ausencias':
+            registros = _ausencias_visibles(self.request.user, registros)
         return registros
 
     def get_context_data(self, **kwargs):

@@ -164,3 +164,24 @@ Herramienta usada: **Claude Code** (asistente de IA dentro de VS Code), trabajan
 **Verificación:** Al cerrar cada tarea la IA ejecutó la suite completa (581 pruebas en verde al terminar la Parte 2) y `plan_pruebas`, revisó `makemigrations --check` y aplicó las migraciones en la base local solo después de explicar qué filas cambiaban. El equipo revisó las pantallas en el navegador.
 
 **Lo que la IA no hizo:** No pidió ni leyó contraseñas, el archivo `.env` ni la llave `.pem`; no tocó la instancia EC2; no redactó el documento técnico (entregó la lista de su contenido).
+
+# Requerimientos de octubre 2026, base de datos y exposición final
+
+## Prompt 14 - Requerimientos de octubre, base de datos y exposición
+
+**Prompt literal:** El equipo entregó el archivo `PROMPT_CLAUDE_CODE_REQUERIMIENTOS_OCTUBRE.md`, que empieza con «Eres mi compañero de desarrollo en el proyecto SGR (Sistema de Gestión de Resultados de la Municipalidad de La Serena)…» y pide cinco fases: preparar la rama y sacar los datos del cliente del repositorio (FASE 0), corregir errores verificados y arreglar las 26 pruebas que fallaban desde el PR #16 (FASE 1), completar los requerimientos del cliente (FASE 2), revisar la base de datos (FASE 3), la documentación que pidió el profesor y la que exige la rúbrica final (FASES 4 y 4b) y el cierre y despliegue (FASE 5). Las reglas de trabajo eran las del prompt 13: rama propia, un commit por tarea, pruebas antes y después, migraciones que no pierden datos, preguntar una vez ante una ambigüedad y nada de datos personales del cliente en GitHub. La sesión se retomó con «Termina SOLO la FASE 0 y la FASE 1, y detente» y luego «sigue con todo hasta el final».
+
+**Cómo ayudó la IA:**
+
+- **FASES 0 y 1.** Sacó del repositorio el Excel de organizaciones con domicilios (sigue en el historial), corrigió el conteo de días de ausencia, aplicó el cierre semanal solo al registrar, arregló las 26 pruebas y agregó pruebas para cada regla de octubre.
+- **FASE 2.** Enlaces del menú a informar ajuste, atención social y comentar; botones «Aplicar» y «Rechazar» de los ajustes; recálculo del semáforo al decidir ajustes, registrar ausencias y cambiar tareas del tubo; ausencias desde el semáforo con el tipo «Emergencia»; casilla de gestión interna; importación de organizaciones por territorio y tipo (de 1.812 sin delegación a 24); generación de la matriz de 13 cargos y 79 ítems sin nombres de personas; parámetros y preguntas pendientes para el municipio.
+- **FASE 3.** Migraciones 0027 y 0028 (una fila de permisos cada una, reversibles), migración completa sobre una base limpia, tabla de migraciones en el README y `seed_demo` con el trimestre actual.
+- **FASES 4 y 4b.** Casos de uso al día y una prueba que compara sus actores con el sistema (184 de 184), requerimientos v2, backlog repriorizado, diagrama de clases, diagramas del informe que cambiaron, plan de mantención con `scripts/respaldo.sh` y GitHub Actions, normativas, resultados medidos, guía de la exposición y preguntas de la defensa.
+
+**Errores que encontró la IA al revisar:** ningún comentario se guardaba (la vista asignaba la actividad después de validar); un funcionario sin delegación recibía los ajustes dirigidos a cualquier otra persona; la unidad de systemd de Gunicorn no se reinicia sola si falla; los dos repositorios son públicos y tienen el Excel con domicilios en su historial.
+
+**Decisiones del equipo:** una felicitación o un reclamo puede dirigirse a cualquier funcionario con respaldo formal (no solo al delegado); una actividad suelta también puede marcarse como gestión interna; las organizaciones de ALFALFARES y sin territorio quedan sin delegación para asignarlas a mano; lo que no calza con ningún tipo de organización es «funcional», según la Ley 19.418.
+
+**Verificación:** La IA ejecutó la suite completa al cerrar cada tarea (de 601 pruebas con 26 fallas a 676 pruebas en verde), `makemigrations --check`, la migración de una base limpia de la 0001 a la 0028 y la reversión de las migraciones nuevas, y probó `scripts/respaldo.sh` con un `mysqldump` simulado.
+
+**Lo que la IA no hizo:** No pidió ni leyó contraseñas, el `.env` ni la llave `.pem`; no tocó la instancia EC2 (entregó los pasos); no cambió la visibilidad de los repositorios; no pudo regenerar la imagen `diapositiva_g06.png` porque no se permitió ejecutar Graphviz descargado (dejó la fuente `.dot` al día); no hizo la presentación (entregó su estructura).

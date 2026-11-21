@@ -1,0 +1,68 @@
+digraph G {
+rankdir=LR; newrank=true; nodesep=0.22; ranksep=0.75; splines=true; pad=0.25;
+graph [fontname="DejaVu Sans", fontsize=15, labelloc=t, labeljust=l];
+node [fontname="DejaVu Sans", fontsize=11];
+edge [fontname="DejaVu Sans", fontsize=9, color="#333333", fontcolor="#444444"];
+subgraph cluster_s { label=<<b>Gestionar tubo de trabajo (G05 · EP-04)</b>>; color="#333333"; penwidth=1.4; margin=14;
+"tarea_reg" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Registrar compromiso</b><br/><font point-size="9" color="#555555">CU-02</font>>];
+"tarea_agenda" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Consultar agenda compartida</b><br/><font point-size="9" color="#555555">CU-12</font>>];
+"tarea_seg" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Seguimiento de compromisos</b><br/><font point-size="9" color="#555555">CU-14</font>>];
+"tarea_mod" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Modificar tarea</b><br/><font point-size="9" color="#555555">CU-58</font>>];
+"tarea_estado" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Actualizar estado de la tarea</b><br/><font point-size="9" color="#555555">CU-13</font>>];
+"tarea_eli" [shape=ellipse, style=filled, fillcolor="white", color="#8E2B24", penwidth=1.5, label=<<b>Eliminar tarea</b><br/><font point-size="9" color="#555555">CU-59</font>>];
+"tarea_valid" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Validar datos de compromiso<br/><font point-size="9" color="#555555">CU-02.1</font>>];
+"folio" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Generar folio<br/><font point-size="9" color="#555555">CU-60</font>>];
+"historial" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Registrar historial de cambio de estado<br/><font point-size="9" color="#555555">CU-13.1</font>>];
+"tarea_filtrar" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Filtrar agenda compartida<br/><font point-size="9" color="#555555">CU-12.1</font>>];
+"clasificar" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Clasificar compromisos por vencimiento<br/><font point-size="9" color="#555555">CU-14.1</font>>];
+"auditar" [shape=ellipse, style=filled, fillcolor="#F4F4F4", color="#666666", penwidth=1.5, label=<Registrar en auditoría<br/><font point-size="9" color="#555555">CU-45</font>>];
+"tarea_falta" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Bloquear guardado por campos faltantes<br/><font point-size="9" color="#555555">CU-02.2</font>>];
+"asignar" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Asignar responsable<br/><font point-size="9" color="#555555">CU-61</font>>];
+"reasignar" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Reasignar responsable<br/><font point-size="9" color="#555555">CU-15</font>>];
+"no_responsable" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Rechazar por no ser responsable<br/><font point-size="9" color="#555555">CU-62</font>>];
+"cierre_tarea" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Reflejar cierre de compromiso<br/><font point-size="9" color="#555555">CU-13.2</font>>];
+"vencido" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Destacar compromiso vencido<br/><font point-size="9" color="#555555">CU-02.3</font>>];
+"conservar" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Conservar tarea vencida<br/><font point-size="9" color="#555555">CU-63</font>>];
+"tarea_sin" [shape=ellipse, style=filled, fillcolor="white", color="#B5651D", penwidth=1.5, label=<Consulta sin coincidencias en agenda<br/><font point-size="9" color="#555555">CU-12.2</font>>];
+}
+"A_Usuario" [shape=none, image="cu_v2/dot/_actor.png", labelloc=b, imagepos=tc, height=1.05, width=1.2, fixedsize=true, label=<<b>Usuario<br/>(cualquier perfil)</b>>, fontsize=11];
+"A_Coordinador" [shape=none, image="cu_v2/dot/_actor.png", labelloc=b, imagepos=tc, height=1.05, width=1.2, fixedsize=true, label=<<b>Coordinador</b>>, fontsize=11];
+"A_Administrador" [shape=none, image="cu_v2/dot/_actor.png", labelloc=b, imagepos=tc, height=1.05, width=1.2, fixedsize=true, label=<<b>Administrador</b>>, fontsize=11];
+{rank=same; "A_Usuario"; "A_Coordinador"; "A_Administrador";}
+"A_Coordinador" -> "A_Usuario" [arrowhead=empty, arrowsize=1.1, penwidth=1.1, constraint=false];
+"A_Administrador" -> "A_Usuario" [arrowhead=empty, arrowsize=1.1, penwidth=1.1, constraint=false];
+label=<<font point-size="10" color="#444444">Rojo: caso de detalle · Gris: incluido (siempre ocurre) · Café: extensión (solo si se cumple su condición) · Triángulo: herencia</font>>; labelloc=b; labeljust=r;
+{rank=same; "tarea_reg"; "tarea_agenda"; "tarea_seg"; "tarea_mod"; "tarea_estado"; "tarea_eli";}
+"A_Usuario" -> "tarea_reg" [arrowhead=none, penwidth=1.1, weight=3];
+"tarea_reg" -> "tarea_valid" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"tarea_reg" -> "folio" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"tarea_reg" -> "historial" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"tarea_reg" -> "auditar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Usuario" -> "tarea_agenda" [arrowhead=none, penwidth=1.1, weight=3];
+"tarea_agenda" -> "tarea_filtrar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"tarea_agenda" -> "clasificar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Usuario" -> "tarea_seg" [arrowhead=none, penwidth=1.1, weight=3];
+"tarea_seg" -> "tarea_filtrar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"tarea_seg" -> "clasificar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Usuario" -> "tarea_mod" [arrowhead=none, penwidth=1.1, weight=3];
+"tarea_mod" -> "tarea_filtrar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"tarea_mod" -> "tarea_valid" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"tarea_mod" -> "auditar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Usuario" -> "tarea_estado" [arrowhead=none, penwidth=1.1, weight=3];
+"tarea_estado" -> "tarea_filtrar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"tarea_estado" -> "historial" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"tarea_estado" -> "auditar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Coordinador" -> "tarea_eli" [arrowhead=none, penwidth=1.1, weight=3];
+"A_Administrador" -> "tarea_eli" [arrowhead=none, penwidth=1.1, weight=3];
+"tarea_eli" -> "tarea_filtrar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"tarea_eli" -> "auditar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"tarea_reg" -> "asignar" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"tarea_mod" -> "reasignar" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"tarea_mod" -> "no_responsable" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"tarea_estado" -> "no_responsable" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"tarea_estado" -> "cierre_tarea" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"tarea_eli" -> "conservar" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»", constraint=true, weight=1];
+"tarea_valid" -> "tarea_falta" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»"];
+"clasificar" -> "vencido" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»"];
+"tarea_filtrar" -> "tarea_sin" [style=dashed, dir=back, arrowtail=vee, arrowsize=0.7, label="«extend»"];
+}

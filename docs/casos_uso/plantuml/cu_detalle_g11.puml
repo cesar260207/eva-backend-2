@@ -1,0 +1,53 @@
+@startuml cu_detalle_g11
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #8E2B24
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #333333
+  FontStyle bold
+}
+skinparam ArrowFontSize 11
+
+left to right direction
+title Gestionar cargos (G11 · EP-08): caso de uso detallado
+actor "Coordinador" as Coordinador
+actor "Administrador" as Administrador
+rectangle "Gestionar cargos" {
+  usecase "CU-93\nRegistrar cargo" as car_reg
+  usecase "CU-94\nConsultar cargos" as car_con
+  usecase "CU-95\nModificar cargo" as car_mod
+  usecase "CU-96\nEliminar cargo" as car_eli
+  usecase "CU-97\nValidar datos de cargo" as car_valid
+  usecase "CU-29\nBuscar y filtrar" as buscar
+  usecase "CU-45\nRegistrar en auditoría" as auditar
+  usecase "CU-69\nInformar error de validación" as error_valid
+  usecase "CU-85\nDesactivar en vez de eliminar" as desactivar
+  usecase "CU-70\nConsulta sin coincidencias" as sin_resultados
+}
+Coordinador --> car_reg
+Administrador --> car_reg
+Coordinador --> car_con
+Administrador --> car_con
+Coordinador --> car_mod
+Administrador --> car_mod
+Coordinador --> car_eli
+Administrador --> car_eli
+car_reg ..> car_valid : <<include>>
+car_reg ..> auditar : <<include>>
+car_con ..> buscar : <<include>>
+car_mod ..> buscar : <<include>>
+car_mod ..> car_valid : <<include>>
+car_mod ..> auditar : <<include>>
+car_eli ..> buscar : <<include>>
+car_eli ..> auditar : <<include>>
+error_valid ..> car_valid : <<extend>>
+desactivar ..> car_eli : <<extend>>
+sin_resultados ..> buscar : <<extend>>
+@enduml

@@ -406,13 +406,13 @@ class ResumenColectivoUnitTests(CompromisoBase):
 class TuboDeTrabajoUnitTests(CompromisoBase):
     """CU-12 Agenda colectiva, que en la interfaz se llama «Tubo de trabajo» (RF-016)."""
 
-    def test_la_pagina_y_el_menu_dicen_tubo_de_trabajo(self):
-        """CU-12 Agenda colectiva (RF-016). El menú, el título y la pestaña usan el término de la Municipalidad."""
+    def test_la_pagina_dice_tubo_de_trabajo_y_el_menu_tareas(self):
+        """CU-12 Agenda colectiva (RF-016). El título y la pestaña usan el término de la Municipalidad; el menú la enlaza como «Tareas»."""
         self.client.force_login(self.coordinador)
         respuesta = self.client.get(reverse('agenda'))
         self.assertContains(respuesta, '<title>Tubo de trabajo | SGR</title>', html=False)
         self.assertContains(respuesta, '<h1 class="page-title mb-2">Tubo de trabajo</h1>', html=False)
-        self.assertContains(respuesta, f'href="{reverse("agenda")}">Tubo de trabajo</a>', html=False)
+        self.assertContains(respuesta, f'href="{reverse("agenda")}">Tareas</a>', html=False)
         self.assertNotContains(respuesta, 'Agenda colectiva')
 
     def test_cada_registro_se_llama_tarea(self):
