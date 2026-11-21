@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}Panel {{ perfil }} | SGR{% endblock %}
 {% block content %}
-{% if puede_revisar %}{% include 'gestion_app/_panel_encabezado.html' with descripcion='Permisos intermedios: trabajas tu delegación y revisas sus evidencias. Lo demás queda restringido.' %}{% else %}{% include 'gestion_app/_panel_encabezado.html' with descripcion='Permisos mínimos: solo las funciones asignadas a tu cuenta. Las operaciones críticas quedan restringidas.' %}{% endif %}
+{% include 'gestion_app/_panel_encabezado.html' %}
 
 <div class="row g-3 mb-4">
     <div class="col-6 col-lg-3"><div class="metric h-100"><small>Actividades en tu ámbito</small><strong>{{ actividades_total }}</strong><small>{{ actividades_pendientes }} esperando revisión</small></div></div>
@@ -24,7 +24,7 @@
 </div>
 {% endfor %}
 <div class="row g-3 mb-4">
-    <div class="col-lg-4"><div class="panel h-100">
+    <div class="col-lg-6"><div class="panel h-100">
         <div class="section-label">Tus funciones</div>
         <div class="d-grid gap-2">
             <a class="btn btn-sgr" href="{% url 'actividad_nueva' %}">Registrar actividad con evidencia</a>
@@ -34,19 +34,7 @@
             <a class="btn btn-outline-sgr" href="{% url 'ficha_personal' %}">Mi ficha y mis metas</a>
         </div>
     </div></div>
-    <div class="col-lg-4"><div class="panel h-100">
-        <div class="section-label">Restringido para tu perfil</div>
-        <ul class="small mb-0">
-            <li>Mantenedores (delegaciones, cargos, catálogo, períodos, ítems, metas).</li>
-            <li>Crear usuarios, asignar perfiles o roles.</li>
-            <li>Eliminar actividades o tareas del tubo de trabajo, y abrir o cerrar períodos.</li>
-            {% if puede_revisar %}<li>Aprobar o rechazar evidencias fuera de tu delegación.</li>{% else %}<li>Aprobar, rechazar o anular evidencias (lo hacen los perfiles Delegado y Coordinador).</li>{% endif %}
-            <li>Ver métricas y registros de otras delegaciones.</li>
-            <li>Asignar delegados o tareas a otros (lo hace la coordinación).</li>
-            <li>Consultar la auditoría.</li>
-        </ul>
-    </div></div>
-    <div class="col-lg-4">{% include 'gestion_app/_panel_alertas.html' %}</div>
+    <div class="col-lg-6">{% include 'gestion_app/_panel_alertas.html' %}</div>
 </div>
 
 <div class="row g-3">

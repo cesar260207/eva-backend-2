@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}Panel Delegado | SGR{% endblock %}
 {% block content %}
-{% include 'gestion_app/_panel_encabezado.html' with descripcion='Permisos intermedios: trabajas tu delegación, revisas sus evidencias y sigues su tubo de trabajo y sus métricas.' %}
+{% include 'gestion_app/_panel_encabezado.html' %}
 
 <div class="row g-3 mb-4">
     {% for fila in resultado_delegacion %}
@@ -15,7 +15,7 @@
 </div>
 
 <div class="row g-3 mb-4">
-    <div class="col-lg-4"><div class="panel h-100">
+    <div class="col-lg-6"><div class="panel h-100">
         <div class="section-label">Tu delegación{% if delegacion_propia %}: {{ delegacion_propia.nombre }}{% endif %}</div>
         <div class="d-grid gap-2">
             <a class="btn btn-sgr" href="{% url 'actividades' %}?estado=pendiente">Revisar evidencias pendientes</a>
@@ -27,17 +27,7 @@
             <a class="btn btn-outline-sgr" href="{% url 'informe' %}">Informes</a>
         </div>
     </div></div>
-    <div class="col-lg-4"><div class="panel h-100">
-        <div class="section-label">Restringido para tu perfil</div>
-        <ul class="small mb-0">
-            <li>Mantenedores, usuarios, perfiles y auditoría.</li>
-            <li>Ver, revisar o modificar registros de otras delegaciones.</li>
-            <li>Revisar las actividades que registraste tú.</li>
-            <li>Eliminar actividades o tareas del tubo de trabajo, y abrir o cerrar períodos.</li>
-            <li>Asignar delegados (lo hace la coordinación).</li>
-        </ul>
-    </div></div>
-    <div class="col-lg-4">{% include 'gestion_app/_panel_alertas.html' %}</div>
+    <div class="col-lg-6">{% include 'gestion_app/_panel_alertas.html' %}</div>
 </div>
 
 <div class="row g-3">

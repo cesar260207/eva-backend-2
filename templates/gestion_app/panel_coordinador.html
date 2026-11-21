@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}Panel Coordinador | SGR{% endblock %}
 {% block content %}
-{% include 'gestion_app/_panel_encabezado.html' with descripcion='Permisos intermedios: gestionas y asignas a los delegados, revisas y sigues todas las delegaciones, y usas los mantenedores que tu perfil autoriza.' %}
+{% include 'gestion_app/_panel_encabezado.html' %}
 
 <div class="section-label mb-2">Información operacional</div>
 <div class="row g-3 mb-4">
@@ -14,15 +14,11 @@
 <div class="row g-3 mb-4">
     <div class="col-lg-4"><div class="panel h-100">
         <div class="section-label">Mantenedores autorizados</div>
-        <ul class="list-unstyled mb-3">
+        <ul class="list-unstyled mb-0">
         {% for m in mantenedores %}
-            <li class="d-flex justify-content-between align-items-center mb-2">
-                <a href="{% url 'mantenedor_lista' m.slug %}">{{ m.titulo }}</a>
-                <small class="text-muted">{% if m.puede.add %}crear{% endif %}{% if m.puede.change %} · editar{% endif %}{% if m.puede.delete %} · eliminar{% endif %}</small>
-            </li>
+            <li class="mb-2"><a href="{% url 'mantenedor_lista' m.slug %}">{{ m.titulo }}</a></li>
         {% endfor %}
         </ul>
-        <p class="small text-muted mb-0">Usuarios, roles, perfiles y auditoría quedan reservados al perfil Administrador.</p>
     </div></div>
     <div class="col-lg-4"><div class="panel h-100">
         <div class="section-label">Coordinación de delegados</div>
