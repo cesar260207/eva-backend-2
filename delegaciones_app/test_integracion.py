@@ -1733,10 +1733,14 @@ class SeedDemoTests(TestCase):
 		cargar_demo()
 		filas = contar_filas()
 		esperadas = {
-			'Delegacion': 6, 'Funcionario': 9, 'FuncionarioRol': 9, 'UsuarioMaestro': 1, 'Periodo': 1, 'ParametroVersionado': 5,
-			# Un ítem por cargo: el de los delegados y el de funcionario.centro (Profesional).
-			'ItemMedible': 2, 'Meta': 6, 'Catalogo': 5, 'Indicador': 6, 'Compromiso': 8, 'HistorialCompromiso': 8,
+			# Dos períodos: julio-septiembre 2026 y el trimestre de la fecha actual, cada uno con sus 5 parámetros.
+			'Delegacion': 6, 'Funcionario': 9, 'FuncionarioRol': 9, 'UsuarioMaestro': 1, 'Periodo': 2, 'ParametroVersionado': 10,
+			# Julio-septiembre: un ítem por cargo (delegados y Profesional). Trimestre actual: el ítem del Profesional
+			# y los 79 ítems de los 13 cargos de la matriz (data/matriz_cargos.json).
+			'ItemMedible': 82, 'Meta': 7, 'Catalogo': 5, 'Indicador': 7, 'Compromiso': 8, 'HistorialCompromiso': 8,
 			'Actividad': 1, 'Evidencia': 1, 'Validacion': 1, 'MedicionDelegacion': 6,
+			# Ejemplos ficticios de las reglas de octubre.
+			'Organizacion': 7, 'Ajuste': 1, 'Ausencia': 1, 'CasoSocial': 1,
 		}
 		for modelo, total in esperadas.items():
 			with self.subTest(modelo=modelo):
@@ -1764,12 +1768,24 @@ class SeedDemoTests(TestCase):
 	def test_la_demo_se_ve_en_la_aplicacion(self):
 		cargar_demo()
 		self.assertTrue(self.client.login(username='coordinador.demo', password=CLAVE_DEMO))
-		respuesta = self.client.get(reverse('dashboard'))
+		julio = Periodo.objects.get(nombre='Trimestre julio-septiembre 2026')
+		respuesta = self.client.get(reverse('dashboard'), {'periodo': julio.pk})
 		filas = {fila['nombre']: fila for fila in respuesta.context['delegaciones']}
 		self.assertEqual(len(filas), 6)
 		self.assertEqual((filas['Centro']['cumplimiento'], filas['Rural']['cumplimiento']), (Decimal('10.00'), Decimal('0.00')))
 		self.assertContains(self.client.get(reverse('agenda')), 'LS-2026-014')
 		self.assertEqual(self.client.get(reverse('actividades')).status_code, 200)
+
+	def test_por_defecto_se_ve_el_trimestre_actual_con_la_meta_de_la_demostracion(self):
+		"""Sin CU (datos de demostración). Como en el servidor: el trimestre actual, con meta 2 para funcionario.centro y una felicitación por decidir."""
+		cargar_demo()
+		self.assertTrue(self.client.login(username='coordinador.demo', password=CLAVE_DEMO))
+		periodo = self.client.get(reverse('dashboard')).context['periodo']
+		self.assertNotEqual(periodo.nombre, 'Trimestre julio-septiembre 2026')
+		self.assertTrue(periodo.fecha_inicio <= timezone.localdate() <= periodo.fecha_termino)
+		meta = Meta.objects.get(item__periodo=periodo, funcionario__usuario__username='funcionario.centro')
+		self.assertEqual((meta.item.nombre, meta.valor_objetivo), ('Atención de casos sociales', 2))
+		self.assertContains(self.client.get(reverse('mantenedor_lista', args=['ajustes'])), 'Aplicar')
 
 	def test_convive_con_datos_ya_migrados_sin_duplicarlos(self):
 		cargo = Cargo.objects.create(nombre='Sin cargo asignado')
@@ -1785,9 +1801,10 @@ class SeedDemoTests(TestCase):
 
 		self.assertEqual(Funcionario.objects.get(pk=migrado.pk).cargo, cargo)
 		self.assertTrue(User.objects.get(pk=usuario.pk).check_password('clave-previa'))
-		self.assertEqual(Meta.objects.filter(funcionario=migrado).count(), 1)
-		self.assertEqual(ItemMedible.objects.filter(cargo=cargo).count(), 1)
-		self.assertEqual((Funcionario.objects.count(), Meta.objects.count(), Periodo.objects.count()), (9, 6, 1))
+		# En julio-septiembre se reutilizan la meta y el ítem migrados; el trimestre actual agrega los suyos.
+		self.assertEqual(Meta.objects.filter(funcionario=migrado, item__periodo=periodo).count(), 1)
+		self.assertEqual(ItemMedible.objects.filter(cargo=cargo, periodo=periodo).count(), 1)
+		self.assertEqual((Funcionario.objects.count(), Meta.objects.count(), Periodo.objects.count()), (9, 7, 2))
 
 
 class AuditoriaTests(BaseOperacion):

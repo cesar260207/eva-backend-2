@@ -1,23 +1,43 @@
+import calendar
 import json
 import os
 import secrets
 from datetime import date, datetime
+from io import StringIO
 from pathlib import Path
 
 from django.contrib.auth.models import User
+from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 from django.utils.text import slugify
 
 from delegaciones_app.models import (
-    Actividad, Cargo, Catalogo, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol, Indicador, ItemMedible,
-    MedicionDelegacion, Meta, ParametroVersionado, Periodo, Rol, UsuarioMaestro, Validacion,
+    Actividad, Ajuste, Ausencia, Cargo, CasoSocial, Catalogo, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
+    Indicador, ItemMedible, MedicionDelegacion, Meta, Organizacion, ParametroVersionado, Periodo, Rol, UsuarioMaestro, Validacion,
 )
+from delegaciones_app.management.commands.importar_organizaciones import Command as ImportarOrganizaciones
 from delegaciones_app.permisos import PERFIL_ADMINISTRADOR, PERFILES, ROLES_DEL_SISTEMA, asignar_perfil
 
 PERIODO = 'Trimestre julio-septiembre 2026'
 ITEM = 'Seguridad y prevencion'
+# Trimestre que incluye la fecha actual, como el del servidor: un ítem del cargo de funcionario.centro con una
+# meta pequeña (2), para que aprobar una actividad en la demostración cambie el semáforo de rojo a ámbar.
+ITEM_TRIMESTRE = 'Atención de casos sociales'
+MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+MATRIZ = Path(__file__).resolve().parents[3] / 'data' / 'matriz_cargos.json'
+
+# Organizaciones ficticias (sin datos reales): una por delegación y una sin territorio, para verificar a mano.
+ORGANIZACIONES = [
+    ('Junta de Vecinos Ejemplo Centro', 'Centro'),
+    ('Club Adulto Mayor Ejemplo Rural', 'Rural'),
+    ('Club Deportivo Ejemplo La Antena', 'La Antena'),
+    ('Conjunto Folclórico Ejemplo La Pampa', 'La Pampa'),
+    ('Comité de Seguridad Ejemplo Avenida del Mar', 'Avenida del Mar'),
+    ('Comité de Vivienda Ejemplo Las Compañías', 'Las Compañías'),
+    ('Agrupación Ejemplo sin territorio', None),
+]
 
 DELEGACIONES = {
     'Centro': ('Centro historico, administrativo, comercial y patrimonial', 'Atencion territorial y gestion del espacio publico.'),
@@ -91,7 +111,11 @@ class Command(BaseCommand):
         compromisos = self._compromisos(delegaciones, delegados)
         self._actividad_demo(delegaciones['Centro'], centro, delegado_centro, metas['Centro'].item, catalogo[('atencion', 'Solicitud ciudadana')])
         mediciones = self._mediciones(delegaciones)
-        indicadores = self._indicadores(periodo)
+        trimestre = self._trimestre_actual(centro)
+        self._organizaciones(delegaciones)
+        if trimestre:
+            self._ejemplos_de_octubre(trimestre, centro, delegado_centro, administrador)
+        indicadores = sum(self._indicadores(p) for p in (periodo, trimestre) if p)
 
         if clave_generada:
             self.stdout.write(self.style.WARNING(f'Clave generada para las cuentas demo NUEVAS (se muestra una sola vez): {clave}'))
@@ -134,10 +158,10 @@ class Command(BaseCommand):
             defaults={'identificador_maestro': usuario.username, 'nombre': funcionario.nombre, 'nivel_dominio': 'total'},
         )
 
-    def _periodo(self):
+    def _periodo(self, nombre=PERIODO, inicio=date(2026, 7, 1), termino=date(2026, 9, 30)):
         periodo = Periodo.objects.get_or_create(
-            nombre=PERIODO,
-            defaults={'fecha_inicio': date(2026, 7, 1), 'fecha_termino': date(2026, 9, 30), 'estado': 'abierto', 'umbral_minimo': 80, 'version_parametros': 1},
+            nombre=nombre,
+            defaults={'fecha_inicio': inicio, 'fecha_termino': termino, 'estado': 'abierto', 'umbral_minimo': 80, 'version_parametros': 1},
         )[0]
         ParametroVersionado.objects.get_or_create(
             periodo=periodo, clave='maximo_cumplimiento',
@@ -148,6 +172,54 @@ class Command(BaseCommand):
         ParametroVersionado.objects.get_or_create(periodo=periodo, clave='max_felicitaciones', defaults={'valor': '3', 'descripcion': 'Máximo de felicitaciones aplicables.'})
         ParametroVersionado.objects.get_or_create(periodo=periodo, clave='valor_reclamo', defaults={'valor': '-30', 'descripcion': 'Porcentaje por reclamo aplicado.'})
         return periodo
+
+    def _trimestre_actual(self, profesional):
+        """Trimestre de la fecha actual con los cargos de la matriz, el ítem del Profesional y su meta de 2."""
+        hoy = timezone.localdate()
+        primer_mes = 3 * ((hoy.month - 1) // 3) + 1
+        ultimo_mes = primer_mes + 2
+        nombre = f'Trimestre {MESES[primer_mes - 1]}-{MESES[ultimo_mes - 1]} {hoy.year}'
+        if nombre == PERIODO:
+            return None
+        termino = date(hoy.year, ultimo_mes, calendar.monthrange(hoy.year, ultimo_mes)[1])
+        trimestre = self._periodo(nombre, date(hoy.year, primer_mes, 1), termino)
+        if trimestre.estado == 'cerrado':
+            return None
+        if MATRIZ.exists():
+            call_command('cargar_matriz', str(MATRIZ), periodo=nombre, stdout=StringIO())
+        item = ItemMedible.objects.get_or_create(
+            nombre=ITEM_TRIMESTRE, cargo=profesional.cargo, periodo=trimestre, defaults={'ponderacion': 100},
+        )[0]
+        Meta.objects.get_or_create(
+            item=item, funcionario=profesional, defaults={'valor_objetivo': 2, 'unidad': 'actividades', 'ponderador': 100},
+        )
+        return trimestre
+
+    def _organizaciones(self, delegaciones):
+        """Organizaciones ficticias con el tipo que deduce el importador a partir del nombre."""
+        for nombre, delegacion in ORGANIZACIONES:
+            Organizacion.objects.get_or_create(nombre=nombre, territorio=delegacion or '', defaults={
+                'tipo': ImportarOrganizaciones._tipo(nombre, None), 'domicilio': 'Domicilio de ejemplo',
+                'delegacion': delegaciones.get(delegacion), 'verificada': bool(delegacion),
+                'observaciones': '' if delegacion else 'Ejemplo sin territorio: asignar la delegación a mano.',
+            })
+
+    def _ejemplos_de_octubre(self, trimestre, profesional, delegado, administrador):
+        """Una felicitación informada (pendiente de decisión), una ausencia y una atención social, todas ficticias."""
+        inicio = trimestre.fecha_inicio
+        Ajuste.objects.get_or_create(
+            tipo='felicitacion', funcionario=profesional, periodo=trimestre, emisor='Junta de Vecinos Ejemplo Centro',
+            defaults={'origen': 'usuario', 'fecha': inicio, 'respaldo': 'ajustes/demo/carta-ejemplo.pdf', 'informado_por': delegado,
+                      'observacion': 'Ejemplo de demostración: carta ficticia.'},
+        )
+        Ausencia.objects.get_or_create(
+            funcionario=delegado, periodo=trimestre, desde=inicio,
+            defaults={'tipo': 'administrativo', 'hasta': inicio, 'registrada_por': administrador, 'observacion': 'Ejemplo de demostración.'},
+        )
+        CasoSocial.objects.get_or_create(
+            funcionario=profesional, nombre_usuario='Vecina de ejemplo', etapa=1,
+            defaults={'telefono_usuario': '900000000', 'tipo': 'informe_social', 'observacion': 'Ejemplo de demostración, datos ficticios.'},
+        )
 
     def _catalogo(self):
         elementos = {}
