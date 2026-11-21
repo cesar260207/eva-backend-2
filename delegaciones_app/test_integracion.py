@@ -1865,6 +1865,24 @@ class AuditoriaTests(BaseOperacion):
 		self.client.get(reverse('actividad_editar', args=[aprobada.codigo_verificador]))
 		self.assertFalse(self._evento('acceso_denegado').exists())
 
+	def test_la_consulta_muestra_los_cambios_en_texto_legible(self):
+		"""CU-30 Auditoría de cambios (RF-036, RNF-008). Campo y valor legibles, sin el JSON con que se guardan."""
+		administrador = crear_funcionario('admin-legible', 'administrador', cargo=self.cargo)
+		Auditoria.registrar_evento(self.coordinador, 'editar', 'Meta', 'M-1', {'valor_objetivo': '20.00'}, {'valor_objetivo': '2'})
+		Auditoria.registrar_evento(self.coordinador, 'iniciar_periodo', 'Periodo', 'P-1', None, {'estado': 'abierto', 'fecha_inicio': '2026-10-01'})
+		Auditoria.registrar_evento(self.coordinador, 'acceso_denegado', 'Acceso', '/administracion/auditoria/', None, {'metodo': 'GET', 'motivo': 'permiso insuficiente'})
+		self.client.force_login(administrador)
+		respuesta = self.client.get(reverse('auditoria_consulta'))
+		contenido = respuesta.content.decode()
+		for texto in ('Valor objetivo:</span> 20.00', 'Valor objetivo:</span> 2<', 'Estado:</span> Abierto', 'Fecha inicio:</span> 01-10-2026',
+					  'Método:</span> GET', 'Inicio de período', 'Acceso denegado', 'Período'):
+			with self.subTest(texto=texto):
+				self.assertIn(texto, contenido)
+		# Sin llaves, comillas ni nombres internos de campos o eventos.
+		for texto in ('{&quot;', 'valor_objetivo', 'acceso_denegado</td>', 'iniciar_periodo</td>'):
+			with self.subTest(texto=texto):
+				self.assertNotIn(texto, contenido)
+
 	def test_la_consulta_de_auditoria_filtra_y_solo_la_ve_el_administrador(self):
 		administrador = crear_funcionario('admin-aud', 'administrador', cargo=self.cargo)
 		Auditoria.registrar_evento(self.coordinador, 'crear', 'Cargo', 'C-1', None, {'nombre': 'Uno'})
