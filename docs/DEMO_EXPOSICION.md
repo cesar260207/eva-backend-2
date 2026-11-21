@@ -2,7 +2,7 @@
 
 Exposición de Ingeniería de Software del lunes 23 de noviembre de 2026. Tiempo máximo: 10:59 minutos, sin informe. El guion suma 9:30 minutos y deja 1:29 de margen.
 
-Los datos que no salen del repositorio quedan marcados con «[COMPLETAR POR EL GRUPO]». Los documentos que todavía no existen se citan con la tarea del plan de trabajo que los crea.
+Los datos que no salen del repositorio quedan marcados con «[COMPLETAR POR EL GRUPO]».
 
 ## 1. Accesos
 
@@ -47,6 +47,10 @@ Qué se destaca: nadie revisa su propio trabajo, el rechazo exige motivo (CU-11,
 2. Entrar como `admin.demo` y abrir «Administración» y «Consultar auditoría»: aparecen el registro de la actividad, la aprobación y el acceso denegado recién hechos, sin opción de editar ni borrar.
 
 Qué se destaca: perfiles con permisos distintos (CU-26.1) y trazabilidad de solo lectura (CU-30, CU-30.1).
+
+### Flujo opcional. La coordinación aplica una felicitación (si sobra tiempo)
+
+Solo si la rama `feat/requerimientos-octubre` está desplegada y hay una felicitación «informada» para `funcionario.centro` (el Delegado la informa desde el menú del usuario, «Informar felicitación o reclamo», con un PDF de respaldo). Como `coordinador.demo`: «Administración», «Ajustes», «Aplicar» y confirmar. El semáforo se recalcula al instante (+10 puntos, regla 8), sin correr ningún comando.
 
 ### Ensayo y estado antes de la clase
 
@@ -103,13 +107,13 @@ Cómo se ejecutó, con la evidencia del repositorio:
 
 | Práctica | Evidencia en el repositorio | Dato del grupo |
 | --- | --- | --- |
-| Sprints | Primer commit el 23 de septiembre de 2026; trabajo integrado en 15 pull requests (del #1 al #16; el #15 no se unió) entre el 27 de septiembre y el 20 de noviembre de 2026 | Duración de cada sprint: [COMPLETAR POR EL GRUPO] |
-| Reuniones del equipo | No quedan en el repositorio | Frecuencia real (por ejemplo, dos por semana): [COMPLETAR POR EL GRUPO] |
+| Sprints | Primer commit el 23 de septiembre de 2026; trabajo integrado en 15 pull requests (del #1 al #16; el #15 no se unió) entre el 27 de septiembre y el 20 de noviembre de 2026 | El informe planificó sprints de 3 semanas (Tabla 27); fechas reales: [COMPLETAR POR EL GRUPO] |
+| Reuniones del equipo | No quedan en el repositorio | El informe planificó la Daily dos veces por semana, 15 minutos, en línea (Tabla 27); confirmar si se hizo así: [COMPLETAR POR EL GRUPO] |
 | Revisión del sprint con el cliente | Reunión de octubre de 2026 con requerimientos nuevos | Fechas: [COMPLETAR POR EL GRUPO] |
-| Pruebas automáticas (XP) | 648 pruebas que pasan; `python manage.py plan_pruebas` genera el plan con su resultado | |
+| Pruebas automáticas (XP) | 676 pruebas que pasan; `python manage.py plan_pruebas` genera el plan con su resultado; GitHub Actions las ejecuta en cada pull request | |
 | Integración por pull request (XP) | Una rama por funcionalidad (`feature/…`, `fix/…`, `docs/…`) unida a main por pull request | |
 | Revisión de código (XP) | [COMPLETAR POR EL GRUPO]: si los pull requests se revisaron, indicar quién revisó; el historial de Git no lo registra | |
-| Tablero por ciclo de vida | Product backlog, Sprint backlog, En progreso, En pruebas y Desplegado (ver `docs/BACKLOG_SPRINT.md`, tarea 18) | Herramienta usada: [COMPLETAR POR EL GRUPO] (la herramienta no justifica la metodología) |
+| Tablero por ciclo de vida | Product backlog, Sprint backlog, En progreso, En pruebas y Desplegado ([BACKLOG_SPRINT.md](BACKLOG_SPRINT.md)) | Herramienta usada: [COMPLETAR POR EL GRUPO] (la herramienta no justifica la metodología) |
 
 No se mencionan ceremonias que el grupo no hizo.
 
@@ -119,21 +123,21 @@ Fecha de la reunión de octubre: [COMPLETAR POR EL GRUPO].
 
 | Paso | Qué se hizo | Evidencia |
 | --- | --- | --- |
-| 1. Agrupar los requerimientos | Las 10 reglas y los tipos de organización se agruparon por tema: registro de actividades, puntaje, ajustes, ausencias, atenciones sociales y organizaciones | `docs/REQUERIMIENTOS_V2.md` (tarea 17, pendiente) |
-| 2. Identificar RF y RNF | Cada regla quedó como requerimiento con código, criterio de aceptación y prueba | `docs/REQUERIMIENTOS_V2.md` (tarea 17, pendiente) |
+| 1. Agrupar los requerimientos | Las 10 reglas y los tipos de organización se agruparon por tema: registro de actividades, puntaje, ajustes, ausencias, atenciones sociales y organizaciones | [REQUERIMIENTOS_V2.md](REQUERIMIENTOS_V2.md), commit 293bfc6 |
+| 2. Identificar RF y RNF | Cada regla quedó como requerimiento (RF-039 a RF-050, RNF-019 y RNF-020) con criterio de aceptación y prueba | [REQUERIMIENTOS_V2.md](REQUERIMIENTOS_V2.md) |
 | 3. Ajustar los casos de uso | Nuevas gestiones G06 Ajustes de puntaje, G07 Ausencias y G08 Atenciones sociales; casos nuevos CU-32 a CU-139; actores comprobados contra el sistema (184 de 184) | `docs/CASOS_DE_USO.md`, commit 0859227 |
-| 4. Actualizar el diagrama de clases | Modelos nuevos Organizacion, Ajuste, Ausencia, CasoSocial y Comentario | Migración `0021_reglas_sgr.py`; `docs/DIAGRAMA_CLASES.md` (tarea 19b, pendiente) |
-| 5. Crear las tareas nuevas y repriorizar | Lo que no cabía en el sprint se postergó según su valor para el municipio; la duración del sprint no cambió | `docs/BACKLOG_SPRINT.md` (tarea 18, pendiente) |
-| 6. Implementar | Reglas de octubre, modelos y mantenedores (pull request #16, commits ffbb5e2 y 7b1a99f); correcciones y accesos en la rama `feat/requerimientos-octubre` (commits 6781d88, 791b9ac, 193eed5 y 3c2aaef) | Historial de Git |
-| 7. Probar | Se corrigieron las 26 pruebas que fallaban y se agregaron pruebas para cada regla nueva: de 601 a 648 pruebas, todas aprobadas | Commits 93bab31 y 2fe7e6f; `PLAN_DE_PRUEBAS.md` |
+| 4. Actualizar el diagrama de clases | Modelos nuevos Organizacion, Ajuste, Ausencia, CasoSocial y Comentario | Migración `0021_reglas_sgr.py`; [DIAGRAMA_CLASES.md](DIAGRAMA_CLASES.md), commit 19b89d8 |
+| 5. Crear las tareas nuevas y repriorizar | Lo que no cabía en el sprint se postergó según su valor para el municipio; la duración del sprint no cambió | [BACKLOG_SPRINT.md](BACKLOG_SPRINT.md), commit d5063c7 |
+| 6. Implementar | Reglas de octubre, modelos y mantenedores (pull request #16, commits ffbb5e2 y 7b1a99f); correcciones, accesos, ajustes, recálculo, ausencias, organizaciones y matriz en la rama `feat/requerimientos-octubre` (commits 6781d88 a d83d09a) | Historial de Git |
+| 7. Probar | Se corrigieron las 26 pruebas que fallaban y se agregaron pruebas para cada regla nueva: de 601 a 676 pruebas, todas aprobadas | Commits 93bab31 y 2fe7e6f; `PLAN_DE_PRUEBAS.md` |
 
 ## 7. Números para la presentación
 
-Medidos el 21 de noviembre de 2026 en la rama `feat/requerimientos-octubre`. La versión completa, con CSV para los gráficos, va en `docs/RESULTADOS.md` (tarea 20d).
+Medidos el 21 de noviembre de 2026 en la rama `feat/requerimientos-octubre`. La versión completa, con CSV para los gráficos, está en [RESULTADOS.md](RESULTADOS.md).
 
-- 648 pruebas automáticas, 648 aprobadas.
+- 676 pruebas automáticas, todas aprobadas; cobertura del código: 93 %.
 - 171 casos de uso en 19 gestiones; 184 de 184 combinaciones de perfil y pantalla coinciden con los actores de los cuadros.
-- 27 migraciones de base de datos (0001 a 0027).
+- 28 migraciones de base de datos (0001 a 0028).
 - 15 pull requests integrados en main.
 
 ## 8. Estructura de la presentación según la rúbrica
@@ -145,9 +149,9 @@ Medidos el 21 de noviembre de 2026 en la rama `feat/requerimientos-octubre`. La 
 | Metodología y requerimientos nuevos | 1:45 | Exposición oral (10) y defensa (10) | Secciones 5 y 6 |
 | Diseño | 0:45 | Documentación final (10) | Casos de uso, clases y arquitectura |
 | Demostración en vivo | 3:30 | Funcionalidad en la demostración (20) | Sección 2 |
-| Resultados con números | 0:45 | Presentación de resultados con datos cuantificables (10) | Sección 7 y `docs/RESULTADOS.md` |
-| Normativas y estándares | 0:30 | Normativas y estándares (10) | `docs/NORMATIVAS_Y_ESTANDARES.md` (tarea 20c) |
-| Plan de mantención | 0:35 | Plan de mantención (20) | `docs/PLAN_MANTENCION.md` (tarea 20b) |
+| Resultados con números | 0:45 | Presentación de resultados con datos cuantificables (10) | Sección 7 y [RESULTADOS.md](RESULTADOS.md) |
+| Normativas y estándares | 0:30 | Normativas y estándares (10) | [NORMATIVAS_Y_ESTANDARES.md](NORMATIVAS_Y_ESTANDARES.md) |
+| Plan de mantención | 0:35 | Plan de mantención (20) | [PLAN_MANTENCION.md](PLAN_MANTENCION.md) |
 | Cierre | 0:10 | Confección de la presentación (10) | Pendientes y cierre |
 
 El plan de mantención vale 20 puntos: aunque su tiempo sea corto, la diapositiva debe mostrar roles, frecuencias y herramientas en un calendario.
