@@ -16,8 +16,8 @@ jobs:
       DEBUG: "False"
       ALLOWED_HOSTS: localhost
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
           cache: pip
@@ -29,5 +29,7 @@ jobs:
         run: |
           python manage.py check
           python manage.py makemigrations --check --dry-run
+      # Sin --parallel: en Linux, Python 3.14 crea los procesos con «forkserver» y Django 5.2 no puede clonar
+      # la base de pruebas SQLite con ese método (NotSupportedError). En un solo proceso tarda más, pero funciona.
       - name: Pruebas
-        run: python manage.py test --parallel 4
+        run: python manage.py test
