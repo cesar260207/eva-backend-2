@@ -125,8 +125,7 @@
                 <nav aria-labelledby="pie-ayuda">
                     <h2 id="pie-ayuda">Ayuda</h2>
                     <ul>
-                        {% if not user.is_authenticated %}<li><a href="{% url 'password_reset' %}">¿Olvidaste tu contraseña?</a></li>{% endif %}
-                        <li><a href="{% url 'institucional' %}">Territorio</a></li>
+                        {% if user.is_authenticated %}<li><a href="{% url 'institucional' %}">Territorio</a></li>{% else %}<li><a href="{% url 'password_reset' %}">¿Olvidaste tu contraseña?</a></li>{% endif %}
                         <li data-requiere-js hidden><button class="btn-enlace" type="button" data-bs-toggle="collapse" data-bs-target="#panel-accesibilidad" aria-expanded="false" aria-controls="panel-accesibilidad" data-a11y-desde-pie>{% include 'includes/_icono.html' with nombre='accesibilidad' clase='icono-sm' %}Opciones de accesibilidad</button></li>
                     </ul>
                 </nav>
