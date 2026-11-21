@@ -17,6 +17,7 @@ CATALOGO_CU = {
     'CU-01': 'Registro de actividades', 'CU-01.1': 'Validar campos de actividad', 'CU-01.2': 'Gestionar error de validación',
     'CU-02': 'Registro de compromisos ciudadanos', 'CU-02.1': 'Validar datos de compromiso', 'CU-02.2': 'Bloquear guardado por campos faltantes',
     'CU-02.3': 'Destacar compromiso vencido',
+    'CU-03': 'Registrar atención social',
     'CU-04': 'Administración de funciones por cargo', 'CU-04.1': 'Validar reglas de configuración', 'CU-04.2': 'Bloquear guardado por ponderación inválida',
     'CU-05': 'Definición de metas', 'CU-05.1': 'Validar parámetros de meta', 'CU-05.2': 'Bloquear guardado por valor inválido', 'CU-05.3': 'Notificar período cerrado',
     'CU-06': 'Seguimiento de avance', 'CU-06.1': 'Recalcular indicadores automáticamente', 'CU-06.2': 'Destacar meta cumplida',
