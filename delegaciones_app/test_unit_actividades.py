@@ -4,6 +4,7 @@ from datetime import datetime
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
 from .forms import ActividadForm, EvidenciaForm
@@ -220,6 +221,33 @@ class ActividadFormUnitTests(EscenarioBase, TestCase):
         formulario = ActividadForm(self._datos(fecha='ayer a las diez'), user=self.usuario_autor)
         self.assertFalse(formulario.is_valid())
         self.assertIn('fecha', formulario.errors)
+
+    def test_no_se_ingresa_una_actividad_de_una_semana_cerrada(self):
+        """CU-01.1 Validar campos de actividad (RF-010). Regla 4: no se ingresan actividades de una semana anterior."""
+        antigua = self.fecha_valida - timezone.timedelta(days=14)
+        formulario = ActividadForm(self._datos(fecha=antigua.strftime('%Y-%m-%dT%H:%M')), user=self.usuario_autor)
+        self.assertFalse(formulario.is_valid())
+        self.assertIn('cierre semanal', str(formulario.errors['fecha']))
+
+    def test_corregir_una_actividad_rechazada_antigua_la_devuelve_a_pendiente(self):
+        """CU-01.1 Validar campos de actividad (RF-010). Regla 4: el cierre semanal no impide corregir una actividad rechazada de hace dos semanas."""
+        antigua = self.fecha_valida - timezone.timedelta(days=14)
+        actividad = self.nueva_actividad(fecha=antigua, estado='rechazada')
+        self.client.force_login(self.usuario_autor)
+        respuesta = self.client.post(reverse('actividad_editar', args=[actividad.codigo_verificador]), self._datos(
+            fecha=timezone.localtime(antigua).strftime('%Y-%m-%dT%H:%M'), solicitud_problema='Solicitud corregida', version=actividad.version,
+        ))
+        self.assertRedirects(respuesta, reverse('actividad_detalle', args=[actividad.codigo_verificador]))
+        actividad.refresh_from_db()
+        self.assertEqual((actividad.estado, actividad.solicitud_problema), ('pendiente', 'Solicitud corregida'))
+
+    def test_al_corregir_no_se_mueve_la_fecha_a_una_semana_cerrada(self):
+        """CU-01.1 Validar campos de actividad (RF-010). Regla 4: cambiar el día de la fecha a una semana anterior es un ingreso nuevo y se rechaza."""
+        actividad = self.nueva_actividad(fecha=self.fecha_valida, estado='rechazada')
+        antigua = self.fecha_valida - timezone.timedelta(days=14)
+        formulario = ActividadForm(self._datos(fecha=antigua.strftime('%Y-%m-%dT%H:%M'), version=actividad.version), instance=actividad, user=self.usuario_autor)
+        self.assertFalse(formulario.is_valid())
+        self.assertIn('cierre semanal', str(formulario.errors['fecha']))
 
     def test_un_telefono_invalido_se_informa_en_el_formulario(self):
         """CU-01.2 Gestionar error de validación (RF-010). El error del teléfono aparece en su campo."""

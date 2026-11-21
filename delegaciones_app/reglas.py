@@ -17,11 +17,12 @@ def semana_abierta(fecha, hoy=None):
 	return fecha >= lunes_actual
 
 
-def validar_fecha_actividad(fecha, periodo):
+def validar_fecha_actividad(fecha, periodo, cierre_semanal=True):
+	"""Regla 4: el cierre semanal solo se aplica a los ingresos (cierre_semanal=False al corregir sin cambiar la fecha)."""
 	hoy = timezone.localdate()
 	if fecha > hoy:
 		raise ValidationError({'fecha': 'La fecha de la actividad no puede estar en el futuro.'})
-	if not semana_abierta(fecha, hoy):
+	if cierre_semanal and not semana_abierta(fecha, hoy):
 		raise ValidationError({'fecha': 'El cierre semanal impide registrar una actividad de una semana anterior.'})
 	if not periodo.fecha_inicio <= fecha <= periodo.fecha_termino:
 		raise ValidationError({'fecha': f'La fecha debe estar dentro del período «{periodo}».'})

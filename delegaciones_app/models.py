@@ -285,10 +285,16 @@ class Actividad(VersionOptimistaMixin, models.Model):
 				raise ValidationError({'fecha': f'La fecha de la actividad debe estar dentro del período «{periodo}».'})
 			if self.fecha:
 				fecha = timezone.localtime(self.fecha).date()
-				validar_fecha_actividad(fecha, periodo)
+				# Regla 4: el cierre semanal impide ingresar actividades de una semana anterior, pero no corregir
+				# una ya registrada (por ejemplo, una rechazada) mientras no se cambie el día de su fecha.
+				validar_fecha_actividad(fecha, periodo, cierre_semanal=self._state.adding or self._cambia_el_dia(fecha))
 				if self._state.adding and self.funcionario_autor_id:
 					validar_limite_diario(self.funcionario_autor, fecha, periodo)
 		self.cuenta_puntaje, self.motivo_sin_puntaje = evaluar_puntaje(self)
+
+	def _cambia_el_dia(self, fecha):
+		guardada = Actividad.objects.filter(pk=self.pk).values_list('fecha', flat=True).first()
+		return guardada is None or timezone.localtime(guardada).date() != fecha
 
 	def save(self, *args, **kwargs):
 		self.generar_codigo_verificador()
