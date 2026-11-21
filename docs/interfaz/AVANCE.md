@@ -59,3 +59,33 @@ Registro de cada fase del rediseño (rama `feat/interfaz-terracota`). Se agrega 
 5. **Límites:** no tocamos `forms.py`; las etiquetas «Delegacion», «Tipo accion» y «Organizacion» se ven sin tilde porque vienen del modelo y la regla 10 no permite cambiarlas. El formulario de mantenedores conserva su `<form>` sin `enctype` (agregarlo habría cambiado su comportamiento).
 6. **No verificado en navegador real:** revisamos con capturas de Chrome sin ventana sobre un servidor local (ingreso, panel del Profesional, registrar actividad con error y semáforo). El editor marca dos avisos de contraste en `sgr.css` que son falsos positivos: texto blanco sobre un velo blanco translúcido encima de fondos oscuros (calculado: unos 10:1 y 5:1).
 7. **Commits:** `feat: sistema de diseño terracota con fuentes, íconos y JavaScript propios`; `feat: formularios con el error junto a cada campo`; `feat: nueva pantalla de ingreso con mostrar u ocultar contraseña`; `feat: subir evidencia con zona de archivo y nombre del archivo elegido`; `feat: semáforo con colores propios, ícono y texto en todas las pantallas`; `test: pruebas de formularios, ingreso, semáforo y recursos locales`; `docs: avance de la fase 2 de la interfaz`.
+
+## Fase 3. Portada y movimiento (21-11-2026)
+
+1. **Qué hicimos**
+   - Reescribimos `index.html` en varias líneas, con las mismas variables de la vista (`total_solicitudes`, `alertas`, `promedio`, `ejes`, `delegaciones`).
+   - Hero en dos columnas: el título y el párrafo actuales; con sesión «Registrar actividad» y «Ver medición», sin sesión «Ingresar» y «Territorio». A la derecha, una ilustración SVG propia: el SGR al centro, seis puntos que orbitan (uno por delegación, 40 s por vuelta) y formas de teja y arco que flotan.
+   - Accesos rápidos con ícono y texto de acción. Sin sesión: «Ingresar», «Territorio», «Cómo funciona», «Delegaciones» y «Preguntas frecuentes». Con sesión: los destinos del menú con sus mismas condiciones.
+   - Cifras que cuentan de 0 a su valor (900 ms); el valor final está en el HTML y el lector de pantalla lee solo ese.
+   - «Cómo funciona»: los cinco pasos actuales como tarjetas con motivo geométrico propio (círculo, cuadrícula, hexágono, triángulo y semáforo), unidas por una línea que se completa al bajar.
+   - Las seis delegaciones con su enlace actual y los ejes de gestión como etiquetas.
+   - Seis preguntas frecuentes en acordeón (collapse de Bootstrap). Sin JavaScript las respuestas se ven abiertas.
+   - `sgr.js` reúne: aparición al bajar, conteo, llenado de barras, encabezado compacto, foco en el primer error, nombre del archivo elegido, mostrar u ocultar contraseña, acordeón y barra de accesibilidad.
+2. **De dónde sale cada respuesta**
+
+   | Pregunta | Fuente |
+   | --- | --- |
+   | ¿Quién registra las actividades? | `templates/delegaciones_app/actividad_form.html` (texto «El registro quedará asociado a tu usuario y a la delegación seleccionada.» y «Se genera un código único.»); `delegaciones_app/views.py:223` (`actividad_nueva`) |
+   | ¿Cuándo suma una actividad al avance? | `delegaciones_app/models.py:858-866` (solo actividades `aprobada`, con `cuenta_puntaje` y evidencia aprobada); `docs/REQUERIMIENTOS_V2.md:62` (RN-014: nombre y teléfono, sin gestión interna ni previa) |
+   | ¿Quién revisa la evidencia? | `delegaciones_app/views.py:31` (`MENSAJE_REVISION_PROPIA`); `delegaciones_app/permisos.py:126` (`puede_revisar`); motivo obligatorio del rechazo en `docs/DEMO_EXPOSICION.md`, flujo 2 |
+   | ¿Qué evidencia se acepta? | `delegaciones_app/models.py:356` (`EXTENSIONES_EVIDENCIA`: jpg, jpeg, png y pdf); el tamaño máximo no se escribe a mano: lo muestra «Subir evidencia» desde `gestion_laserena/settings.py:192` |
+   | ¿Cómo se calcula el semáforo? | `delegaciones_app/medicion.py:36-41` (`_semaforo`) |
+   | ¿Hasta cuándo puedo registrar una actividad? | `delegaciones_app/reglas.py:14-22` (`semana_abierta`) y `:25-29` (fechas futuras); `docs/REQUERIMIENTOS_V2.md:64` (RN-016) |
+
+3. **Archivos cambiados:** `templates/delegaciones_app/index.html`, `static/css/sgr.css`, `static/js/sgr.js`, `delegaciones_app/test_unit_interfaz.py`.
+4. **Pruebas:** 699 en total, 699 aprobadas, 0 fallidas (línea base 681).
+5. **Qué mirar:** la portada sin sesión y como `funcionario.centro`; bajar despacio para ver las apariciones y la línea de los pasos; abrir y cerrar las preguntas.
+6. **Comprobado:** con capturas de Chrome sin ventana a 1280 px y en un marco de 375 px (Chrome sin ventana no baja de 504 px de ancho, así que usamos un marco), y con la portada guardada sin sus `<script>` para simular un navegador sin JavaScript: todo el contenido queda visible. En el celular los accesos rápidos van en dos columnas.
+7. **No verificado:** el movimiento en sí (las capturas son imágenes fijas) y el modo de movimiento reducido del sistema operativo; ambos están cubiertos en el CSS (`@media (prefers-reduced-motion: reduce)`) y en `sgr.js`.
+8. **Límites:** no se cambió la vista `index`. Las respuestas no muestran códigos internos (RN, RF, CU), porque una prueba existente lo impide en las pantallas.
+9. **Commits:** `feat: portada con hero de órbitas, accesos rápidos y preguntas frecuentes`; `test: pruebas de la portada con y sin sesión`; `docs: avance de la fase 3 de la interfaz`.
