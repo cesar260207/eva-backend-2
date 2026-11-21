@@ -1,49 +1,52 @@
-{% load static %}
-<!DOCTYPE html>
-<html lang="es">
+{% load static %}<!DOCTYPE html>
+<html lang="es" class="a11y-font-0">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}SGR | Municipalidad de La Serena{% endblock %}</title>
+    <link rel="preload" href="{% static 'fonts/roboto-latin-400-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="{% static 'bootstrap/css/bootstrap.min.css' %}">
-    <link rel="stylesheet" href="{% static 'css/sgr.css' %}?v=eva3-20261109">
+    <link rel="stylesheet" href="{% static 'css/sgr.css' %}?v=interfaz-20261121">
 </head>
 <body>
     <a class="skip-link" href="#contenido-principal">Ir al contenido principal</a>
-    <nav class="navbar navbar-expand-lg navbar-dark sticky-top sgr-nav">
+    {% with ruta=request.resolver_match.url_name %}
+    {% block encabezado %}
+    <header class="sgr-header" data-encabezado>
+    <nav class="navbar navbar-expand-lg sgr-nav" aria-label="Menú principal">
         <div class="container-fluid px-4">
-            <a class="navbar-brand d-flex align-items-center gap-2" href="{% url 'inicio' %}">
-                <span class="brand-mark">SGR</span>
+            <a class="navbar-brand" href="{% url 'inicio' %}">
+                <span class="brand-mark" aria-hidden="true">SGR</span>
                 <span><strong>Gestión de Resultados</strong><small>Municipalidad de La Serena</small></span>
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-label="Mostrar menú principal">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Mostrar menú principal">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="mainNav">
                 <ul class="navbar-nav ms-auto gap-lg-1 align-items-lg-center">
                     {% if user.is_authenticated %}
-                    <li class="nav-item"><a class="nav-link" href="{% url 'panel' %}">Mi panel</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'actividades' %}">Actividades</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'agenda' %}">Tareas</a></li>
-                    {% if es_coordinacion %}<li class="nav-item"><a class="nav-link" href="{% url 'delegados' %}">Delegados</a></li>
-                    {% elif mi_delegacion %}<li class="nav-item"><a class="nav-link" href="{% url 'delegacion_detalle' mi_delegacion.nombre %}">Mi delegación</a></li>{% endif %}
+                    <li class="nav-item"><a class="nav-link"{% if ruta == 'panel' %} aria-current="page"{% endif %} href="{% url 'panel' %}">Mi panel</a></li>
+                    <li class="nav-item"><a class="nav-link"{% if ruta|slice:':9' == 'actividad' or ruta == 'evidencia_subir' or ruta == 'comentario_nuevo' %} aria-current="page"{% endif %} href="{% url 'actividades' %}">Actividades</a></li>
+                    <li class="nav-item"><a class="nav-link"{% if ruta == 'agenda' or ruta == 'solicitudes' or ruta|slice:':10' == 'compromiso' %} aria-current="page"{% endif %} href="{% url 'agenda' %}">Tareas</a></li>
+                    {% if es_coordinacion %}<li class="nav-item"><a class="nav-link"{% if ruta == 'delegados' %} aria-current="page"{% endif %} href="{% url 'delegados' %}">Delegados</a></li>
+                    {% elif mi_delegacion %}<li class="nav-item"><a class="nav-link"{% if ruta == 'delegacion_detalle' %} aria-current="page"{% endif %} href="{% url 'delegacion_detalle' mi_delegacion.nombre %}">Mi delegación</a></li>{% endif %}
                     <li class="nav-item dropdown">
-                        <button class="nav-link dropdown-toggle btn btn-link border-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">Resultados</button>
+                        <button class="nav-link dropdown-toggle btn btn-link border-0{% if ruta == 'dashboard' or ruta == 'semaforo' or ruta == 'resumen' or ruta == 'informe' or ruta == 'alertas' %} activo{% endif %}" type="button" data-bs-toggle="dropdown" aria-expanded="false">Resultados</button>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><h6 class="dropdown-header">Seguimiento</h6></li>
-                            <li><a class="dropdown-item" href="{% url 'dashboard' %}">Cumplimiento general</a></li>
-                            <li><a class="dropdown-item" href="{% url 'semaforo' %}">Semáforo de avance</a></li>
-                            <li><a class="dropdown-item" href="{% url 'resumen' %}">Resumen por delegación</a></li>
-                            <li><a class="dropdown-item" href="{% url 'informe' %}">Informes y exportación</a></li>
-                            <li><a class="dropdown-item" href="{% url 'alertas' %}">Alertas pendientes</a></li>
+                            <li><a class="dropdown-item"{% if ruta == 'dashboard' %} aria-current="page"{% endif %} href="{% url 'dashboard' %}">Cumplimiento general</a></li>
+                            <li><a class="dropdown-item"{% if ruta == 'semaforo' %} aria-current="page"{% endif %} href="{% url 'semaforo' %}">Semáforo de avance</a></li>
+                            <li><a class="dropdown-item"{% if ruta == 'resumen' %} aria-current="page"{% endif %} href="{% url 'resumen' %}">Resumen por delegación</a></li>
+                            <li><a class="dropdown-item"{% if ruta == 'informe' %} aria-current="page"{% endif %} href="{% url 'informe' %}">Informes y exportación</a></li>
+                            <li><a class="dropdown-item"{% if ruta == 'alertas' %} aria-current="page"{% endif %} href="{% url 'alertas' %}">Alertas pendientes</a></li>
                         </ul>
                     </li>
-                    {% if puede_administrar %}<li class="nav-item"><a class="nav-link" href="{% url 'mantenedores' %}">Administración</a></li>{% endif %}
+                    {% if puede_administrar %}<li class="nav-item"><a class="nav-link"{% if ruta == 'mantenedores' or ruta|slice:':10' == 'mantenedor' or ruta == 'perfiles' or ruta == 'auditoria_consulta' %} aria-current="page"{% endif %} href="{% url 'mantenedores' %}">Administración</a></li>{% endif %}
                     <li class="nav-item dropdown">
                         <button class="nav-link dropdown-toggle nav-usuario btn btn-link" type="button" data-bs-toggle="dropdown" aria-expanded="false">{{ user.get_username }}{% if perfil_usuario %} · {{ perfil_usuario }}{% endif %}</button>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="{% url 'ficha_personal' %}">Mi ficha</a></li>
-                            <li><a class="dropdown-item" href="{% url 'institucional' %}">Territorio</a></li>
+                            <li><a class="dropdown-item"{% if ruta == 'ficha_personal' %} aria-current="page"{% endif %} href="{% url 'ficha_personal' %}">Mi ficha</a></li>
+                            <li><a class="dropdown-item"{% if ruta == 'institucional' %} aria-current="page"{% endif %} href="{% url 'institucional' %}">Territorio</a></li>
                             {% if perms.delegaciones_app.add_ajuste %}<li><a class="dropdown-item" href="{% url 'ajuste_nuevo' %}">Informar felicitación o reclamo</a></li>{% endif %}
                             {% if perms.delegaciones_app.add_casosocial %}<li><a class="dropdown-item" href="{% url 'caso_social_nuevo' %}">Registrar atención social</a></li>{% endif %}
                             <li><hr class="dropdown-divider"></li>
@@ -51,18 +54,21 @@
                         </ul>
                     </li>
                     {% else %}
-                    <li class="nav-item"><a class="nav-link" href="{% url 'inicio' %}">Inicio</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'institucional' %}">Territorio</a></li>
+                    <li class="nav-item"><a class="nav-link"{% if ruta == 'inicio' %} aria-current="page"{% endif %} href="{% url 'inicio' %}">Inicio</a></li>
+                    <li class="nav-item"><a class="nav-link"{% if ruta == 'institucional' %} aria-current="page"{% endif %} href="{% url 'institucional' %}">Territorio</a></li>
                     <li class="nav-item"><a class="btn btn-sgr btn-sm ms-lg-2" href="{% url 'login' %}">Ingresar</a></li>
                     {% endif %}
                 </ul>
             </div>
         </div>
     </nav>
+    </header>
+    {% endblock %}
+    {% endwith %}
 
     {% block page_header %}{% endblock %}
 
-    <main id="contenido-principal" class="container-fluid px-4 py-4 app-shell">
+    <main id="contenido-principal" class="{% block main_clase %}container-fluid px-4 py-4 app-shell{% endblock %}">
         {% for message in messages %}
         <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show" role="alert">
             {{ message }}
@@ -72,15 +78,16 @@
         {% block content %}{% endblock %}
     </main>
 
+    {% block pie %}
     <footer class="footer">
-        <div class="container-fluid px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <div>
-                <strong>Municipalidad de La Serena</strong><br>
-                <small>Departamento de Gestión Territorial</small>
-            </div>
+        <div class="container">
+            <strong>Municipalidad de La Serena</strong><br>
+            <small>Departamento de Gestión Territorial</small>
         </div>
     </footer>
+    {% endblock %}
 
     <script src="{% static 'bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'js/sgr.js' %}" defer></script>
 </body>
 </html>
