@@ -1,0 +1,5 @@
+{% comment %}Formulario completo con el sistema del SGR: errores arriba, campos ocultos y cada campo visible con _campo.html.{% endcomment %}{% include 'includes/_errores_formulario.html' %}
+{% for campo in form.hidden_fields %}{{ campo }}{% endfor %}
+<div class="form-seccion-campos">
+{% for campo in form.visible_fields %}{% include 'includes/_campo.html' %}{% endfor %}
+</div>
