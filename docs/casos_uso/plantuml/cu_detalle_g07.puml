@@ -34,6 +34,7 @@ rectangle "Gestionar ausencias" {
 }
 Delegado --> au_reg
 Administrador --> au_reg
+Delegado --> au_con
 Coordinador --> au_con
 Administrador --> au_con
 Coordinador --> au_mod

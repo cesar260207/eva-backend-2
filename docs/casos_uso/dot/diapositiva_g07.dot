@@ -25,6 +25,7 @@ label=<<font point-size="10" color="#444444">Rojo: caso de detalle · Gris: incl
 "A_Administrador" -> "au_reg" [arrowhead=none, penwidth=1.1, weight=3];
 "au_reg" -> "au_valid" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
 "au_reg" -> "auditar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
+"A_Delegado" -> "au_con" [arrowhead=none, penwidth=1.1, weight=3];
 "A_Coordinador" -> "au_con" [arrowhead=none, penwidth=1.1, weight=3];
 "A_Administrador" -> "au_con" [arrowhead=none, penwidth=1.1, weight=3];
 "au_con" -> "buscar" [style=dashed, arrowhead=vee, arrowsize=0.7, label="«include»"];
