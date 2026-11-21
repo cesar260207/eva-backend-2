@@ -403,14 +403,21 @@ ul.errorlist.nonfield { margin: 0; }
 .paso h3 { margin: .2rem 0 .3rem; font-family: var(--fuente-titulo); font-size: 1.15rem; font-weight: 700; }
 .paso p { margin: 0; color: var(--muted); font-size: .9375rem; }
 .delegaciones-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e4); }
-.delegacion-tarjeta { position: relative; display: flex; flex-direction: column; gap: .35rem; min-height: 132px; padding: var(--e6); border: 1px solid var(--line); border-radius: var(--radio-tarjeta); background: var(--panel); color: var(--ink); text-decoration: none; box-shadow: var(--sombra); overflow: hidden; transition: transform var(--rapido) var(--curva), box-shadow var(--rapido) var(--curva); }
+/* La tarjeta entera lleva a Territorio (el enlace se estira con ::after); el seguimiento es un segundo enlace encima. */
+.delegacion-tarjeta { position: relative; display: flex; flex-direction: column; gap: .75rem; min-height: 132px; padding: var(--e6); border: 1px solid var(--line); border-radius: var(--radio-tarjeta); background: var(--panel); color: var(--ink); box-shadow: var(--sombra); overflow: hidden; transition: transform var(--rapido) var(--curva), box-shadow var(--rapido) var(--curva); }
 .delegacion-tarjeta::before { content: ""; position: absolute; right: -28px; top: -28px; width: 96px; height: 96px; border-radius: 999px; border: 14px solid var(--terracotta-soft); transition: transform 400ms var(--curva); }
+.delegacion-enlace { display: flex; flex: 1 1 auto; flex-direction: column; gap: .35rem; color: var(--ink); text-decoration: none; }
+.delegacion-enlace::after { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; }
+.delegacion-enlace:focus-visible { outline: none; }
+.delegacion-enlace:focus-visible::after { outline: 3px solid var(--ochre); outline-offset: -3px; }
 .delegacion-tarjeta strong { position: relative; font-family: var(--fuente-titulo); font-size: 1.2rem; }
 .delegacion-tarjeta small { position: relative; display: flex; align-items: center; gap: .35rem; margin-top: auto; color: var(--terracotta-dark); font-weight: 500; }
+.delegacion-seguimiento { position: relative; z-index: 2; display: inline-flex; align-self: flex-start; align-items: center; gap: .35rem; min-height: 34px; padding: .25rem .75rem; border-radius: 999px; background: var(--terracotta-soft); color: var(--terracotta-dark); font-size: .875rem; font-weight: 700; text-decoration: none; }
+.delegacion-seguimiento:hover, .delegacion-seguimiento:focus-visible { background: var(--terracotta); color: #fff; }
 .delegacion-tarjeta .flecha { transition: transform var(--rapido) var(--curva); }
-.delegacion-tarjeta:hover, .delegacion-tarjeta:focus-visible { transform: translateY(-4px); box-shadow: var(--sombra-alta); color: var(--ink); }
+.delegacion-tarjeta:hover, .delegacion-tarjeta:focus-within { transform: translateY(-4px); box-shadow: var(--sombra-alta); }
 .delegacion-tarjeta:hover::before { transform: scale(1.15); }
-.delegacion-tarjeta:hover .flecha, .delegacion-tarjeta:focus-visible .flecha { transform: translateX(4px); }
+.delegacion-enlace:hover .flecha, .delegacion-enlace:focus-visible .flecha, .delegacion-seguimiento:hover .flecha { transform: translateX(4px); }
 .ejes { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: var(--e6); padding: 0; list-style: none; }
 .ejes li { padding: .4rem .85rem; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: #5c524b; font-size: .9rem; }
 .preguntas { max-width: 860px; }
@@ -548,7 +555,7 @@ ul.errorlist.nonfield { margin: 0; }
     .reveal-pendiente { opacity: 1; transform: none; }
     .barra-pendiente::after { display: none; }
     .linea-pendiente .pasos-linea::after { transform: none; }
-    .mosaico:hover, .tarjeta-enlace:hover, .delegacion-tarjeta:hover, .btn:active, .territorio-tarjeta:hover, .territorio-tarjeta.is-activa, .territorio-tarjeta:hover .delegacion-motivo, .territorio-tarjeta.is-activa .delegacion-motivo { transform: none; }
+    .mosaico:hover, .tarjeta-enlace:hover, .delegacion-tarjeta:hover, .delegacion-tarjeta:focus-within, .btn:active, .territorio-tarjeta:hover, .territorio-tarjeta.is-activa, .territorio-tarjeta:hover .delegacion-motivo, .territorio-tarjeta.is-activa .delegacion-motivo { transform: none; }
 }
 
 /* 16. Modos de accesibilidad (clases del Kit de Gobierno Digital) ---------- */
@@ -562,7 +569,7 @@ html.a11y-font-2 { font-size: 150%; }  /* 24 px */
     html.a11y-font-1 .sgr-nav .navbar-collapse, html.a11y-font-2 .sgr-nav .navbar-collapse { flex-basis: 100%; }
     html.a11y-font-1 .sgr-nav .navbar-nav, html.a11y-font-2 .sgr-nav .navbar-nav { flex-wrap: wrap; justify-content: flex-end; }
 }
-html.a11y-subrayar a:not(.btn):not(.nav-link):not(.dropdown-item):not(.mosaico):not(.navbar-brand):not(.delegacion-tarjeta) { text-decoration: underline !important; text-decoration-thickness: 2px !important; }
+html.a11y-subrayar a:not(.btn):not(.nav-link):not(.dropdown-item):not(.mosaico):not(.navbar-brand):not(.delegacion-enlace) { text-decoration: underline !important; text-decoration-thickness: 2px !important; }
 /* Alto contraste: todos los textos quedan en 7:1 o más (ver la guía de estilo). */
 html.a11y-contrast {
     --ink: #000000; --muted: #2b2b2b; --paper: #ffffff; --paper-2: #ffffff; --line: #000000; --line-strong: #000000;
@@ -575,7 +582,7 @@ html.a11y-contrast .sgr-header { background: #fff; -webkit-backdrop-filter: none
 html.a11y-contrast .panel, html.a11y-contrast .card, html.a11y-contrast .metric, html.a11y-contrast .mosaico, html.a11y-contrast .cifra, html.a11y-contrast .paso, html.a11y-contrast .pregunta, html.a11y-contrast .delegacion-tarjeta, html.a11y-contrast .filtros, html.a11y-contrast .ingreso-tarjeta, html.a11y-contrast .territorio-tarjeta, html.a11y-contrast .esquema-nombre, html.a11y-contrast .chip-delegacion { border: 2px solid #000 !important; box-shadow: none !important; }
 html.a11y-contrast .mosaico-principal, html.a11y-contrast .brand-mark { background: #6e1a12; color: #fff; }
 html.a11y-contrast .semaforo, html.a11y-contrast .badge { border: 2px solid currentColor; }
-html.a11y-contrast a:not(.btn):not(.mosaico):not(.delegacion-tarjeta):not(.navbar-brand) { text-decoration: underline; }
+html.a11y-contrast a:not(.btn):not(.mosaico):not(.delegacion-enlace):not(.navbar-brand) { text-decoration: underline; }
 html.a11y-contrast .form-control, html.a11y-contrast .form-select { border: 2px solid #000; }
 html.a11y-contrast .table thead th { background: #fff; color: #000; }
 html.a11y-contrast .page-intro, html.a11y-contrast .text-muted, html.a11y-contrast .form-text { color: #2b2b2b !important; }
