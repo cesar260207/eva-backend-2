@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.core.validators import FileExtensionValidator, MinValueValidator
 from django.db import models, transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from datetime import datetime, time, timedelta
@@ -923,12 +923,13 @@ class Indicador(ControlPeriodoCerradoMixin, models.Model):
 		felicitaciones = aplicados.filter(tipo='felicitacion')
 		reclamos = aplicados.filter(tipo='reclamo')
 		if self.meta.funcionario_id:
-			felicitaciones = felicitaciones.filter(funcionario=self.meta.funcionario).union(
-				aplicados.filter(tipo='felicitacion', delegacion=self.meta.funcionario.delegacion)
-			)
-			reclamos = reclamos.filter(funcionario=self.meta.funcionario).union(
-				aplicados.filter(tipo='reclamo', delegacion=self.meta.funcionario.delegacion)
-			)
+			# Regla 8: cuentan los ajustes del funcionario y los de su delegación, si tiene una (sin delegación,
+			# delegacion=None traería los ajustes dirigidos a cualquier otra persona).
+			destinatario = Q(funcionario=self.meta.funcionario)
+			if self.meta.funcionario.delegacion_id:
+				destinatario |= Q(delegacion_id=self.meta.funcionario.delegacion_id)
+			felicitaciones = felicitaciones.filter(destinatario)
+			reclamos = reclamos.filter(destinatario)
 		cantidad_felicitaciones = min(felicitaciones.count(), int(self.periodo.obtener_parametro('max_felicitaciones', '3')))
 		self.ajuste = (
 			Decimal(cantidad_felicitaciones) * Decimal(self.periodo.obtener_parametro('valor_felicitacion', '10'))
