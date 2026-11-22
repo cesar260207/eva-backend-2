@@ -220,3 +220,18 @@ Rama `feat/interfaz-ronda-2`, creada desde `main` en caf02d6 (PR #20). Mismo for
 6. **Límites:** no tocamos vistas ni ajustes. El encargo dice que el hero terracota de la portada se mantiene en ambos temas, pero el hero de la portada es claro desde la primera ronda (fondo crema con la ilustración de órbitas). Por eso en oscuro pasa a fondo oscuro con un brillo cálido. Los bloques que sí son terracota (la banda de Territorio y el hero de las pantallas internas) se mantienen igual en ambos temas.
 7. **No verificado:** los clics reales en el selector, el cambio del sistema con la página abierta y la combinación de alto contraste con oscuro (las capturas son imágenes fijas sin interacción); quedan cubiertos por el código de `tema.js` y `sgr.js`.
 8. **Commits:** `feat: modo claro, oscuro y automático con colores en variables y selector de tema`; `fix: olas del esquema de Territorio sin tapar la etiqueta del mar`; `test: pruebas del tema (carga en el head, selector accesible y etiqueta html intacta)`; `docs: avance de la fase 3 de la segunda ronda`.
+
+## Ronda 2, fase 4. Verificación y documentación (21-11-2026)
+
+1. **Qué hicimos**
+   - `check` sin problemas; `makemigrations --check --dry-run`: «No changes detected»; 717 pruebas aprobadas.
+   - `probe.py` con la base local de demostración: 200 de 200 combinaciones iguales a la línea base (50 pantallas con 4 perfiles; el encargo menciona 164, de una versión anterior del script).
+   - Recorrimos los textos de los 3 flujos de `docs/DEMO_EXPOSICION.md`: los 28 que revisa nuestro script siguen en su lugar. Para el flujo 1 completo (registrar, subir evidencia, revisar) respaldamos la base local, hicimos el flujo, revisamos y sacamos capturas, y después restauramos el respaldo y borramos el archivo subido. El HTML es el mismo en claro y en oscuro; el aspecto en oscuro lo revisamos con capturas de ingreso, panel, «Registrar actividad» con error, «Subir evidencia», la revisión del Delegado, semáforo, portada y Territorio.
+   - Guardamos 10 capturas nuevas en `docs/interfaz/capturas/` (17 a 26): Territorio en escritorio, a 375 px y en oscuro; portada sin sesión en claro y en oscuro; panel del Profesional, ingreso, «Registrar actividad» con el teléfono «abc», semáforo y revisión del Delegado en oscuro.
+   - Actualizamos `GUIA_DE_ESTILO.md` (sección 10: tema claro y oscuro con la paleta y sus contrastes; sección 11: Territorio y su esquema; tres decisiones nuevas) y `CAMBIOS_INTERFAZ.md` (sección 6: qué cambió, la corrección del censo con su fuente, los enlaces de delegaciones, RNF-011 a RNF-013 y la verificación; «Para desplegar» con `tema.js`).
+2. **Archivos:** `docs/interfaz/GUIA_DE_ESTILO.md`, `docs/interfaz/CAMBIOS_INTERFAZ.md`, `docs/interfaz/capturas/` (10 PNG nuevos) y este archivo.
+3. **Pruebas:** 717 en total, 717 aprobadas, 0 fallidas (línea base 703). No ajustamos ninguna prueba existente.
+4. **Qué mirar:** las capturas 17 a 26 y, en local, el botón «Tema» en cada pantalla.
+5. **Para desplegar:** después del `git pull`, correr `python manage.py collectstatic --noinput` y reiniciar Gunicorn (hay un estático nuevo, `tema.js`). No lo ejecutamos.
+6. **No verificado:** el movimiento y los clics del selector de tema en un navegador real; el modo de movimiento reducido del sistema operativo; la combinación de alto contraste con el tema oscuro (cubierta por el código, sin captura).
+7. **Commits:** `docs: guía de estilo con el tema oscuro y el esquema del territorio`; `docs: cambios de la segunda ronda con capturas, censo corregido y pasos para desplegar`; `docs: avance de la fase 4 de la segunda ronda`.
