@@ -570,6 +570,7 @@ Qué hacen las migraciones de perfiles y permisos de la Evaluación Sumativa 3:
 | `0026_alter_ajuste_respaldo` | El respaldo del ajuste acepta solo JPG, PNG o PDF de hasta 5 MB | No: solo la validación |
 | `0027_delegado_ve_ajustes` | Da al Delegado `view_ajuste` para consultar los ajustes de su delegación | Sí: una fila en `auth_group_permissions` (se revierte) |
 | `0028_ausencia_emergencia_delegado_ve_ausencias` | Agrega el tipo de ausencia «Emergencia» y da al Delegado `view_ausencia` | Sí: una fila en `auth_group_permissions` (se revierte); el tipo nuevo solo cambia las opciones del campo |
+| `0029_actividad_lugar` | Agrega a Actividad el campo opcional `lugar` | No mueve filas: las actividades existentes quedan con el lugar vacío |
 
 En un servidor que ya está en `f910537` (PR #16), `migrate --plan` debe listar solo la `0027` y la `0028`.
 

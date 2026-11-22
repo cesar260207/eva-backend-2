@@ -140,6 +140,7 @@ erDiagram
         bigint compromiso_id FK "nullable"
         bigint organizacion_id FK "nullable"
         datetime fecha
+        varchar lugar
         varchar contacto_nombre
         varchar contacto_telefono
         varchar tipo_accion

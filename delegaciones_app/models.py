@@ -233,6 +233,8 @@ class Actividad(VersionOptimistaMixin, models.Model):
 	funcionario_autor = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='actividades')
 	# Ajuste 9: se conserva para filtrar y medir por delegación (también la de coordinadores sin delegación).
 	delegacion = models.ForeignKey(Delegacion, on_delete=models.PROTECT, related_name='actividades')
+	# Requerimiento de noviembre: «dónde» se hizo la actividad, más preciso que la delegación (opcional).
+	lugar = models.CharField(max_length=255, blank=True, default='')
 	item = models.ForeignKey('ItemMedible', on_delete=models.PROTECT, related_name='actividades')
 	catalogo = models.ForeignKey('Catalogo', on_delete=models.PROTECT, null=True, blank=True, related_name='actividades')
 	compromiso = models.ForeignKey('Compromiso', on_delete=models.SET_NULL, null=True, blank=True, related_name='actividades')

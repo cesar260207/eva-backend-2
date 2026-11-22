@@ -19,7 +19,7 @@
     <div class="col-lg-7">
         <div class="panel">
             <div class="row g-3">
-                <div class="col-md-6"><div class="section-label">Delegación</div><strong>{{ actividad.delegacion }}</strong></div>
+                <div class="col-md-6"><div class="section-label">Delegación</div><strong>{{ actividad.delegacion }}</strong>{% if actividad.lugar %}<div class="small text-muted">Lugar: {{ actividad.lugar }}</div>{% endif %}</div>
                 <div class="col-md-6"><div class="section-label">Funcionario</div><strong>{{ actividad.funcionario_autor.nombre|default:'-' }}</strong></div>
                 <div class="col-md-6"><div class="section-label">Fecha y hora</div><strong>{{ actividad.fecha|date:'d-m-Y H:i' }}</strong></div>
                 <div class="col-md-6"><div class="section-label">Tipo de atención</div><strong>{{ actividad.catalogo.nombre|default:'-' }}</strong></div>

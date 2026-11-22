@@ -9,7 +9,7 @@ from django.template import Context, Template
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Delegacion
+from .models import Actividad, Delegacion
 from .pruebas_base import CLAVE_PRUEBA, EscenarioBase, crear_funcionario, fijar_hoy
 from .templatetags.sgr_interfaz import campo_sgr, campos, campos_restantes, partes_cifra
 
@@ -121,6 +121,26 @@ class FormularioDeActividadTests(EscenarioBase, TestCase):
         for nombre in respuesta.context['form'].fields:
             self.assertContains(respuesta, f'name="{nombre}"', count=1, msg_prefix=nombre)
         self.assertNotContains(respuesta, 'Otros datos')
+
+    def test_el_lugar_va_en_donde_y_cuando_y_es_opcional(self):
+        """CU-01 Registrar actividad (RF-009). «Lugar» aparece en el bloque «Dónde y cuándo» y no es obligatorio."""
+        self.client.force_login(self.usuario_autor)
+        html = self.client.get(reverse('actividad_nueva')).content.decode('utf-8')
+        bloque = html.split('Dónde y cuándo', 1)[1].split('</fieldset>', 1)[0]
+        self.assertIn('name="lugar"', bloque)
+        self.assertIn('Lugar (opcional)', bloque)
+        respuesta = self.client.post(reverse('actividad_nueva'), self._datos())
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertEqual(Actividad.objects.latest('pk').lugar, '')
+
+    def test_el_lugar_se_guarda_y_se_muestra_en_la_ficha(self):
+        """CU-01 Registrar actividad y CU-03 Consultar actividad (RF-009). El lugar queda guardado y visible en la ficha."""
+        self.client.force_login(self.usuario_autor)
+        self.client.post(reverse('actividad_nueva'), self._datos(lugar='Sede junta vecinal Centro'))
+        actividad = Actividad.objects.latest('pk')
+        self.assertEqual(actividad.lugar, 'Sede junta vecinal Centro')
+        respuesta = self.client.get(reverse('actividad_detalle', args=[actividad.codigo_verificador]))
+        self.assertContains(respuesta, 'Lugar: Sede junta vecinal Centro')
 
 
 class IngresoTests(TestCase):

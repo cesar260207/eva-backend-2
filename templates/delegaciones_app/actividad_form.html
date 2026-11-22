@@ -20,7 +20,7 @@
                 <fieldset class="form-seccion">
                     <legend><span class="numero" aria-hidden="true">1</span>Dónde y cuándo</legend>
                     <div class="form-seccion-campos">
-                        {% for campo in form|campos:"delegacion fecha" %}{% include 'includes/_campo.html' %}{% endfor %}
+                        {% for campo in form|campos:"delegacion lugar fecha" %}{% include 'includes/_campo.html' %}{% endfor %}
                     </div>
                 </fieldset>
 
@@ -46,7 +46,7 @@
                     </div>
                 </fieldset>
 
-                {% with restantes=form|campos_restantes:"delegacion fecha item catalogo solicitud_problema accion tipo_accion contacto_nombre contacto_telefono organizacion compromiso gestion_interna" %}{% if restantes %}
+                {% with restantes=form|campos_restantes:"delegacion lugar fecha item catalogo solicitud_problema accion tipo_accion contacto_nombre contacto_telefono organizacion compromiso gestion_interna" %}{% if restantes %}
                 <fieldset class="form-seccion">
                     <legend><span class="numero" aria-hidden="true">5</span>Otros datos</legend>
                     <div class="form-seccion-campos">
