@@ -235,3 +235,35 @@ Rama `feat/interfaz-ronda-2`, creada desde `main` en caf02d6 (PR #20). Mismo for
 5. **Para desplegar:** después del `git pull`, correr `python manage.py collectstatic --noinput` y reiniciar Gunicorn (hay un estático nuevo, `tema.js`). No lo ejecutamos.
 6. **No verificado:** el movimiento y los clics del selector de tema en un navegador real; el modo de movimiento reducido del sistema operativo; la combinación de alto contraste con el tema oscuro (cubierta por el código, sin captura).
 7. **Commits:** `docs: guía de estilo con el tema oscuro y el esquema del territorio`; `docs: cambios de la segunda ronda con capturas, censo corregido y pasos para desplegar`; `docs: avance de la fase 4 de la segunda ronda`.
+
+## Ronda 3. Lugar de la actividad, paneles ordenados y pantallas con movimiento (22-11-2026)
+
+1. **Qué hicimos**
+   - **Lugar de la actividad (requerimiento de noviembre):** al registrar una actividad se puede anotar el «Lugar (opcional)», más preciso que la delegación (por ejemplo una sede vecinal o una calle). Va en el bloque «Dónde y cuándo» del formulario y se ve en la ficha como «Lugar: …». Es un campo nuevo de `Actividad` con su migración (`0029_actividad_lugar`); las actividades anteriores quedan con el lugar vacío. Las otras notas de noviembre ya estaban cubiertas: quién la registró, la delegación y el ítem ligado a la meta; la evidencia que revisa el delegado; la tarea con responsable y plazo; y la asignación de delegados del coordinador (pantalla «Delegados»).
+   - **Paneles de los cuatro perfiles:** antes eran filas de cajas del mismo peso (métricas, delegación, funciones, alertas). Ahora cada panel tiene tres partes:
+     1. un encabezado con el saludo, la acción principal del perfil como botón grande y un anillo de cumplimiento que se llena al aparecer;
+     2. una franja de cifras que cuentan desde 0;
+     3. dos columnas: a la izquierda el trabajo (tareas, actividades por revisar o cumplimiento por delegación como barras); a la derecha las alertas y los accesos en una lista con íconos.
+     La acción principal es «Registrar actividad con evidencia» (Profesional), «Revisar evidencias pendientes» (Delegado), «Delegados y asignaciones» (Coordinador) y «Crear usuario» (Administrador). No repetimos enlaces dentro del mismo panel.
+   - **Tubo de trabajo como tablero:** una columna por estado (Ingresada, Pendiente, En proceso, Realizada) con su cantidad; cada tarea es una tarjeta con su folio, semáforo, delegación, plazo, responsable y los mismos botones de antes. El botón «Tablero / Lista» cambia la vista y la recuerda en el navegador; sin JavaScript se ve el tablero. La explicación «¿Quién agrega tareas al tubo de trabajo?» quedó plegable. En el resumen por responsable, el porcentaje realizado lleva una barra.
+   - **Ficha de la actividad:** nuevo bloque «Recorrido» con la línea de tiempo (registrada, evidencia subida, revisión y estado actual). La línea se dibuja al aparecer y el estado actual late.
+   - **Resto de las pantallas internas:** unas órbitas decorativas giran lentamente detrás del título de cada página. Los bloques aparecen al bajar y las filas de las tablas se destacan al pasar el mouse. Con movimiento reducido no hay animaciones, y en alto contraste no aparecen las órbitas.
+2. **Archivos cambiados:** `delegaciones_app/models.py`, `forms.py`, `templatetags/sgr_interfaz.py` (filtros `avance` y `por_estado`), `test_unit_interfaz.py`, `templates/base.html` (versión del CSS), los cuatro `panel_*.html`, `_panel_encabezado.html`, `_panel_alertas.html`, `agenda.html`, `actividad_form.html`, `actividad_detalle.html`, `static/css/sgr.css`, `static/js/sgr.js`, `MODELO_DATOS.md`, `README.md`, `docs/DIAGRAMA_CLASES.md` y `docs/diagramas/entidad_relacion.md`. **Creados:** la migración `0029_actividad_lugar.py`, `templates/includes/_anillo_avance.html`, `_valor_contado.html`, `_orbita_panel.html`, `templates/gestion_app/_barras_delegaciones.html` y las capturas 27 a 34.
+3. **Pruebas:** 727 en total, 727 aprobadas (línea base de esta ronda: 717). Hay 10 nuevas:
+   - Lugar (2): va en «Dónde y cuándo» y es opcional; se guarda y se ve en la ficha.
+   - Paneles (4): acción principal una sola vez en el encabezado con el anillo; franja de cifras y dos columnas sin métricas ni mosaicos sueltos; cifras animadas con el valor real para el lector de pantalla; el filtro `avance` deja el porcentaje entre 0 y 100.
+   - Tablero y recorrido (4): una columna por estado con su cantidad; botones de vista ocultos sin JavaScript; recorrido en orden; aviso de evidencia faltante.
+
+   No ajustamos ninguna prueba existente.
+4. **Qué mirar:**
+   - Con `funcionario.centro`, `delegado.demo`, `coordinador.demo` y `admin.demo`: «Mi panel» en claro y en oscuro.
+   - Con `coordinador.demo`: «Tareas», cambiando entre «Tablero» y «Lista».
+   - Con `funcionario.centro`: la ficha de una actividad y «Registrar actividad» con un lugar.
+   - Las capturas 27 a 34.
+5. **Para desplegar:** hay una migración nueva. Después del `git pull`, correr `python manage.py migrate`, luego `python manage.py collectstatic --noinput` y reiniciar Gunicorn. No lo ejecutamos.
+6. **Límites:** no cambiamos vistas, permisos, URLs ni nombres de campos de los formularios del tubo. «Lugar» es el único cambio de modelo, pedido por el grupo. El archivo `sgr.js` no lleva número de versión (una prueba revisa su etiqueta), así que después de desplegar conviene recargar con Ctrl + F5.
+7. **No verificado:**
+   - El movimiento en un navegador real. Las capturas se sacaron con movimiento reducido para ver los valores finales.
+   - El cambio «Tablero / Lista» con clics.
+   - El tablero con muchas tareas: en la base local hay 8.
+8. **Commits:** `feat: lugar opcional al registrar una actividad`; `feat: paneles por perfil con acción principal, anillo de cumplimiento y dos columnas` (incluye los estilos y el JavaScript de toda la ronda: tablero, recorrido y movimiento de las pantallas internas); `feat: tubo de trabajo como tablero por estado con vista de lista`; `feat: recorrido de la actividad como línea de tiempo`; `test: pruebas de paneles, tablero y recorrido`; `docs: avance de la tercera ronda con capturas`.
