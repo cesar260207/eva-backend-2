@@ -1,51 +1,56 @@
 {% extends 'base.html' %}
 {% block title %}Panel Coordinador | SGR{% endblock %}
 {% block content %}
-{% include 'gestion_app/_panel_encabezado.html' %}
-
-<div class="section-label mb-2">Información operacional</div>
-<div class="row g-3 mb-4">
-    <div class="col-6 col-lg-3"><div class="metric amber h-100"><small>Cumplimiento promedio</small><strong>{{ promedio }} %</strong><small>{{ periodo|default:'Sin período vigente' }}</small></div></div>
-    <div class="col-6 col-lg-3"><div class="metric h-100"><small>Actividades por revisar</small><strong>{{ actividades_pendientes }}</strong><small>{{ evidencias_pendientes }} evidencias pendientes</small></div></div>
-    <div class="col-6 col-lg-3"><div class="metric coral h-100"><small>Tareas vencidas</small><strong>{{ compromisos_vencidos }}</strong><small>{{ compromisos_por_vencer }} por vencer</small></div></div>
-    <div class="col-6 col-lg-3"><div class="metric navy h-100"><small>Tareas abiertas</small><strong>{{ compromisos_abiertos }}</strong><small>{{ actividades_aprobadas }} actividades aprobadas</small></div></div>
-</div>
-
-<div class="row g-3 mb-4">
-    <div class="col-lg-4"><div class="panel h-100">
-        <div class="section-label">Mantenedores autorizados</div>
-        <ul class="lista-enlaces">
-        {% for m in mantenedores %}
-            <li><a href="{% url 'mantenedor_lista' m.slug %}">{{ m.titulo }}{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</a></li>
-        {% endfor %}
-        </ul>
-    </div></div>
-    <div class="col-lg-4"><div class="panel h-100">
-        <div class="section-label">Coordinación de delegados</div>
-        <div class="mosaicos mosaicos-panel mb-3">
-            <a class="mosaico mosaico-principal" href="{% url 'delegados' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='equipo' %}</span><span class="mosaico-texto">Delegados y asignaciones{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+<section class="panel-hero">
+    {% include 'includes/_orbita_panel.html' %}
+    <div class="panel-hero-saludo">
+        {% include 'gestion_app/_panel_encabezado.html' %}
+        <div class="panel-hero-acciones">
+            <a class="btn btn-sgr btn-lg" href="{% url 'delegados' %}">{% include 'includes/_icono.html' with nombre='equipo' %} Delegados y asignaciones</a>
         </div>
-        <div class="section-label">Transacciones autorizadas</div>
-        <div class="mosaicos mosaicos-panel">
-            <a class="mosaico" href="{% url 'actividades' %}?estado=pendiente"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='revisar' %}</span><span class="mosaico-texto">Actividades por revisar{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
-            <a class="mosaico" href="{% url 'agenda' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='tubo' %}</span><span class="mosaico-texto">Ver tubo de trabajo{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
-            <a class="mosaico" href="{% url 'informe' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='documento' %}</span><span class="mosaico-texto">Informes{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
-        </div>
-    </div></div>
-    <div class="col-lg-4">{% include 'gestion_app/_panel_alertas.html' %}</div>
-</div>
-
-<div class="panel">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-        <div class="section-label mb-0">Cumplimiento por delegación</div>
-        <a class="btn btn-sm btn-outline-sgr" href="{% url 'dashboard' %}">Ver medición</a>
     </div>
-    <table class="table table-sm align-middle">
-        <thead><tr><th>Delegación</th><th>Delegado</th><th class="text-end">Cumplimiento</th><th class="text-end">Diferencia con lo esperado</th><th>Estado</th></tr></thead>
-        <tbody>
-        {% for fila in delegaciones %}<tr><td>{{ fila.nombre }}</td><td>{{ fila.delegados|default:'Sin delegado activo' }}</td><td class="text-end">{{ fila.cumplimiento }} %</td><td class="text-end">{{ fila.diferencia|default:'-' }}</td><td>{% include 'includes/_semaforo_insignia.html' with estado=fila.estado estado_class=fila.estado_class %}</td></tr>
-        {% empty %}<tr><td colspan="5" class="text-muted">Sin indicadores para el período vigente.</td></tr>{% endfor %}
-        </tbody>
-    </table>
+    <div class="panel-hero-avance">
+        {% include 'includes/_anillo_avance.html' with valor=promedio etiqueta='Cumplimiento promedio' %}
+        <small class="text-muted">{{ periodo|default:'Sin período vigente' }}</small>
+    </div>
+</section>
+
+<h2 class="section-label">Información operacional</h2>
+<ul class="cifras-panel cifras-panel-3">
+    <li class="cifra-panel"><span class="cifra-panel-etiqueta">Actividades por revisar</span><strong class="cifra-panel-valor">{% include 'includes/_valor_contado.html' with valor=actividades_pendientes %}</strong><span class="cifra-panel-detalle">{{ evidencias_pendientes }} evidencias pendientes</span></li>
+    <li class="cifra-panel tono-rojo"><span class="cifra-panel-etiqueta">Tareas vencidas</span><strong class="cifra-panel-valor">{% include 'includes/_valor_contado.html' with valor=compromisos_vencidos %}</strong><span class="cifra-panel-detalle">{{ compromisos_por_vencer }} por vencer</span></li>
+    <li class="cifra-panel tono-ambar"><span class="cifra-panel-etiqueta">Tareas abiertas</span><strong class="cifra-panel-valor">{% include 'includes/_valor_contado.html' with valor=compromisos_abiertos %}</strong><span class="cifra-panel-detalle">{{ actividades_aprobadas }} actividades aprobadas</span></li>
+</ul>
+
+<div class="panel-cuerpo">
+    <div class="panel-principal">
+        <section class="panel reveal" aria-labelledby="titulo-cumplimiento">
+            <div class="panel-lateral-titulo">
+                <h2 class="section-label mb-0" id="titulo-cumplimiento">Cumplimiento por delegación</h2>
+                <a class="btn btn-sm btn-outline-sgr" href="{% url 'dashboard' %}">Ver medición</a>
+            </div>
+            {% include 'gestion_app/_barras_delegaciones.html' with delegaciones=delegaciones con_delegado=True %}
+        </section>
+        <nav class="panel reveal" aria-labelledby="titulo-mantenedores">
+            <h2 class="section-label" id="titulo-mantenedores">Mantenedores autorizados</h2>
+            <ul class="accesos accesos-compactos accesos-grilla">
+            {% for m in mantenedores %}
+                <li><a href="{% url 'mantenedor_lista' m.slug %}"><span>{{ m.titulo }}</span>{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</a></li>
+            {% endfor %}
+            </ul>
+        </nav>
+    </div>
+
+    <aside class="panel-aside" aria-label="Accesos y alertas">
+        {% include 'gestion_app/_panel_alertas.html' %}
+        <nav class="panel panel-lateral" aria-labelledby="titulo-transacciones">
+            <h2 class="section-label" id="titulo-transacciones">Transacciones autorizadas</h2>
+            <ul class="accesos">
+                <li><a href="{% url 'actividades' %}?estado=pendiente"><span class="acceso-icono">{% include 'includes/_icono.html' with nombre='revisar' %}</span><span>Actividades por revisar</span>{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</a></li>
+                <li><a href="{% url 'agenda' %}"><span class="acceso-icono">{% include 'includes/_icono.html' with nombre='tubo' %}</span><span>Ver tubo de trabajo</span>{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</a></li>
+                <li><a href="{% url 'informe' %}"><span class="acceso-icono">{% include 'includes/_icono.html' with nombre='documento' %}</span><span>Informes</span>{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</a></li>
+            </ul>
+        </nav>
+    </aside>
 </div>
 {% endblock %}

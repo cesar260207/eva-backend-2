@@ -1,59 +1,76 @@
 {% extends 'base.html' %}
 {% block title %}Panel Delegado | SGR{% endblock %}
 {% block content %}
-{% include 'gestion_app/_panel_encabezado.html' %}
-
-<div class="row g-3 mb-4">
-    {% for fila in resultado_delegacion %}
-    <div class="col-6 col-lg-3"><div class="metric amber h-100"><small>Cumplimiento de {{ fila.nombre }}</small><strong>{{ fila.cumplimiento }} %</strong><small>{% include 'includes/_semaforo_insignia.html' with estado=fila.estado estado_class=fila.estado_class %} {{ periodo }}</small></div></div>
-    {% empty %}
-    <div class="col-6 col-lg-3"><div class="metric amber h-100"><small>Cumplimiento</small><strong>-</strong><small>Sin período vigente o sin metas</small></div></div>
-    {% endfor %}
-    <div class="col-6 col-lg-3"><div class="metric h-100"><small>Actividades por revisar</small><strong>{{ actividades_pendientes }}</strong><small>{{ actividades_total }} en tu delegación</small></div></div>
-    <div class="col-6 col-lg-3"><div class="metric coral h-100"><small>Tareas vencidas</small><strong>{{ compromisos_vencidos }}</strong><small>{{ compromisos_por_vencer }} por vencer</small></div></div>
-    <div class="col-6 col-lg-3"><div class="metric navy h-100"><small>Tareas abiertas</small><strong>{{ compromisos_abiertos }}</strong><small>en el tubo de trabajo</small></div></div>
-</div>
-
-<div class="row g-3 mb-4">
-    <div class="col-lg-6"><div class="panel h-100">
-        <div class="section-label">Tu delegación{% if delegacion_propia %}: {{ delegacion_propia.nombre }}{% endif %}</div>
-        <div class="mosaicos mosaicos-panel">
-            <a class="mosaico mosaico-principal" href="{% url 'actividades' %}?estado=pendiente"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='revisar' %}</span><span class="mosaico-texto">Revisar evidencias pendientes{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
-            <a class="mosaico" href="{% url 'agenda' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='tubo' %}</span><span class="mosaico-texto">Ver tubo de trabajo{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
-            {% if delegacion_propia %}<a class="mosaico" href="{% url 'delegacion_detalle' delegacion_propia.nombre %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='edificio' %}</span><span class="mosaico-texto">Ver mi delegación{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>{% endif %}
-            <a class="mosaico" href="{% url 'actividades' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='lista' %}</span><span class="mosaico-texto">Actividades de la delegación{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
-            <a class="mosaico" href="{% url 'actividad_nueva' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='subir' %}</span><span class="mosaico-texto">Registrar actividad{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
-            <a class="mosaico" href="{% url 'dashboard' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='grafico' %}</span><span class="mosaico-texto">Medición y semáforo{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
-            <a class="mosaico" href="{% url 'informe' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='documento' %}</span><span class="mosaico-texto">Informes{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+<section class="panel-hero">
+    {% include 'includes/_orbita_panel.html' %}
+    <div class="panel-hero-saludo">
+        {% include 'gestion_app/_panel_encabezado.html' %}
+        <div class="panel-hero-acciones">
+            <a class="btn btn-sgr btn-lg" href="{% url 'actividades' %}?estado=pendiente">{% include 'includes/_icono.html' with nombre='revisar' %} Revisar evidencias pendientes</a>
         </div>
-    </div></div>
-    <div class="col-lg-6">{% include 'gestion_app/_panel_alertas.html' %}</div>
-</div>
+    </div>
+    <div class="panel-hero-avance">
+        {% for fila in resultado_delegacion %}
+        {% include 'includes/_anillo_avance.html' with valor=fila.cumplimiento etiqueta='Cumplimiento de '|add:fila.nombre estado=fila.estado estado_class=fila.estado_class %}
+        <small class="text-muted">{{ periodo }}</small>
+        {% empty %}
+        {% include 'includes/_anillo_avance.html' with valor=None etiqueta='Cumplimiento' %}
+        <small class="text-muted">Sin período vigente o sin metas</small>
+        {% endfor %}
+    </div>
+</section>
 
-<div class="row g-3">
-    <div class="col-lg-6"><div class="panel h-100">
-        <div class="section-label">Esperan tu revisión</div>
-        <div class="table-responsive">
-            <table class="table table-sm align-middle">
-                <thead><tr><th>Código</th><th>Registró</th><th>Fecha</th></tr></thead>
-                <tbody>
-                {% for actividad in por_revisar %}<tr><td><a href="{% url 'actividad_detalle' actividad.codigo_verificador %}">{{ actividad.codigo_verificador }}</a></td><td>{{ actividad.funcionario_autor.nombre }}</td><td>{{ actividad.fecha|date:'d-m-Y' }}</td></tr>
-                {% empty %}<tr><td colspan="3" class="text-muted">No hay evidencias pendientes de revisión.</td></tr>{% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div></div>
-    <div class="col-lg-6"><div class="panel h-100">
-        <div class="section-label">Tubo de trabajo de la delegación</div>
-        <div class="table-responsive">
-            <table class="table table-sm align-middle">
-                <thead><tr><th>Folio</th><th>Responsable</th><th>Plazo</th><th>Estado</th></tr></thead>
-                <tbody>
-                {% for compromiso in tareas_abiertas %}<tr><td>{{ compromiso.folio }}</td><td>{{ compromiso.funcionario_responsable.nombre }}</td><td>{{ compromiso.fecha_comprometida|date:'d-m-Y' }}</td><td>{{ compromiso.get_estado_display }}{% if compromiso.vencido %} {% include 'includes/_semaforo_insignia.html' with estado='Vencida' estado_class='danger' %}{% endif %}</td></tr>
-                {% empty %}<tr><td colspan="4" class="text-muted">No hay tareas abiertas.</td></tr>{% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div></div>
+<ul class="cifras-panel cifras-panel-3">
+    <li class="cifra-panel"><span class="cifra-panel-etiqueta">Actividades por revisar</span><strong class="cifra-panel-valor">{% include 'includes/_valor_contado.html' with valor=actividades_pendientes %}</strong><span class="cifra-panel-detalle">{{ actividades_total }} en tu delegación</span></li>
+    <li class="cifra-panel tono-rojo"><span class="cifra-panel-etiqueta">Tareas vencidas</span><strong class="cifra-panel-valor">{% include 'includes/_valor_contado.html' with valor=compromisos_vencidos %}</strong><span class="cifra-panel-detalle">{{ compromisos_por_vencer }} por vencer</span></li>
+    <li class="cifra-panel tono-ambar"><span class="cifra-panel-etiqueta">Tareas abiertas</span><strong class="cifra-panel-valor">{% include 'includes/_valor_contado.html' with valor=compromisos_abiertos %}</strong><span class="cifra-panel-detalle">en el tubo de trabajo</span></li>
+</ul>
+
+<div class="panel-cuerpo">
+    <div class="panel-principal">
+        <section class="panel reveal" aria-labelledby="titulo-por-revisar">
+            <h2 class="section-label" id="titulo-por-revisar">Esperan tu revisión</h2>
+            <ul class="lista-trabajo">
+            {% for actividad in por_revisar %}
+                <li class="trabajo-item">
+                    <span class="trabajo-punto punto-pendiente" aria-hidden="true"></span>
+                    <span class="trabajo-cuerpo"><a class="trabajo-enlace" href="{% url 'actividad_detalle' actividad.codigo_verificador %}">{{ actividad.codigo_verificador }}</a><small>Registró {{ actividad.funcionario_autor.nombre }}</small></span>
+                    <span class="trabajo-meta">{{ actividad.fecha|date:'d-m-Y' }}</span>
+                </li>
+            {% empty %}
+                <li class="empty-state py-3">No hay evidencias pendientes de revisión.</li>
+            {% endfor %}
+            </ul>
+        </section>
+        <section class="panel reveal" aria-labelledby="titulo-tubo-delegacion">
+            <h2 class="section-label" id="titulo-tubo-delegacion">Tubo de trabajo de la delegación</h2>
+            <ul class="lista-trabajo">
+            {% for compromiso in tareas_abiertas %}
+                <li class="trabajo-item{% if compromiso.vencido %} es-vencida{% endif %}">
+                    <span class="trabajo-punto punto-{{ compromiso.estado }}" aria-hidden="true"></span>
+                    <span class="trabajo-cuerpo"><strong>{{ compromiso.folio }}</strong><small>Responsable: {{ compromiso.funcionario_responsable.nombre }}</small></span>
+                    <span class="trabajo-meta"><small>Plazo {{ compromiso.fecha_comprometida|date:'d-m-Y' }}</small>{{ compromiso.get_estado_display }}{% if compromiso.vencido %} {% include 'includes/_semaforo_insignia.html' with estado='Vencida' estado_class='danger' %}{% endif %}</span>
+                </li>
+            {% empty %}
+                <li class="empty-state py-3">No hay tareas abiertas.</li>
+            {% endfor %}
+            </ul>
+        </section>
+    </div>
+
+    <aside class="panel-aside" aria-label="Accesos y alertas">
+        {% include 'gestion_app/_panel_alertas.html' %}
+        <nav class="panel panel-lateral" aria-labelledby="titulo-funciones">
+            <h2 class="section-label" id="titulo-funciones">Tu delegación{% if delegacion_propia %}: {{ delegacion_propia.nombre }}{% endif %}</h2>
+            <ul class="accesos">
+                <li><a href="{% url 'agenda' %}"><span class="acceso-icono">{% include 'includes/_icono.html' with nombre='tubo' %}</span><span>Ver tubo de trabajo</span>{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</a></li>
+                {% if delegacion_propia %}<li><a href="{% url 'delegacion_detalle' delegacion_propia.nombre %}"><span class="acceso-icono">{% include 'includes/_icono.html' with nombre='edificio' %}</span><span>Ver mi delegación</span>{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</a></li>{% endif %}
+                <li><a href="{% url 'actividades' %}"><span class="acceso-icono">{% include 'includes/_icono.html' with nombre='lista' %}</span><span>Actividades de la delegación</span>{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</a></li>
+                <li><a href="{% url 'actividad_nueva' %}"><span class="acceso-icono">{% include 'includes/_icono.html' with nombre='subir' %}</span><span>Registrar actividad</span>{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</a></li>
+                <li><a href="{% url 'dashboard' %}"><span class="acceso-icono">{% include 'includes/_icono.html' with nombre='grafico' %}</span><span>Medición y semáforo</span>{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</a></li>
+                <li><a href="{% url 'informe' %}"><span class="acceso-icono">{% include 'includes/_icono.html' with nombre='documento' %}</span><span>Informes</span>{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</a></li>
+            </ul>
+        </nav>
+    </aside>
 </div>
 {% endblock %}

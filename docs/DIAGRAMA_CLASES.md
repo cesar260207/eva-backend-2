@@ -90,6 +90,7 @@ classDiagram
     class Actividad {
         codigo_verificador
         fecha
+        lugar
         contacto_nombre
         contacto_telefono
         tipo_accion

@@ -67,6 +67,8 @@ y luego seguir los pasos habituales del despliegue del grupo. Sin `collectstatic
 
 **Segunda ronda (rama `feat/interfaz-ronda-2`):** hay un archivo estático nuevo, `static/js/tema.js`, y cambiaron `sgr.css`, `sgr.js` y `sgr-iconos.svg`. En el servidor, después del `git pull`, hay que volver a correr `python manage.py collectstatic --noinput` y reiniciar Gunicorn. Sin ese paso, el `<head>` pide un `tema.js` que no existe y el botón «Tema» no aparece. Tampoco hay migraciones ni dependencias nuevas. El parámetro del CSS pasó a `?v=interfaz-r2` para que los navegadores descarguen la hoja nueva.
 
+**Tercera ronda (rama `feat/interfaz-ronda-3`):** esta vez **hay una migración** (`0029_actividad_lugar`, el campo opcional «Lugar» de la actividad). En el servidor, después del `git pull`: `python manage.py migrate`, luego `python manage.py collectstatic --noinput` y reiniciar Gunicorn. Cambiaron `sgr.css` (parámetro `?v=interfaz-r3`) y `sgr.js` (sin parámetro: conviene recargar con Ctrl + F5). No hay dependencias nuevas.
+
 ## 6. Segunda ronda: Territorio, modo oscuro y ajustes
 
 ### 6.1 Qué cambió
@@ -103,3 +105,15 @@ Antes, las seis tarjetas de la portada enlazaban siempre a `delegacion_detalle`:
 - `probe.py` con la base de demostración: 200 de 200 combinaciones de perfil y pantalla iguales a la línea base.
 - Textos de la demo: los 28 que revisa nuestro script siguen en su lugar, incluido el flujo 1 completo (registrar, subir evidencia, revisar), que recorrimos en una copia de la base local y después restauramos.
 - Capturas en claro y en oscuro de Chrome sin ventana sobre la base de demostración. En las capturas 17 a 20 y 25 las cifras aparecen a mitad del conteo animado. La 23 se generó desde un archivo local, por eso no muestra los íconos de los botones de la barra superior.
+
+## 7. Tercera ronda: paneles ordenados, tablero y movimiento
+
+| Pantalla | Antes | Ahora |
+| --- | --- | --- |
+| Panel de cada perfil | Filas de cajas del mismo peso: métricas, delegación, mosaicos y alertas | Encabezado con la acción principal y el anillo de cumplimiento, una franja de cifras que cuentan y dos columnas (trabajo a la izquierda; alertas y accesos a la derecha) |
+| Tubo de trabajo | Tabla con todas las tareas | Tablero con una columna por estado y su cantidad; botón «Tablero / Lista»; ayuda plegable; barra del porcentaje realizado por responsable |
+| Ficha de la actividad | Datos y evidencias | Además, «Recorrido»: registro, evidencia, revisión y estado actual como línea de tiempo |
+| Registrar actividad | Delegación y fecha | Además, «Lugar (opcional)» en «Dónde y cuándo» |
+| Resto de pantallas internas | Encabezado fijo | Órbitas decorativas que giran detrás del título, bloques que aparecen al bajar y filas que se destacan al pasar el mouse |
+
+Todo el movimiento se detiene con la preferencia de movimiento reducido del sistema, y las figuras decorativas no aparecen en alto contraste. Las cifras animadas dejan el valor real para el lector de pantalla. Capturas: 27 a 34 en `docs/interfaz/capturas/`.

@@ -1,0 +1,19 @@
+{% load sgr_interfaz %}{% comment %}Cumplimiento por delegación como barras. Recibe «delegaciones» (filas de resultados_por_delegacion) y, opcional, «con_delegado».{% endcomment %}
+<ul class="barras-delegacion">
+{% for fila in delegaciones %}
+    <li class="barra-delegacion">
+        <div class="barra-delegacion-nombre">
+            <strong>{{ fila.nombre }}</strong>
+            {% if con_delegado %}<small>{{ fila.delegados|default:'Sin delegado activo' }}</small>{% endif %}
+        </div>
+        <div class="barra-avance avance-{{ fila.estado_class|default:'marca' }}" aria-hidden="true"><span style="width: {{ fila.cumplimiento|avance }}%"></span></div>
+        <div class="barra-delegacion-valor">
+            <strong>{{ fila.cumplimiento }} %</strong>
+            {% include 'includes/_semaforo_insignia.html' with estado=fila.estado estado_class=fila.estado_class %}
+            {% if con_delegado %}<small>Diferencia con lo esperado: {{ fila.diferencia|default:'-' }}</small>{% endif %}
+        </div>
+    </li>
+{% empty %}
+    <li class="empty-state py-3">Sin indicadores para el período vigente.</li>
+{% endfor %}
+</ul>

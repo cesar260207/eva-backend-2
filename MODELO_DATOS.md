@@ -209,6 +209,7 @@ problema del municipio que resuelve y por la alternativa de diseño que se desca
 |---|---|---|
 | `Actividad` | `tipo_accion` (ejecución o gestión previa) | Regla 5: la gestión previa no puntúa |
 | `Actividad` | `gestion_interna` | Regla 1: el usuario es el delegado; casilla en el formulario desde esta versión |
+| `Actividad` | `lugar` (opcional) | Requerimiento de noviembre: dónde se hizo la actividad, más preciso que la delegación |
 | `Actividad` | `cuenta_puntaje`, `motivo_sin_puntaje` | Resultado de `reglas.evaluar_puntaje`: la actividad se guarda para el historial aunque no sume |
 | `Compromiso` | `item`, `solicitante_telefono`, `gestion_interna`, `organizacion` | Ítem tipo «tubo»: porcentaje de tareas realizadas con contacto |
 | `ItemMedible` | `tipo_calculo` (actividades o tubo) | La matriz mide «Soluciones de ingresos al tubo» como porcentaje, no como conteo |
