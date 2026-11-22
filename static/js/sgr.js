@@ -56,6 +56,48 @@
         document.querySelectorAll('[data-a11y-nivel]').forEach(function (aviso) {
             aviso.textContent = 'Texto al ' + PORCENTAJES[preferencias.fuente];
         });
+        refrescarTema();
+    }
+
+    /* Tema claro, oscuro o automático. tema.js ya lo aplicó en el <head>; aquí se marcan los botones y
+       se vuelve a aplicar cuando cambia la elección, el alto contraste o la configuración del sistema. */
+    var NOMBRES_TEMA = { claro: 'claro', oscuro: 'oscuro', auto: 'automático' };
+
+    function refrescarTema() {
+        var tema = window.sgrTema;
+        if (!tema) { return; }
+        var actual = tema.leer();
+        var oscuro = tema.aplicar(actual);
+        document.querySelectorAll('[data-tema]').forEach(function (boton) {
+            boton.setAttribute('aria-pressed', String(boton.getAttribute('data-tema') === actual));
+        });
+        document.querySelectorAll('[data-tema-boton]').forEach(function (boton) {
+            boton.setAttribute('aria-label', 'Tema: ' + NOMBRES_TEMA[actual]);
+            var uso = boton.querySelector('use');
+            if (uso) {
+                var base = uso.getAttribute('href').split('#')[0];
+                uso.setAttribute('href', base + (actual === 'auto' ? '#i-tema-auto' : (oscuro ? '#i-luna' : '#i-sol')));
+            }
+        });
+    }
+
+    function iniciarTema() {
+        var tema = window.sgrTema;
+        if (!tema) { return; }
+        document.querySelectorAll('[data-tema]').forEach(function (boton) {
+            boton.addEventListener('click', function () {
+                tema.guardar(boton.getAttribute('data-tema'));
+                refrescarTema();
+            });
+        });
+        if (tema.sistema) {
+            if (tema.sistema.addEventListener) {
+                tema.sistema.addEventListener('change', refrescarTema);
+            } else if (tema.sistema.addListener) {
+                tema.sistema.addListener(refrescarTema);
+            }
+        }
+        refrescarTema();
     }
 
     function iniciarAccesibilidad() {
@@ -303,6 +345,7 @@
     function iniciar() {
         iniciarPlegables();
         iniciarAccesibilidad();
+        iniciarTema();
         iniciarEncabezado();
         iniciarApariciones();
         iniciarConteos();

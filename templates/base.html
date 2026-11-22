@@ -3,17 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
     <title>{% block title %}SGR | Municipalidad de La Serena{% endblock %}</title>
+    <script src="{% static 'js/tema.js' %}?v=interfaz-r2"></script>
     <link rel="preload" href="{% static 'fonts/roboto-latin-400-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="{% static 'bootstrap/css/bootstrap.min.css' %}">
-    <link rel="stylesheet" href="{% static 'css/sgr.css' %}?v=interfaz-20261121">
+    <link rel="stylesheet" href="{% static 'css/sgr.css' %}?v=interfaz-r2">
 </head>
 <body>
     <a class="skip-link" href="#contenido-principal">Ir al contenido principal</a>
     <div class="sgr-utilidad">
         <div class="container-fluid px-4">
             <span>Municipalidad de La Serena · Departamento de Gestión Territorial</span>
-            <button class="btn-accesibilidad" type="button" data-bs-toggle="collapse" data-bs-target="#panel-accesibilidad" aria-expanded="false" aria-controls="panel-accesibilidad" data-requiere-js hidden>{% include 'includes/_icono.html' with nombre='accesibilidad' %}Accesibilidad</button>
+            <div class="utilidad-acciones">
+                <div class="dropdown" data-requiere-js hidden>
+                    <button class="btn-accesibilidad" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Tema: automático" data-tema-boton>{% include 'includes/_icono.html' with nombre='tema-auto' %}<span class="utilidad-texto" aria-hidden="true">Tema</span></button>
+                    <ul class="dropdown-menu dropdown-menu-end menu-tema" aria-label="Tema">
+                        <li><button class="dropdown-item" type="button" data-tema="claro" aria-pressed="false">{% include 'includes/_icono.html' with nombre='sol' %}Claro</button></li>
+                        <li><button class="dropdown-item" type="button" data-tema="oscuro" aria-pressed="false">{% include 'includes/_icono.html' with nombre='luna' %}Oscuro</button></li>
+                        <li><button class="dropdown-item" type="button" data-tema="auto" aria-pressed="false">{% include 'includes/_icono.html' with nombre='tema-auto' %}Automático</button></li>
+                    </ul>
+                </div>
+                <button class="btn-accesibilidad" type="button" data-bs-toggle="collapse" data-bs-target="#panel-accesibilidad" aria-expanded="false" aria-controls="panel-accesibilidad" data-requiere-js hidden>{% include 'includes/_icono.html' with nombre='accesibilidad' %}Accesibilidad</button>
+            </div>
         </div>
     </div>
     <section class="collapse panel-accesibilidad" id="panel-accesibilidad" aria-labelledby="titulo-accesibilidad">
@@ -25,6 +37,12 @@
             <button class="btn-a11y" type="button" data-a11y="subrayar" aria-pressed="false">Links subrayados</button>
             <button class="btn-a11y" type="button" data-a11y="reiniciar">Reiniciar</button>
             <span class="small text-muted ms-lg-2" data-a11y-nivel aria-live="polite"></span>
+            <div class="grupo-tema" role="group" aria-labelledby="titulo-tema">
+                <span class="grupo-tema-titulo" id="titulo-tema">Tema</span>
+                <button class="btn-a11y" type="button" data-tema="claro" aria-pressed="false">{% include 'includes/_icono.html' with nombre='sol' %}Claro</button>
+                <button class="btn-a11y" type="button" data-tema="oscuro" aria-pressed="false">{% include 'includes/_icono.html' with nombre='luna' %}Oscuro</button>
+                <button class="btn-a11y" type="button" data-tema="auto" aria-pressed="false">{% include 'includes/_icono.html' with nombre='tema-auto' %}Automático</button>
+            </div>
         </div>
     </section>
     {% with ruta=request.resolver_match.url_name %}
