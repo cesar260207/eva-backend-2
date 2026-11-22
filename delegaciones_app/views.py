@@ -676,8 +676,9 @@ def institucional(request):
     return render(request, 'delegaciones_app/institucional.html', {
         'delegaciones': delegaciones,
         'poblacion': '250.141',
-        'urbano': '89,14 %',
-        'rural': '10,86 %',
+        'urbano': '88,0 %',
+        'rural': '12,0 %',
+        'fuente_poblacion': 'Censo de Población y Vivienda 2024, INE',
     })
 
 

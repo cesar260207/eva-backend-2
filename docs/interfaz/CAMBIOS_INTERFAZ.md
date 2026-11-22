@@ -64,3 +64,42 @@ python manage.py collectstatic --noinput
 ```
 
 y luego seguir los pasos habituales del despliegue del grupo. Sin `collectstatic`, el servidor no encuentra `static/js/sgr.js`, `static/fonts/` ni `static/icons/` y la página se verá sin fuentes, sin íconos y sin la barra de accesibilidad. No hay migraciones ni dependencias nuevas. El parámetro `?v=interfaz-20261121` del CSS obliga a los navegadores a descargar la hoja nueva.
+
+**Segunda ronda (rama `feat/interfaz-ronda-2`):** hay un archivo estático nuevo, `static/js/tema.js`, y cambiaron `sgr.css`, `sgr.js` y `sgr-iconos.svg`. En el servidor, después del `git pull`, hay que volver a correr `python manage.py collectstatic --noinput` y reiniciar Gunicorn. Sin ese paso, el `<head>` pide un `tema.js` que no existe y el botón «Tema» no aparece. Tampoco hay migraciones ni dependencias nuevas. El parámetro del CSS pasó a `?v=interfaz-r2` para que los navegadores descarguen la hoja nueva.
+
+## 6. Segunda ronda: Territorio, modo oscuro y ajustes
+
+### 6.1 Qué cambió
+
+| Pantalla | Cambio | Captura |
+| --- | --- | --- |
+| Territorio | Mismo lenguaje de la portada: hero en dos columnas con un esquema propio de la comuna (mar al oeste, nodos que laten, «Esquema referencial, no a escala»); cuatro cifras con conteo animado y su fuente; barra urbana y rural; fila de botones y tarjetas de las seis delegaciones que se resaltan con el esquema; banda de cierre. Sin las insignias «Territorio» e «Información institucional de referencia» y sin el bloque «Principio de acceso» | `17_territorio.png`, `18_territorio_375px.png`, `25_oscuro_territorio.png` |
+| Territorio con sesión | «Ver seguimiento» solo en la tarjeta de la propia delegación, o en las seis para la coordinación | |
+| Portada sin sesión | Cifras públicas de la comuna con su fuente en vez de las cifras internas; accesos rápidos que no repiten el hero; cada tarjeta de delegación lleva a su tarjeta en Territorio | `19_portada_sin_sesion.png`, `20_oscuro_portada.png` |
+| Portada con sesión | Las tarjetas llevan a Territorio y solo la propia delegación (o todas, para la coordinación) muestra «Seguimiento territorial»; sin el acceso «Ver resultados», que repetía «Ver medición» | |
+| Pie | «Territorio» aparece una sola vez | |
+| Todas | Tema «Claro», «Oscuro» y «Automático», con el botón «Tema» en la franja superior y en el panel de accesibilidad | `21` a `24`, `26_oscuro_revision_delegado.png` |
+
+### 6.2 Corrección del censo
+
+La vista `institucional` mostraba 89,14 % de población urbana y 10,86 % rural. Según el Censo de Población y Vivienda 2024 del INE (reporte comunal de la Biblioteca del Congreso Nacional), La Serena tiene 250.141 habitantes: 220.187 en zona urbana y 29.954 en zona rural, con un 12,0 % de ruralidad. Corregimos los textos a **88,0 %** y **12,0 %**, y la vista entrega la fuente en `fuente_poblacion`, que Territorio y la portada muestran debajo de las cifras. Es el único cambio en `views.py` (regla 8 del encargo).
+
+### 6.3 Enlaces de las delegaciones
+
+Antes, las seis tarjetas de la portada enlazaban siempre a `delegacion_detalle`: sin sesión llevaban al ingreso y, para un Profesional o un Delegado, las otras cinco respondían 404 y cada clic quedaba en la auditoría como acceso denegado. Ahora cada tarjeta lleva a su tarjeta en Territorio (`/territorio/#delegacion-las-companias`, etc.), y el enlace al seguimiento aparece solo cuando el perfil puede abrirlo, con la misma condición del menú (`es_coordinacion` o `mi_delegacion`). La protección en la vista no cambió.
+
+### 6.4 Requerimientos no funcionales
+
+| Requerimiento | Cómo responde esta ronda | Evidencia |
+| --- | --- | --- |
+| **RNF-011 Usabilidad** | Territorio interactivo con el mismo lenguaje de la portada; ningún enlace lleva a una pantalla que el perfil no puede abrir; sin cifras internas para quien no ingresó; menos enlaces repetidos en la portada y el pie; cifras con su fuente | `TerritorioTests` y las pruebas nuevas de `PortadaTests` y `EncabezadoPieYAccesibilidadTests` en `test_unit_interfaz.py` |
+| **RNF-012 Accesibilidad** | Tema oscuro con texto de 4,5:1 o más (tabla en la sección 10 de `GUIA_DE_ESTILO.md`); el alto contraste manda sobre el tema; selector con `aria-pressed` y nombre accesible; esquema con `role="img"` y nodos enfocables con teclado; un solo `h1`; el movimiento del esquema se apaga con `prefers-reduced-motion`; Territorio se ve completo sin JavaScript | `test_el_selector_de_tema_tiene_tres_opciones_con_nombre`, `test_cada_tarjeta_tiene_su_id_y_el_esquema_es_accesible` |
+| **RNF-013 Compatibilidad** | El tema usa el `data-bs-theme` de Bootstrap 5.3 y `<meta name="color-scheme">`; `tema.js` sin librerías, con `try/catch` en `localStorage` y respaldo para navegadores sin `matchMedia.addEventListener`; sin `<script>` en línea; nada cargado desde internet (el esquema es propio, sin mapas externos) | `test_tema_js_se_carga_en_el_head_antes_del_css_y_sin_defer`, `test_el_tema_no_cambia_la_etiqueta_html_ni_usa_scripts_en_linea`, `RecursosLocalesTests` |
+
+### 6.5 Verificación
+
+- Pruebas: 703 en la línea base de esta ronda y todas siguen aprobadas; se agregaron 14 (717 en total). No se modificó ninguna prueba existente.
+- `check` sin problemas y `makemigrations --check --dry-run`: «No changes detected».
+- `probe.py` con la base de demostración: 200 de 200 combinaciones de perfil y pantalla iguales a la línea base.
+- Textos de la demo: los 28 que revisa nuestro script siguen en su lugar, incluido el flujo 1 completo (registrar, subir evidencia, revisar), que recorrimos en una copia de la base local y después restauramos.
+- Capturas en claro y en oscuro de Chrome sin ventana sobre la base de demostración. En las capturas 17 a 20 y 25 las cifras aparecen a mitad del conteo animado. La 23 se generó desde un archivo local, por eso no muestra los íconos de los botones de la barra superior.

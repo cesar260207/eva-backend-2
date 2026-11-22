@@ -1,9 +1,151 @@
 {% extends 'base.html' %}
+{% load sgr_interfaz %}
+
 {% block title %}Territorio | SGR{% endblock %}
+{% block main_clase %}app-shell app-shell-portada{% endblock %}
+
 {% block content %}
-<div class="hero-sgr mb-4"><div class="page-kicker text-white">Contexto institucional</div><h1 class="display-5 mb-3">Municipio central + gestión territorial</h1><p class="mb-0">Las Delegaciones Municipales acercan la gestión a barrios y localidades, recogen necesidades y coordinan respuestas trazables con las unidades técnicas.</p></div>
-<div class="row g-3 mb-4"><div class="col-md-4"><div class="metric"><strong>{{ poblacion }}</strong><small>Habitantes de la comuna</small></div></div><div class="col-md-4"><div class="metric coral"><strong>{{ urbano }}</strong><small>Población urbana</small></div></div><div class="col-md-4"><div class="metric amber"><strong>{{ rural }}</strong><small>Población rural</small></div></div></div>
-<div class="d-flex justify-content-between align-items-end mb-3"><div><div class="page-kicker">Descentralización y cercanía</div><h2 class="page-title h3 mb-0">Las seis delegaciones</h2></div><span class="badge badge-soft">Información institucional de referencia</span></div>
-<div class="row g-3">{% for nombre, territorio, enfasis in delegaciones %}<div class="col-md-6 col-xl-4"><div class="card territory-card h-100"><div class="card-body"><div class="d-flex justify-content-between align-items-start mb-3"><h3 class="mb-0">{{ nombre }}</h3><span class="badge badge-soft">Territorio</span></div><div class="section-label mb-1">Territorio predominante</div><p class="mb-3">{{ territorio }}</p><div class="section-label mb-1">Énfasis operativo</div><p class="text-muted mb-0">{{ enfasis }}</p></div></div></div>{% endfor %}</div>
-<div class="panel mt-4"><div class="section-label mb-2">Principio de acceso</div><p class="mb-0">Cada actor debe visualizar y modificar únicamente la información necesaria para su función, delegación y nivel de responsabilidad.</p></div>
+<div class="portada territorio" data-territorio>
+
+    <section class="hero" aria-labelledby="titulo-territorio">
+        <div class="contenedor hero-grid">
+            <div>
+                <div class="page-kicker">Territorio</div>
+                <h1 class="hero-titulo" id="titulo-territorio">Municipio central + gestión territorial</h1>
+                <p class="hero-texto">Las Delegaciones Municipales acercan la gestión a barrios y localidades, recogen necesidades y coordinan respuestas trazables con las unidades técnicas.</p>
+                <div class="hero-acciones">
+                    {% if user.is_authenticated %}
+                    <a class="btn btn-sgr" href="{% url 'panel' %}">Ir a mi panel</a>
+                    {% else %}
+                    <a class="btn btn-sgr" href="{% url 'login' %}">Ingresar</a>
+                    {% endif %}
+                    <a class="btn btn-outline-sgr" href="#delegaciones">Ver delegaciones</a>
+                </div>
+            </div>
+            <figure class="territorio-esquema">
+                <div class="esquema-lienzo">
+                    <svg viewBox="0 0 480 400" preserveAspectRatio="none" role="img" focusable="false" aria-label="Esquema referencial de la comuna de La Serena con sus delegaciones: {% for nombre, territorio, enfasis in delegaciones %}{{ nombre }}{% if not forloop.last %}, {% endif %}{% endfor %}.">
+                        <defs>
+                            <radialGradient id="esquema-difuso">
+                                <stop class="esquema-difuso-centro" offset="0"/>
+                                <stop class="esquema-difuso-borde" offset="1"/>
+                            </radialGradient>
+                        </defs>
+                        <path class="esquema-mar" d="M0 0H64C78 40 52 80 66 120S54 200 70 240S50 320 64 360S60 390 62 400H0Z"/>
+                        <g class="esquema-olas">
+                            <path d="M10 24q6-6 12 0t12 0"/>
+                            <path d="M16 214q6-6 12 0t12 0"/>
+                            <path d="M8 290q6-6 12 0t12 0"/>
+                            <path d="M16 362q6-6 12 0t12 0"/>
+                        </g>
+                        <text class="esquema-etiqueta-mar" x="32" y="118" transform="rotate(-90 32 118)" text-anchor="middle">OCÉANO PACÍFICO</text>
+                        <ellipse class="esquema-rural" cx="404" cy="208" rx="104" ry="176"/>
+                        <path class="esquema-urbano" d="M78 36C150 8 262 28 318 92S338 262 290 330S124 386 80 334C60 280 92 220 76 170S62 70 78 36Z"/>
+                        <g class="esquema-enlaces">
+                            <path d="M163 176L96 224"/>
+                            <path d="M163 176L182 60"/>
+                            <path d="M163 176L278 160"/>
+                            <path d="M163 176L192 312"/>
+                            <path d="M163 176L394 208"/>
+                        </g>
+                        <g class="esquema-norte">
+                            <path d="M452 18l8 20-8-5-8 5z"/>
+                            <text x="452" y="56" text-anchor="middle">N</text>
+                        </g>
+                    </svg>
+                    {% for nombre, territorio, enfasis in delegaciones %}{% with slug=nombre|slugify %}
+                    <a class="esquema-nodo nodo-{{ slug }}" href="#delegacion-{{ slug }}" data-delegacion="{{ slug }}"><span class="esquema-punto" aria-hidden="true"></span><span class="esquema-nombre">{{ nombre }}</span></a>
+                    {% endwith %}{% endfor %}
+                </div>
+                <figcaption>Esquema referencial, no a escala</figcaption>
+            </figure>
+        </div>
+    </section>
+
+    <section class="portada-seccion" aria-labelledby="titulo-cifras-territorio">
+        <div class="contenedor">
+            <div class="page-kicker">La comuna en cifras</div>
+            <h2 class="portada-titulo-seccion" id="titulo-cifras-territorio">La Serena hoy</h2>
+            <div class="cifras cifras-4">
+                {% with c=poblacion|partes_cifra %}
+                <div class="cifra reveal">
+                    <span class="cifra-valor"><span class="visually-hidden">{{ poblacion }}</span><span aria-hidden="true" data-contar="{{ c.plano }}">{{ c.texto }}</span></span>
+                    <span class="cifra-texto">Habitantes de la comuna</span>
+                </div>
+                {% endwith %}
+                {% with c=urbano|partes_cifra %}
+                <div class="cifra reveal">
+                    <span class="cifra-valor"><span class="visually-hidden">{{ urbano }}</span><span aria-hidden="true"><span data-contar="{{ c.plano }}" data-decimales="{{ c.decimales }}">{{ c.texto }}</span> {{ c.sufijo }}</span></span>
+                    <span class="cifra-texto">Población urbana</span>
+                </div>
+                {% endwith %}
+                {% with c=rural|partes_cifra %}
+                <div class="cifra reveal">
+                    <span class="cifra-valor"><span class="visually-hidden">{{ rural }}</span><span aria-hidden="true"><span data-contar="{{ c.plano }}" data-decimales="{{ c.decimales }}">{{ c.texto }}</span> {{ c.sufijo }}</span></span>
+                    <span class="cifra-texto">Población rural</span>
+                </div>
+                {% endwith %}
+                <div class="cifra reveal">
+                    <span class="cifra-valor"><span class="visually-hidden">{{ delegaciones|length }}</span><span aria-hidden="true" data-contar="{{ delegaciones|length }}">{{ delegaciones|length }}</span></span>
+                    <span class="cifra-texto">Delegaciones municipales</span>
+                </div>
+            </div>
+            {% with u=urbano|partes_cifra r=rural|partes_cifra %}
+            <div class="proporcion reveal">
+                <p class="visually-hidden">Población urbana {{ urbano }} y población rural {{ rural }}.</p>
+                <div class="progress progress-proporcion" aria-hidden="true">
+                    <div class="progress-bar barra-urbana" style="width: {{ u.plano }}%"></div>
+                    <div class="progress-bar barra-rural" style="width: {{ r.plano }}%"></div>
+                </div>
+                <ul class="proporcion-leyenda" aria-hidden="true">
+                    <li><span class="muestra muestra-urbana"></span>Urbana {{ urbano }}</li>
+                    <li><span class="muestra muestra-rural"></span>Rural {{ rural }}</li>
+                </ul>
+            </div>
+            {% endwith %}
+            <p class="fuente-dato">Fuente: {{ fuente_poblacion }}</p>
+        </div>
+    </section>
+
+    <section class="portada-seccion portada-seccion-alterna" id="delegaciones" aria-labelledby="titulo-delegaciones-territorio">
+        <div class="contenedor">
+            <div class="page-kicker">Descentralización y cercanía</div>
+            <h2 class="portada-titulo-seccion" id="titulo-delegaciones-territorio">Las seis delegaciones</h2>
+            <nav class="delegaciones-chips" aria-label="Ir a una delegación">
+                {% for nombre, territorio, enfasis in delegaciones %}
+                <a class="chip-delegacion" href="#delegacion-{{ nombre|slugify }}" data-delegacion="{{ nombre|slugify }}">{{ nombre }}</a>
+                {% endfor %}
+            </nav>
+            <div class="territorio-grid">
+                {% for nombre, territorio, enfasis in delegaciones %}{% with slug=nombre|slugify %}
+                <article class="territorio-tarjeta reveal" id="delegacion-{{ slug }}" data-delegacion="{{ slug }}" tabindex="-1" aria-labelledby="nombre-{{ slug }}">
+                    {% include 'includes/_motivo_delegacion.html' with slug=slug %}
+                    <h3 id="nombre-{{ slug }}">{{ nombre }}</h3>
+                    <div class="section-label">Territorio predominante</div>
+                    <p>{{ territorio }}</p>
+                    <div class="section-label">Énfasis operativo</div>
+                    <p class="text-muted">{{ enfasis }}</p>
+                    {% if user.is_authenticated %}{% if es_coordinacion or mi_delegacion.nombre == nombre %}
+                    <a class="enlace-seguimiento" href="{% url 'delegacion_detalle' nombre %}">Ver seguimiento{% include 'includes/_icono.html' with nombre='flecha' clase='flecha icono-sm' %}</a>
+                    {% endif %}{% endif %}
+                </article>
+                {% endwith %}{% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <section class="portada-seccion banda-seccion" aria-labelledby="titulo-cierre-territorio">
+        <div class="contenedor">
+            <div class="banda-cierre">
+                {% if user.is_authenticated %}
+                <h2 id="titulo-cierre-territorio">Tus actividades y tareas están en tu panel.</h2>
+                <a class="btn btn-banda" href="{% url 'panel' %}">Ir a mi panel</a>
+                {% else %}
+                <h2 id="titulo-cierre-territorio">¿Trabajas en una delegación?</h2>
+                <a class="btn btn-banda" href="{% url 'login' %}">Ingresar</a>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+</div>
 {% endblock %}

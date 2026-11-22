@@ -11,7 +11,7 @@ from django.urls import reverse
 
 from .models import Delegacion
 from .pruebas_base import CLAVE_PRUEBA, EscenarioBase, crear_funcionario, fijar_hoy
-from .templatetags.sgr_interfaz import campo_sgr, campos, campos_restantes
+from .templatetags.sgr_interfaz import campo_sgr, campos, campos_restantes, partes_cifra
 
 
 MENSAJES_DE_PERMISOS = ('Restringido para tu perfil', 'Permisos mínimos', 'Permisos intermedios', 'Acceso total')
@@ -216,6 +216,48 @@ class PortadaTests(TestCase):
         self.assertContains(respuesta, 'ámbar desde el 60 % de lo esperado')
         self.assertContains(respuesta, '<h1', count=1)
 
+    def test_sin_sesion_muestra_cifras_publicas_con_su_fuente(self):
+        """RNF-011 Usabilidad. Sin sesión no se ven cifras de gestión interna; sí las de la comuna con su fuente."""
+        respuesta = self.client.get(reverse('inicio'))
+        for interna in ('Tareas en el tubo de trabajo', 'Tareas que requieren atención', 'Cumplimiento promedio'):
+            self.assertNotContains(respuesta, interna)
+        self.assertContains(respuesta, 'Fuente: Censo de Población y Vivienda 2024, INE')
+        self.client.force_login(crear_funcionario('portada.cifras', 'funcionario'))
+        respuesta = self.client.get(reverse('inicio'))
+        self.assertContains(respuesta, 'Tareas en el tubo de trabajo')
+        self.assertContains(respuesta, 'data-contar=', count=3)
+
+    def test_las_cifras_publicas_son_las_de_territorio(self):
+        """RNF-011 Usabilidad. La portada repite la población y la ruralidad que entrega la vista de Territorio."""
+        territorio = self.client.get(reverse('institucional')).context
+        respuesta = self.client.get(reverse('inicio'))
+        self.assertContains(respuesta, f'<span class="visually-hidden">{territorio["poblacion"]}</span>')
+        self.assertContains(respuesta, f'<span class="visually-hidden">{territorio["rural"]}</span>')
+
+    def test_ninguna_tarjeta_enlaza_al_seguimiento_de_una_delegacion_ajena(self):
+        """CU-26.1 Denegar acceso por ámbito (RF-029). Las tarjetas llevan a Territorio; el seguimiento, solo si se puede abrir."""
+        centro = Delegacion.objects.create(nombre='Centro')
+        Delegacion.objects.create(nombre='Rural')
+        respuesta = self.client.get(reverse('inicio'))
+        self.assertContains(respuesta, f'href="{reverse("institucional")}#delegacion-rural"')
+        self.assertNotContains(respuesta, reverse('delegacion_detalle', args=['Centro']))
+        self.client.force_login(crear_funcionario('portada.centro', 'funcionario', delegacion=centro))
+        respuesta = self.client.get(reverse('inicio'))
+        self.assertContains(respuesta, reverse('delegacion_detalle', args=['Centro']))
+        self.assertNotContains(respuesta, reverse('delegacion_detalle', args=['Rural']))
+        self.client.force_login(crear_funcionario('portada.coord', 'coordinador'))
+        respuesta = self.client.get(reverse('inicio'))
+        self.assertContains(respuesta, reverse('delegacion_detalle', args=['Rural']))
+
+    def test_sin_sesion_los_accesos_rapidos_no_repiten_el_hero(self):
+        """RNF-011 Usabilidad. «Ingresar» y «Territorio» están en el hero y en el menú; los accesos rápidos llevan a otras partes."""
+        html = self.client.get(reverse('inicio')).content.decode('utf-8')
+        accesos = html.split('aria-label="Accesos rápidos"', 1)[1].split('</nav>', 1)[0]
+        self.assertNotIn(reverse('login'), accesos)
+        self.assertNotIn(f'href="{reverse("institucional")}"', accesos)
+        for ancla in ('#como-funciona', '#delegaciones', '#preguntas'):
+            self.assertIn(f'href="{ancla}"', accesos)
+
 
 class EncabezadoPieYAccesibilidadTests(TestCase):
     """RNF-011 Usabilidad y RNF-012 Accesibilidad. Menú con la sección activa, pie en bloques y barra de accesibilidad."""
@@ -235,6 +277,50 @@ class EncabezadoPieYAccesibilidadTests(TestCase):
             self.assertIn(f'href="{url}"', pie)
         self.assertNotIn(reverse('password_reset'), pie)
         self.assertNotIn(reverse('delegados'), pie)
+
+    def test_en_el_pie_cada_destino_aparece_una_sola_vez(self):
+        """RNF-011 Usabilidad. Con o sin sesión, el pie no repite enlaces (antes «Territorio» salía dos veces)."""
+        destinos = re.compile(r'href="([^"]+)"')
+        for usuario in (None, crear_funcionario('pie.unico', 'funcionario')):
+            if usuario:
+                self.client.force_login(usuario)
+            pie = self.client.get(reverse('inicio')).content.decode('utf-8').split('<footer', 1)[1]
+            enlaces = destinos.findall(pie)
+            self.assertTrue(enlaces)
+            self.assertEqual(len(enlaces), len(set(enlaces)), enlaces)
+            self.assertEqual(enlaces.count(reverse('institucional')), 1)
+
+    def test_tema_js_se_carga_en_el_head_antes_del_css_y_sin_defer(self):
+        """RNF-013 Compatibilidad. El tema se aplica antes de dibujar la página (sin parpadeo) y el navegador sabe que hay dos esquemas."""
+        html = self.client.get(reverse('inicio')).content.decode('utf-8')
+        cabeza = html.split('</head>', 1)[0]
+        etiqueta = re.search(r'<script src="[^"]*js/tema\.js[^"]*"[^>]*>', cabeza)
+        self.assertIsNotNone(etiqueta)
+        self.assertNotIn('defer', etiqueta.group(0))
+        self.assertNotIn('async', etiqueta.group(0))
+        self.assertLess(cabeza.index('js/tema.js'), cabeza.index('css/sgr.css'))
+        self.assertLess(cabeza.index('js/tema.js'), cabeza.index('bootstrap.min.css'))
+        self.assertIn('<meta name="color-scheme" content="light dark">', cabeza)
+
+    def test_el_selector_de_tema_tiene_tres_opciones_con_nombre(self):
+        """RNF-012 Accesibilidad. Claro, Oscuro y Automático en la barra superior y en el panel, con aria-pressed y nombre accesible."""
+        respuesta = self.client.get(reverse('inicio'))
+        self.assertContains(respuesta, 'aria-label="Tema: automático" data-tema-boton')
+        self.assertContains(respuesta, 'aria-label="Tema"')
+        self.assertContains(respuesta, 'role="group" aria-labelledby="titulo-tema"')
+        for tema, texto in (('claro', 'Claro'), ('oscuro', 'Oscuro'), ('auto', 'Automático')):
+            self.assertContains(respuesta, f'data-tema="{tema}" aria-pressed="false"', count=2)
+            self.assertContains(respuesta, f'{texto}</button>', count=2)
+
+    def test_el_tema_no_cambia_la_etiqueta_html_ni_usa_scripts_en_linea(self):
+        """RNF-013 Compatibilidad. data-bs-theme lo pone JavaScript: el servidor no escribe atributos nuevos en <html>."""
+        self.client.force_login(crear_funcionario('tema.ui', 'funcionario'))
+        for url in (reverse('inicio'), reverse('institucional'), reverse('panel')):
+            html = self.client.get(url).content.decode('utf-8')
+            self.assertIn('<html lang="es" class="a11y-font-0">', html, url)
+            self.assertNotIn('data-bs-theme', html.split('<head>', 1)[0], url)
+            for script in re.findall(r'<script\b[^>]*>', html):
+                self.assertIn(' src="', script, url)
 
     def test_la_barra_de_accesibilidad_usa_las_clases_del_kit(self):
         """RNF-012 Accesibilidad. Botones de la barra y clase inicial a11y-font-0 en la etiqueta html."""
@@ -294,3 +380,62 @@ class FiltrosDeInterfazTests(TestCase):
         form = self.Formulario()
         self.assertEqual([c.name for c in campos(form, 'telefono nombre inexistente oculto')], ['telefono', 'nombre'])
         self.assertEqual([c.name for c in campos_restantes(form, 'telefono')], ['nombre', 'activo'])
+
+    def test_partes_cifra_separa_el_numero_para_el_conteo(self):
+        """RNF-012 Accesibilidad. El conteo parte del número sin formato y termina en el texto original."""
+        self.assertEqual(partes_cifra('250.141'), {'plano': '250141', 'decimales': 0, 'texto': '250.141', 'sufijo': ''})
+        self.assertEqual(partes_cifra('88,0 %'), {'plano': '88.0', 'decimales': 1, 'texto': '88,0', 'sufijo': '%'})
+
+
+DELEGACIONES_TERRITORIO = ('Avenida del Mar', 'Centro', 'La Antena', 'Las Compañías', 'La Pampa', 'Rural')
+
+
+class TerritorioTests(TestCase):
+    """RNF-011 y RNF-012. Territorio con cifras del censo y su fuente, esquema accesible y enlaces según el perfil."""
+
+    def test_muestra_el_censo_2024_con_su_fuente(self):
+        """RNF-011 Usabilidad. 88,0 % urbana y 12,0 % rural (Censo 2024, INE), con la fuente a la vista."""
+        respuesta = self.client.get(reverse('institucional'))
+        for texto in ('250.141', '88,0 %', '12,0 %', 'Fuente: Censo de Población y Vivienda 2024, INE'):
+            self.assertContains(respuesta, texto)
+        self.assertNotContains(respuesta, '89,14')
+        self.assertNotContains(respuesta, '10,86')
+        self.assertContains(respuesta, 'data-contar=', count=4)
+
+    def test_no_muestra_mensajes_de_permisos_ni_insignias_de_relleno(self):
+        """RNF-011 Usabilidad. Sin «Principio de acceso» ni las insignias «Territorio» e «Información institucional de referencia»."""
+        respuesta = self.client.get(reverse('institucional'))
+        self.assertNotContains(respuesta, 'Principio de acceso')
+        self.assertNotContains(respuesta, 'Información institucional de referencia')
+        self.assertNotContains(respuesta, 'badge-soft">Territorio')
+
+    def test_sin_sesion_ninguna_tarjeta_enlaza_al_seguimiento(self):
+        """RNF-011 Usabilidad. Sin sesión no hay enlaces a pantallas privadas."""
+        respuesta = self.client.get(reverse('institucional'))
+        for nombre in DELEGACIONES_TERRITORIO:
+            self.assertNotContains(respuesta, reverse('delegacion_detalle', args=[nombre]), msg_prefix=nombre)
+        self.assertContains(respuesta, '¿Trabajas en una delegación?')
+
+    def test_cada_perfil_ve_solo_el_seguimiento_que_puede_abrir(self):
+        """CU-26.1 Denegar acceso por ámbito (RF-029). El Profesional de Centro ve solo Centro; el Coordinador, las seis."""
+        centro = Delegacion.objects.create(nombre='Centro')
+        self.client.force_login(crear_funcionario('territorio.pro', 'funcionario', delegacion=centro))
+        respuesta = self.client.get(reverse('institucional'))
+        self.assertContains(respuesta, reverse('delegacion_detalle', args=['Centro']))
+        for nombre in DELEGACIONES_TERRITORIO[2:] + DELEGACIONES_TERRITORIO[:1]:
+            self.assertNotContains(respuesta, reverse('delegacion_detalle', args=[nombre]), msg_prefix=nombre)
+        self.client.force_login(crear_funcionario('territorio.coord', 'coordinador'))
+        respuesta = self.client.get(reverse('institucional'))
+        for nombre in DELEGACIONES_TERRITORIO:
+            self.assertContains(respuesta, reverse('delegacion_detalle', args=[nombre]), count=1, msg_prefix=nombre)
+
+    def test_cada_tarjeta_tiene_su_id_y_el_esquema_es_accesible(self):
+        """RNF-012 Accesibilidad. Un id estable por tarjeta, esquema con nombre accesible y un solo h1."""
+        respuesta = self.client.get(reverse('institucional'))
+        for slug in ('avenida-del-mar', 'centro', 'la-antena', 'las-companias', 'la-pampa', 'rural'):
+            self.assertContains(respuesta, f'id="delegacion-{slug}"')
+            self.assertContains(respuesta, f'href="#delegacion-{slug}"', count=2)
+        self.assertContains(respuesta, 'role="img"')
+        self.assertContains(respuesta, 'con sus delegaciones: Avenida del Mar, Centro, La Antena, Las Compañías, La Pampa, Rural.')
+        self.assertContains(respuesta, 'Esquema referencial, no a escala')
+        self.assertContains(respuesta, '<h1', count=1)

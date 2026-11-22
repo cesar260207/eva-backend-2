@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load l10n %}
+{% load l10n sgr_interfaz %}
 
 {% block title %}Inicio | Municipalidad de La Serena{% endblock %}
 {% block main_clase %}app-shell app-shell-portada{% endblock %}
@@ -73,11 +73,8 @@
                 <a class="mosaico reveal" href="{% url 'agenda' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='tubo' %}</span><span class="mosaico-texto">Ver tareas{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
                 {% if es_coordinacion %}<a class="mosaico reveal" href="{% url 'delegados' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='equipo' %}</span><span class="mosaico-texto">Coordinar delegados{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
                 {% elif mi_delegacion %}<a class="mosaico reveal" href="{% url 'delegacion_detalle' mi_delegacion.nombre %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='edificio' %}</span><span class="mosaico-texto">Ver mi delegación{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>{% endif %}
-                <a class="mosaico reveal" href="{% url 'dashboard' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='grafico' %}</span><span class="mosaico-texto">Ver resultados{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
                 {% if puede_administrar %}<a class="mosaico reveal" href="{% url 'mantenedores' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='ajustes' %}</span><span class="mosaico-texto">Administrar datos{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>{% endif %}
                 {% else %}
-                <a class="mosaico mosaico-principal reveal" href="{% url 'login' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='entrar' %}</span><span class="mosaico-texto">Ingresar{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
-                <a class="mosaico reveal" href="{% url 'institucional' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='mapa' %}</span><span class="mosaico-texto">Territorio{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
                 <a class="mosaico reveal" href="#como-funciona"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='revisar' %}</span><span class="mosaico-texto">Cómo funciona{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
                 <a class="mosaico reveal" href="#delegaciones"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='edificio' %}</span><span class="mosaico-texto">Delegaciones{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
                 <a class="mosaico reveal" href="#preguntas"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='pregunta' %}</span><span class="mosaico-texto">Preguntas frecuentes{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
@@ -86,6 +83,7 @@
         </div>
     </nav>
 
+    {% if user.is_authenticated %}
     <section class="portada-seccion" aria-labelledby="titulo-cifras">
         <div class="contenedor">
             <div class="page-kicker">Avance en cifras</div>
@@ -106,6 +104,34 @@
             </div>
         </div>
     </section>
+    {% else %}
+    {# Sin sesión solo se muestran datos públicos de la comuna: los mismos de Territorio, con su fuente. #}
+    <section class="portada-seccion" aria-labelledby="titulo-cifras">
+        <div class="contenedor">
+            <div class="page-kicker">La comuna en cifras</div>
+            <h2 class="portada-titulo-seccion" id="titulo-cifras">La Serena y sus delegaciones</h2>
+            <div class="cifras">
+                {% with poblacion='250.141' %}{% with c=poblacion|partes_cifra %}
+                <div class="cifra reveal">
+                    <span class="cifra-valor"><span class="visually-hidden">{{ poblacion }}</span><span aria-hidden="true" data-contar="{{ c.plano }}">{{ c.texto }}</span></span>
+                    <span class="cifra-texto">Habitantes de la comuna</span>
+                </div>
+                {% endwith %}{% endwith %}
+                <div class="cifra reveal">
+                    <span class="cifra-valor"><span class="visually-hidden">{{ delegaciones|length }}</span><span aria-hidden="true" data-contar="{{ delegaciones|length }}">{{ delegaciones|length }}</span></span>
+                    <span class="cifra-texto">Delegaciones municipales</span>
+                </div>
+                {% with rural='12,0 %' %}{% with c=rural|partes_cifra %}
+                <div class="cifra reveal">
+                    <span class="cifra-valor"><span class="visually-hidden">{{ rural }}</span><span aria-hidden="true"><span data-contar="{{ c.plano }}" data-decimales="{{ c.decimales }}">{{ c.texto }}</span> {{ c.sufijo }}</span></span>
+                    <span class="cifra-texto">Población rural</span>
+                </div>
+                {% endwith %}{% endwith %}
+            </div>
+            <p class="fuente-dato">Fuente: Censo de Población y Vivienda 2024, INE</p>
+        </div>
+    </section>
+    {% endif %}
 
     <section class="portada-seccion portada-seccion-alterna" id="como-funciona" aria-labelledby="titulo-flujo">
         <div class="contenedor">
@@ -152,19 +178,19 @@
 
     <section class="portada-seccion" id="delegaciones" aria-labelledby="titulo-delegaciones">
         <div class="contenedor">
-            <div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
-                <div>
-                    <div class="page-kicker">Cobertura municipal</div>
-                    <h2 class="portada-titulo-seccion mb-0" id="titulo-delegaciones">Delegaciones operativas</h2>
-                </div>
-                <a href="{% url 'institucional' %}" class="btn btn-outline-sgr">Ver contexto</a>
-            </div>
+            <div class="page-kicker">Cobertura municipal</div>
+            <h2 class="portada-titulo-seccion mb-4" id="titulo-delegaciones">Delegaciones operativas</h2>
             <div class="delegaciones-grid">
                 {% for delegacion in delegaciones %}
-                <a class="delegacion-tarjeta reveal" href="{% url 'delegacion_detalle' delegacion %}">
-                    <strong>{{ delegacion }}</strong>
-                    <small>Seguimiento territorial {% include 'includes/_icono.html' with nombre='flecha' clase='flecha icono-sm' %}</small>
-                </a>
+                <div class="delegacion-tarjeta reveal">
+                    <a class="delegacion-enlace" href="{% url 'institucional' %}#delegacion-{{ delegacion|slugify }}">
+                        <strong>{{ delegacion }}</strong>
+                        <small>Ver en el territorio {% include 'includes/_icono.html' with nombre='flecha' clase='flecha icono-sm' %}</small>
+                    </a>
+                    {% if user.is_authenticated %}{% if es_coordinacion or mi_delegacion.nombre == delegacion %}
+                    <a class="delegacion-seguimiento" href="{% url 'delegacion_detalle' delegacion %}">Seguimiento territorial {% include 'includes/_icono.html' with nombre='flecha' clase='flecha icono-sm' %}</a>
+                    {% endif %}{% endif %}
+                </div>
                 {% endfor %}
             </div>
             {% if ejes %}

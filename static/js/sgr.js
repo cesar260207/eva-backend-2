@@ -56,6 +56,48 @@
         document.querySelectorAll('[data-a11y-nivel]').forEach(function (aviso) {
             aviso.textContent = 'Texto al ' + PORCENTAJES[preferencias.fuente];
         });
+        refrescarTema();
+    }
+
+    /* Tema claro, oscuro o automático. tema.js ya lo aplicó en el <head>; aquí se marcan los botones y
+       se vuelve a aplicar cuando cambia la elección, el alto contraste o la configuración del sistema. */
+    var NOMBRES_TEMA = { claro: 'claro', oscuro: 'oscuro', auto: 'automático' };
+
+    function refrescarTema() {
+        var tema = window.sgrTema;
+        if (!tema) { return; }
+        var actual = tema.leer();
+        var oscuro = tema.aplicar(actual);
+        document.querySelectorAll('[data-tema]').forEach(function (boton) {
+            boton.setAttribute('aria-pressed', String(boton.getAttribute('data-tema') === actual));
+        });
+        document.querySelectorAll('[data-tema-boton]').forEach(function (boton) {
+            boton.setAttribute('aria-label', 'Tema: ' + NOMBRES_TEMA[actual]);
+            var uso = boton.querySelector('use');
+            if (uso) {
+                var base = uso.getAttribute('href').split('#')[0];
+                uso.setAttribute('href', base + (actual === 'auto' ? '#i-tema-auto' : (oscuro ? '#i-luna' : '#i-sol')));
+            }
+        });
+    }
+
+    function iniciarTema() {
+        var tema = window.sgrTema;
+        if (!tema) { return; }
+        document.querySelectorAll('[data-tema]').forEach(function (boton) {
+            boton.addEventListener('click', function () {
+                tema.guardar(boton.getAttribute('data-tema'));
+                refrescarTema();
+            });
+        });
+        if (tema.sistema) {
+            if (tema.sistema.addEventListener) {
+                tema.sistema.addEventListener('change', refrescarTema);
+            } else if (tema.sistema.addListener) {
+                tema.sistema.addListener(refrescarTema);
+            }
+        }
+        refrescarTema();
     }
 
     function iniciarAccesibilidad() {
@@ -246,9 +288,64 @@
         });
     }
 
+    /* Territorio: el esquema, los botones de delegación y las tarjetas comparten «data-delegacion».
+       Al pasar el mouse o enfocar uno se resaltan los otros; al hacer clic se baja a la tarjeta y queda
+       seleccionada. Sin JavaScript los enlaces llevan igual a cada tarjeta (#delegacion-…). */
+    function iniciarTerritorio() {
+        var territorio = document.querySelector('[data-territorio]');
+        if (!territorio) { return; }
+        var enlaces = territorio.querySelectorAll('a[data-delegacion]');
+        var tarjetas = territorio.querySelectorAll('article[data-delegacion]');
+
+        function delMismo(slug) {
+            return territorio.querySelectorAll('[data-delegacion="' + slug + '"]');
+        }
+        function resaltar(slug, activo) {
+            delMismo(slug).forEach(function (elemento) { elemento.classList.toggle('is-activa', activo); });
+        }
+        function seleccionar(slug, desplazar) {
+            var tarjeta = null;
+            tarjetas.forEach(function (actual) {
+                var es = actual.getAttribute('data-delegacion') === slug;
+                actual.classList.toggle('is-seleccionada', es);
+                if (es) { tarjeta = actual; }
+            });
+            if (!tarjeta) { return; }
+            enlaces.forEach(function (enlace) {
+                if (enlace.getAttribute('data-delegacion') === slug) {
+                    enlace.setAttribute('aria-current', 'true');
+                } else {
+                    enlace.removeAttribute('aria-current');
+                }
+            });
+            if (desplazar) {
+                tarjeta.scrollIntoView({ block: 'center', behavior: movimientoReducido ? 'auto' : 'smooth' });
+                tarjeta.focus({ preventScroll: true });
+                try { window.history.replaceState(null, '', '#' + tarjeta.id); } catch (error) { /* sin historial: igual queda marcada */ }
+            }
+        }
+
+        territorio.querySelectorAll('[data-delegacion]').forEach(function (elemento) {
+            var slug = elemento.getAttribute('data-delegacion');
+            elemento.addEventListener('mouseenter', function () { resaltar(slug, true); });
+            elemento.addEventListener('mouseleave', function () { resaltar(slug, false); });
+            elemento.addEventListener('focusin', function () { resaltar(slug, true); });
+            elemento.addEventListener('focusout', function () { resaltar(slug, false); });
+        });
+        enlaces.forEach(function (enlace) {
+            enlace.addEventListener('click', function (evento) {
+                evento.preventDefault();
+                seleccionar(enlace.getAttribute('data-delegacion'), true);
+            });
+        });
+        var inicial = window.location.hash.replace('#delegacion-', '');
+        if (inicial && inicial !== window.location.hash) { seleccionar(inicial, false); }
+    }
+
     function iniciar() {
         iniciarPlegables();
         iniciarAccesibilidad();
+        iniciarTema();
         iniciarEncabezado();
         iniciarApariciones();
         iniciarConteos();
@@ -256,6 +353,7 @@
         iniciarFocoEnError();
         iniciarArchivos();
         iniciarVerClave();
+        iniciarTerritorio();
     }
 
     if (document.readyState === 'loading') {
