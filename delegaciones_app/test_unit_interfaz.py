@@ -290,6 +290,38 @@ class EncabezadoPieYAccesibilidadTests(TestCase):
             self.assertEqual(len(enlaces), len(set(enlaces)), enlaces)
             self.assertEqual(enlaces.count(reverse('institucional')), 1)
 
+    def test_tema_js_se_carga_en_el_head_antes_del_css_y_sin_defer(self):
+        """RNF-013 Compatibilidad. El tema se aplica antes de dibujar la página (sin parpadeo) y el navegador sabe que hay dos esquemas."""
+        html = self.client.get(reverse('inicio')).content.decode('utf-8')
+        cabeza = html.split('</head>', 1)[0]
+        etiqueta = re.search(r'<script src="[^"]*js/tema\.js[^"]*"[^>]*>', cabeza)
+        self.assertIsNotNone(etiqueta)
+        self.assertNotIn('defer', etiqueta.group(0))
+        self.assertNotIn('async', etiqueta.group(0))
+        self.assertLess(cabeza.index('js/tema.js'), cabeza.index('css/sgr.css'))
+        self.assertLess(cabeza.index('js/tema.js'), cabeza.index('bootstrap.min.css'))
+        self.assertIn('<meta name="color-scheme" content="light dark">', cabeza)
+
+    def test_el_selector_de_tema_tiene_tres_opciones_con_nombre(self):
+        """RNF-012 Accesibilidad. Claro, Oscuro y Automático en la barra superior y en el panel, con aria-pressed y nombre accesible."""
+        respuesta = self.client.get(reverse('inicio'))
+        self.assertContains(respuesta, 'aria-label="Tema: automático" data-tema-boton')
+        self.assertContains(respuesta, 'aria-label="Tema"')
+        self.assertContains(respuesta, 'role="group" aria-labelledby="titulo-tema"')
+        for tema, texto in (('claro', 'Claro'), ('oscuro', 'Oscuro'), ('auto', 'Automático')):
+            self.assertContains(respuesta, f'data-tema="{tema}" aria-pressed="false"', count=2)
+            self.assertContains(respuesta, f'{texto}</button>', count=2)
+
+    def test_el_tema_no_cambia_la_etiqueta_html_ni_usa_scripts_en_linea(self):
+        """RNF-013 Compatibilidad. data-bs-theme lo pone JavaScript: el servidor no escribe atributos nuevos en <html>."""
+        self.client.force_login(crear_funcionario('tema.ui', 'funcionario'))
+        for url in (reverse('inicio'), reverse('institucional'), reverse('panel')):
+            html = self.client.get(url).content.decode('utf-8')
+            self.assertIn('<html lang="es" class="a11y-font-0">', html, url)
+            self.assertNotIn('data-bs-theme', html.split('<head>', 1)[0], url)
+            for script in re.findall(r'<script\b[^>]*>', html):
+                self.assertIn(' src="', script, url)
+
     def test_la_barra_de_accesibilidad_usa_las_clases_del_kit(self):
         """RNF-012 Accesibilidad. Botones de la barra y clase inicial a11y-font-0 en la etiqueta html."""
         respuesta = self.client.get(reverse('inicio'))
