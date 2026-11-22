@@ -1,6 +1,6 @@
 # Guía de estilo de la interfaz del SGR
 
-Como grupo definimos esta guía para que cada pantalla nueva del Sistema de Gestión de Resultados se vea y se comporte igual que las demás. Todo vive en `static/css/sgr.css` (sobre Bootstrap 5.3.3 guardado en `static/bootstrap/`), `static/js/sgr.js` y las parciales de `templates/includes/`.
+Como grupo definimos esta guía para que cada pantalla nueva del Sistema de Gestión de Resultados se vea y se comporte igual que las demás. Todo vive en `static/css/sgr.css` (sobre Bootstrap 5.3.3 guardado en `static/bootstrap/`), `static/js/tema.js`, `static/js/sgr.js` y las parciales de `templates/includes/`. La tabla de colores de la sección 2 es la del tema claro; la del tema oscuro está en la sección 10.
 
 ## 1. Principios
 
@@ -112,3 +112,49 @@ La paleta azul y roja del Kit de Gobierno Digital no se usa: la marca del SGR es
 | Ocultar en vez de deshabilitar | Cada usuario ya sabe lo que puede hacer; las tarjetas grises solo agregaban ruido. La protección sigue en el servidor. |
 | Respuestas de la portada abiertas sin JavaScript | La portada debe verse completa aunque el script no cargue. |
 | Filtro `campo_sgr` en `templatetags` | Es la única forma de agregar `is-invalid` al widget sin tocar `forms.py`; no tiene lógica de negocio y tiene pruebas propias. |
+| Tema con `data-bs-theme` puesto por JavaScript | Bootstrap 5.3 ya cambia sus componentes con ese atributo. Lo pone `tema.js` en el `<head>` para que no parpadee, y el servidor no escribe atributos nuevos en `<html>` (una prueba busca la etiqueta exacta). |
+| Variables en vez de reglas duplicadas para el oscuro | Un solo bloque `[data-bs-theme="dark"]` cambia los valores; las reglas son las mismas en ambos temas, así que un componente nuevo funciona en oscuro si usa las variables. |
+| Esquema propio del territorio en vez de un mapa | Un mapa externo (Google Maps, OpenStreetMap) envía la IP del funcionario a un tercero y agrega dependencias. El esquema es referencial y lo dice. |
+
+## 10. Tema claro y oscuro
+
+- Opciones: «Claro», «Oscuro» y «Automático» (por defecto; sigue a `prefers-color-scheme`). Se eligen en el botón «Tema» de la franja superior o en el grupo «Tema» del panel de accesibilidad. La elección se guarda en `localStorage` con la clave `sgr-tema` dentro de `try/catch`.
+- `static/js/tema.js` se carga en el `<head>`, sin `defer` y antes del CSS: aplica el tema y las preferencias de accesibilidad guardadas antes de dibujar la página. Expone `window.sgrTema` (`leer`, `guardar`, `aplicar`, `sistema`), que usa `sgr.js` para los botones y para el evento `change` del sistema.
+- El alto contraste manda: con `a11y-contrast` activo, el tema efectivo es claro.
+- **Regla para componentes nuevos:** usar las variables, nunca colores escritos a mano. Para texto o trazos terracota se usa `--acento` (o `--acento-fuerte` para hover y texto destacado); `--terracotta` queda para fondos con texto blanco (botón principal, mosaico principal, selección), que no cambian en oscuro.
+- En oscuro, `--sombra` no dibuja nada y `--sombra-alta` es un borde de 1 px: las tarjetas se separan por sus bordes.
+
+| Variable | Claro | Oscuro | Contraste en oscuro |
+| --- | --- | --- | --- |
+| `--paper` (fondo) | `#fbf8f4` | `#161311` | |
+| `--panel` (tarjetas) | `#ffffff` | `#201c19` | |
+| `--paper-2` (secciones alternas) | `#f4eee6` | `#2a2522` | |
+| `--line` (bordes suaves) | `#e8ddd2` | `#3b342f` | Decorativo |
+| `--line-strong` (borde de campos) | `#8f7f73` | `#8a7d73` | 4,24:1 sobre tarjeta; 4,63:1 sobre el campo |
+| `--ink` (texto) | `#2f2925` | `#f3ece6` | 14,46:1 sobre tarjeta; 15,81:1 sobre fondo |
+| `--muted` (texto secundario) | `#766961` | `#b9ada3` | 7,71:1 sobre tarjeta; 6,90:1 sobre `--paper-2` |
+| `--texto-2` (texto de apoyo) | `#5c524b` | `#d6cbc2` | 10,62:1 sobre tarjeta |
+| `--acento` (enlaces y texto terracota) | `#a83224` | `#ee8a72` | 6,86:1 sobre tarjeta; 7,50:1 sobre fondo; 6,14:1 sobre `--paper-2` |
+| `--acento-fuerte` (hover y texto destacado) | `#762018` | `#f6b3a2` | 9,58:1 sobre tarjeta; 8,18:1 sobre `--terracotta-soft` |
+| `--terracotta-soft` | `#f6e6e1` | `#3a2420` | |
+| Botón principal (`--terracotta`) | `#a83224` | `#a83224` | Texto blanco 6,67:1 |
+| Verde (texto sobre su fondo) | `#1d7a46` sobre `#e7f4ec` | `#6fd39a` sobre `#16301f` | 7,76:1 |
+| Ámbar (texto sobre su fondo) | `#7a4800` sobre `#fff3dc` | `#f2b860` sobre `#33270f` | 8,21:1 |
+| Rojo (texto sobre su fondo) | `#9b1035` sobre `#fde8ec` | `#ff8fa3` sobre `#3a1520` | 7,42:1 |
+| Rojo de bordes y error de campo (`--rojo-borde`) | `#b0123b` | `#ff8fa3` | 8,55:1 sobre el campo |
+| Sin cálculo | `#4a4f57` sobre `#eef0f3` | `#c6cbd3` sobre `#262a30` | 8,85:1 |
+| En proceso | `#3d4f7a` sobre `#e9eef8` | `#a9bdf0` sobre `#1c2333` | 8,39:1 |
+| Pie y franja superior | `#302c2a` | `#0e0c0b` | `#e8ddd2` encima: 14,59:1 |
+| Foco del teclado (`--ochre`) | `#c48a2a` | `#c48a2a` | 5,65:1 sobre tarjeta |
+
+- El hero terracota de las pantallas internas (`.hero-sgr`) y la banda de cierre de Territorio no cambian: texto blanco sobre el degradado terracota en ambos temas. El hero de la portada y de Territorio es claro en el tema claro y pasa a fondo oscuro con un brillo cálido en el oscuro.
+- El ícono de error dentro de los campos cambia a `#ff8fa3` en oscuro. Las clases de Bootstrap `text-dark` y `text-danger` se corrigen solo en oscuro.
+
+## 11. Territorio y su esquema
+
+- El esquema de `institucional.html` es un SVG propio: mar al oeste con olas que se mueven muy lento (14 s), zona urbana punteada, zona rural difusa al oriente, líneas desde Centro y la flecha del norte. Debajo dice «Esquema referencial, no a escala».
+- Los nodos son enlaces HTML encima del dibujo (`.esquema-nodo.nodo-<slug>`, posición en porcentaje en el CSS). Cada uno lleva a `#delegacion-<slug>` y funciona sin JavaScript. Laten de 1 a 1,08 cada 3 a 4 s, desfasados. Si se agrega una delegación nueva, hay que darle su posición en el CSS.
+- El dibujo tiene `role="img"` y un `aria-label` que nombra las delegaciones; el nombre de cada nodo es su texto visible.
+- `data-delegacion="<slug>"` une el nodo, el botón de la fila y la tarjeta: `sgr.js` resalta los tres al pasar el mouse o enfocar y, al hacer clic, baja a la tarjeta y la marca (`.is-seleccionada`, `aria-current` en el nodo y el botón). Sin JavaScript, `:target` marca la tarjeta.
+- Cifras: `{% with c=valor|partes_cifra %}` separa «88,0 %» en `c.plano` («88.0», para `data-contar`), `c.decimales`, `c.texto` y `c.sufijo`. Cada cifra pública lleva su fuente visible («Fuente: Censo de Población y Vivienda 2024, INE»).
+- Motivo de cada delegación: `includes/_motivo_delegacion.html` con `slug`; dibujos de trazo con el mismo estilo que los pasos de la portada (`.delegacion-motivo`).
