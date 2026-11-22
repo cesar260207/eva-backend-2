@@ -70,6 +70,19 @@
         {% endif %}
     </div>
     <div class="col-lg-5">
+        <section class="panel mb-4" aria-labelledby="titulo-recorrido">
+            <h2 class="section-label mb-3" id="titulo-recorrido">Recorrido</h2>
+            <ol class="linea-tiempo" data-linea-tiempo>
+                <li class="hito hito-hecho"><span class="hito-marca" aria-hidden="true"></span><div><strong>Registrada</strong><small>{{ actividad.creada|date:'d-m-Y H:i' }} · {{ actividad.funcionario_autor.nombre|default:'-' }}</small></div></li>
+                {% for evidencia in actividad.evidencias.all|dictsort:'fecha_carga' %}
+                <li class="hito hito-hecho"><span class="hito-marca" aria-hidden="true"></span><div><strong>Evidencia {{ evidencia.codigo_evidencia }} subida</strong><small>{{ evidencia.fecha_carga|date:'d-m-Y H:i' }}</small></div></li>
+                {% for validacion in evidencia.validaciones.all|dictsort:'fecha' %}
+                <li class="hito hito-{{ validacion.decision }}"><span class="hito-marca" aria-hidden="true"></span><div><strong>{{ validacion.get_decision_display }}</strong><small>{{ validacion.fecha|date:'d-m-Y H:i' }} · {{ validacion.funcionario_verificador.nombre }}</small>{% if validacion.observacion %}<small>{{ validacion.observacion }}</small>{% endif %}</div></li>
+                {% endfor %}
+                {% endfor %}
+                <li class="hito hito-actual hito-estado-{{ actividad.estado }}"><span class="hito-marca" aria-hidden="true"></span><div><strong>Estado actual: {{ actividad.get_estado_display }}</strong>{% if actividad.estado == 'pendiente' and not actividad.evidencias.all %}<small>Falta subir la evidencia.</small>{% elif hay_pendientes %}<small>Espera la revisión.</small>{% endif %}</div></li>
+            </ol>
+        </section>
         <div class="panel">
             <div class="section-label mb-3">Evidencias ({{ actividad.evidencias.all|length }})</div>
             {% for evidencia in actividad.evidencias.all %}
