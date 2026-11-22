@@ -1,77 +1,82 @@
 {% extends 'base.html' %}
 {% block title %}Panel Administrador | SGR{% endblock %}
 {% block content %}
-{% include 'gestion_app/_panel_encabezado.html' %}
-
-<div class="section-label mb-2">Visión global</div>
-<div class="row g-3 mb-4">
-    <div class="col-6 col-lg-2"><div class="metric h-100"><small>Usuarios activos</small><strong>{{ usuarios_activos }}</strong><small>{{ usuarios_inactivos }} inactivos</small></div></div>
-    <div class="col-6 col-lg-2"><div class="metric navy h-100"><small>Delegaciones activas</small><strong>{{ delegaciones_activas }}</strong><small>{{ funcionarios_activos }} funcionarios</small></div></div>
-    <div class="col-6 col-lg-2"><div class="metric amber h-100"><small>Cumplimiento promedio</small><strong>{{ promedio }} %</strong><small>{{ periodo|default:'Sin período vigente' }}</small></div></div>
-    <div class="col-6 col-lg-2"><div class="metric h-100"><small>Actividades</small><strong>{{ actividades_total }}</strong><small>{{ actividades_pendientes }} por revisar</small></div></div>
-    <div class="col-6 col-lg-2"><div class="metric coral h-100"><small>Tareas abiertas</small><strong>{{ compromisos_abiertos }}</strong><small>{{ compromisos_vencidos }} vencidas</small></div></div>
-    <div class="col-6 col-lg-2"><div class="metric navy h-100"><small>Períodos abiertos</small><strong>{{ periodos_abiertos }}</strong><small>{{ evidencias_pendientes }} evidencias pendientes</small></div></div>
-</div>
-
-<div class="row g-3 mb-4">
-    <div class="col-lg-4"><div class="panel h-100">
-        <div class="section-label">Gestión de usuarios</div>
-        <table class="table table-sm align-middle">
-            <thead><tr><th>Perfil</th><th class="text-end">Usuarios activos</th></tr></thead>
-            <tbody>{% for nombre, total in perfiles %}<tr><td>{{ nombre }}</td><td class="text-end">{{ total }}</td></tr>{% endfor %}</tbody>
-        </table>
-        <div class="mosaicos mosaicos-panel">
-            <a class="mosaico mosaico-principal" href="{% url 'mantenedor_nuevo' 'funcionarios' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='mas' %}</span><span class="mosaico-texto">Crear usuario{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
-            <a class="mosaico" href="{% url 'mantenedor_lista' 'funcionarios' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='equipo' %}</span><span class="mosaico-texto">Usuarios y asignación de perfil{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
-            <a class="mosaico" href="{% url 'perfiles' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='escudo' %}</span><span class="mosaico-texto">Perfiles y permisos{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
+<section class="panel-hero">
+    {% include 'includes/_orbita_panel.html' %}
+    <div class="panel-hero-saludo">
+        {% include 'gestion_app/_panel_encabezado.html' %}
+        <div class="panel-hero-acciones">
+            <a class="btn btn-sgr btn-lg" href="{% url 'mantenedor_nuevo' 'funcionarios' %}">{% include 'includes/_icono.html' with nombre='mas' %} Crear usuario</a>
         </div>
-    </div></div>
-    <div class="col-lg-4"><div class="panel h-100">
-        <div class="section-label">Transacciones</div>
-        <div class="mosaicos mosaicos-panel">
-            <a class="mosaico" href="{% url 'actividad_nueva' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='subir' %}</span><span class="mosaico-texto">Registrar actividad con evidencia{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
-            <a class="mosaico" href="{% url 'actividades' %}?estado=pendiente"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='revisar' %}</span><span class="mosaico-texto">Revisar evidencias pendientes{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
-            <a class="mosaico" href="{% url 'delegados' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='equipo' %}</span><span class="mosaico-texto">Delegados y asignaciones{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
-            <a class="mosaico" href="{% url 'agenda' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='tubo' %}</span><span class="mosaico-texto">Ver tubo de trabajo{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
-            <a class="mosaico" href="{% url 'mantenedor_lista' 'periodos' %}"><span class="mosaico-icono">{% include 'includes/_icono.html' with nombre='calendario' %}</span><span class="mosaico-texto">Abrir, cerrar o reabrir períodos{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</span></a>
-        </div>
-    </div></div>
-    <div class="col-lg-4">{% include 'gestion_app/_panel_alertas.html' %}</div>
-</div>
+    </div>
+    <div class="panel-hero-avance">
+        {% include 'includes/_anillo_avance.html' with valor=promedio etiqueta='Cumplimiento promedio' %}
+        <small class="text-muted">{{ periodo|default:'Sin período vigente' }}</small>
+    </div>
+</section>
 
-<div class="section-label mb-2">Todos los mantenedores</div>
-<div class="row g-3 mb-4">
-    {% for m in mantenedores %}
-    <div class="col-6 col-md-3"><a class="text-decoration-none" href="{% url 'mantenedor_lista' m.slug %}"><div class="panel h-100">
-        <h2 class="h6 text-dark mb-1">{{ m.titulo }}</h2>
-        <small class="text-muted">{{ m.descripcion }}</small>
-    </div></a></div>
-    {% endfor %}
-</div>
+<h2 class="section-label">Visión global</h2>
+<ul class="cifras-panel cifras-panel-5">
+    <li class="cifra-panel"><span class="cifra-panel-etiqueta">Usuarios activos</span><strong class="cifra-panel-valor">{% include 'includes/_valor_contado.html' with valor=usuarios_activos %}</strong><span class="cifra-panel-detalle">{{ usuarios_inactivos }} inactivos</span></li>
+    <li class="cifra-panel tono-gris"><span class="cifra-panel-etiqueta">Delegaciones activas</span><strong class="cifra-panel-valor">{% include 'includes/_valor_contado.html' with valor=delegaciones_activas %}</strong><span class="cifra-panel-detalle">{{ funcionarios_activos }} funcionarios</span></li>
+    <li class="cifra-panel tono-ambar"><span class="cifra-panel-etiqueta">Actividades</span><strong class="cifra-panel-valor">{% include 'includes/_valor_contado.html' with valor=actividades_total %}</strong><span class="cifra-panel-detalle">{{ actividades_pendientes }} por revisar</span></li>
+    <li class="cifra-panel tono-rojo"><span class="cifra-panel-etiqueta">Tareas abiertas</span><strong class="cifra-panel-valor">{% include 'includes/_valor_contado.html' with valor=compromisos_abiertos %}</strong><span class="cifra-panel-detalle">{{ compromisos_vencidos }} vencidas</span></li>
+    <li class="cifra-panel tono-gris"><span class="cifra-panel-etiqueta">Períodos abiertos</span><strong class="cifra-panel-valor">{% include 'includes/_valor_contado.html' with valor=periodos_abiertos %}</strong><span class="cifra-panel-detalle">{{ evidencias_pendientes }} evidencias pendientes</span></li>
+</ul>
 
-<div class="row g-3">
-    <div class="col-lg-6"><div class="panel h-100">
-        <div class="section-label">Cumplimiento por delegación</div>
-        <table class="table table-sm align-middle">
-            <thead><tr><th>Delegación</th><th class="text-end">Cumplimiento</th><th>Estado</th></tr></thead>
-            <tbody>
-            {% for fila in delegaciones %}<tr><td>{{ fila.nombre }}</td><td class="text-end">{{ fila.cumplimiento }} %</td><td>{% include 'includes/_semaforo_insignia.html' with estado=fila.estado estado_class=fila.estado_class %}</td></tr>
-            {% empty %}<tr><td colspan="3" class="text-muted">Sin indicadores para el período vigente.</td></tr>{% endfor %}
-            </tbody>
-        </table>
-    </div></div>
-    <div class="col-lg-6"><div class="panel h-100">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <div class="section-label mb-0">Auditoría reciente</div>
-            <a class="btn btn-sm btn-outline-sgr" href="{% url 'auditoria_consulta' %}">Consultar</a>
-        </div>
-        <table class="table table-sm align-middle">
-            <thead><tr><th>Fecha</th><th>Evento</th><th>Entidad</th><th>Usuario</th></tr></thead>
-            <tbody>
-            {% for evento in auditoria_reciente %}<tr><td>{{ evento.fecha|date:'d-m-Y H:i' }}</td><td>{{ evento.evento }}</td><td>{{ evento.entidad }}</td><td>{{ evento.usuario_maestro|default:evento.funcionario|default:'-' }}</td></tr>
-            {% empty %}<tr><td colspan="4" class="text-muted">Sin eventos.</td></tr>{% endfor %}
-            </tbody>
-        </table>
-    </div></div>
+<div class="panel-cuerpo">
+    <div class="panel-principal">
+        <section class="panel reveal" aria-labelledby="titulo-cumplimiento">
+            <h2 class="section-label" id="titulo-cumplimiento">Cumplimiento por delegación</h2>
+            {% include 'gestion_app/_barras_delegaciones.html' with delegaciones=delegaciones %}
+        </section>
+        <section class="panel reveal" aria-labelledby="titulo-auditoria">
+            <div class="panel-lateral-titulo">
+                <h2 class="section-label mb-0" id="titulo-auditoria">Auditoría reciente</h2>
+                <a class="btn btn-sm btn-outline-sgr" href="{% url 'auditoria_consulta' %}">Consultar</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Fecha</th><th>Evento</th><th>Entidad</th><th>Usuario</th></tr></thead>
+                    <tbody>
+                    {% for evento in auditoria_reciente %}<tr><td>{{ evento.fecha|date:'d-m-Y H:i' }}</td><td>{{ evento.evento }}</td><td>{{ evento.entidad }}</td><td>{{ evento.usuario_maestro|default:evento.funcionario|default:'-' }}</td></tr>
+                    {% empty %}<tr><td colspan="4" class="text-muted">Sin eventos.</td></tr>{% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        <section class="reveal" aria-labelledby="titulo-mantenedores">
+            <h2 class="section-label" id="titulo-mantenedores">Todos los mantenedores</h2>
+            <ul class="mantenedores-grilla">
+            {% for m in mantenedores %}
+                <li><a class="tarjeta-mantenedor" href="{% url 'mantenedor_lista' m.slug %}"><strong>{{ m.titulo }}</strong><small>{{ m.descripcion }}</small></a></li>
+            {% endfor %}
+            </ul>
+        </section>
+    </div>
+
+    <aside class="panel-aside" aria-label="Accesos y alertas">
+        {% include 'gestion_app/_panel_alertas.html' %}
+        <section class="panel panel-lateral" aria-labelledby="titulo-usuarios">
+            <h2 class="section-label" id="titulo-usuarios">Gestión de usuarios</h2>
+            <ul class="perfiles-conteo">
+            {% for nombre, total in perfiles %}<li><span>{{ nombre }}</span><strong>{{ total }}</strong></li>{% endfor %}
+            </ul>
+            <ul class="accesos">
+                <li><a href="{% url 'mantenedor_lista' 'funcionarios' %}"><span class="acceso-icono">{% include 'includes/_icono.html' with nombre='equipo' %}</span><span>Usuarios y asignación de perfil</span>{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</a></li>
+                <li><a href="{% url 'perfiles' %}"><span class="acceso-icono">{% include 'includes/_icono.html' with nombre='escudo' %}</span><span>Perfiles y permisos</span>{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</a></li>
+            </ul>
+        </section>
+        <nav class="panel panel-lateral" aria-labelledby="titulo-transacciones">
+            <h2 class="section-label" id="titulo-transacciones">Transacciones</h2>
+            <ul class="accesos">
+                <li><a href="{% url 'actividad_nueva' %}"><span class="acceso-icono">{% include 'includes/_icono.html' with nombre='subir' %}</span><span>Registrar actividad con evidencia</span>{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</a></li>
+                <li><a href="{% url 'actividades' %}?estado=pendiente"><span class="acceso-icono">{% include 'includes/_icono.html' with nombre='revisar' %}</span><span>Revisar evidencias pendientes</span>{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</a></li>
+                <li><a href="{% url 'delegados' %}"><span class="acceso-icono">{% include 'includes/_icono.html' with nombre='equipo' %}</span><span>Delegados y asignaciones</span>{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</a></li>
+                <li><a href="{% url 'agenda' %}"><span class="acceso-icono">{% include 'includes/_icono.html' with nombre='tubo' %}</span><span>Ver tubo de trabajo</span>{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</a></li>
+                <li><a href="{% url 'mantenedor_lista' 'periodos' %}"><span class="acceso-icono">{% include 'includes/_icono.html' with nombre='calendario' %}</span><span>Abrir, cerrar o reabrir períodos</span>{% include 'includes/_icono.html' with nombre='flecha' clase='flecha' %}</a></li>
+            </ul>
+        </nav>
+    </aside>
 </div>
 {% endblock %}

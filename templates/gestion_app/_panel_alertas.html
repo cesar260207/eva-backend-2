@@ -1,14 +1,14 @@
-<div class="panel h-100">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div class="section-label mb-0">Alertas en tu ámbito</div>
+<section class="panel panel-lateral" aria-labelledby="titulo-alertas-panel">
+    <div class="panel-lateral-titulo">
+        <h2 class="section-label mb-0" id="titulo-alertas-panel">Alertas en tu ámbito</h2>
         <a class="btn btn-sm btn-outline-sgr" href="{% url 'alertas' %}">Ver todas</a>
     </div>
     <p class="small text-muted">Revisa estas situaciones para saber qué requiere atención en tu ámbito.</p>
-    <ul class="list-unstyled mb-0">
+    <ul class="list-unstyled mb-0 lista-alertas">
     {% for alerta in alertas %}
-        <li class="mb-2">{% include 'includes/_semaforo_insignia.html' with estado=alerta.etiqueta estado_class=alerta.nivel %} <a class="text-dark" href="{{ alerta.url }}">{{ alerta.motivo }}</a></li>
+        <li>{% include 'includes/_semaforo_insignia.html' with estado=alerta.etiqueta estado_class=alerta.nivel %} <a class="text-dark" href="{{ alerta.url }}">{{ alerta.motivo }}</a></li>
     {% empty %}
         <li class="empty-state py-2">No hay alertas por ahora.</li>
     {% endfor %}
     </ul>
-</div>
+</section>

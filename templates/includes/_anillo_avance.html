@@ -1,0 +1,12 @@
+{% load sgr_interfaz %}{% comment %}Anillo de cumplimiento. Recibe «valor» (porcentaje), «etiqueta» y, opcionales, «estado» y «estado_class» del semáforo. El anillo se llena hasta 100; el número muestra el valor real.{% endcomment %}
+<div class="anillo anillo-{{ estado_class|default:'marca' }}" style="--avance: {{ valor|avance }}">
+    <svg class="anillo-dibujo" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
+        <circle class="anillo-pista" cx="60" cy="60" r="52" pathLength="100"/>
+        <circle class="anillo-valor" cx="60" cy="60" r="52" pathLength="100"/>
+    </svg>
+    <div class="anillo-texto">
+        <strong>{% if valor is not None %}{% include 'includes/_valor_contado.html' with valor=valor decimales=2 %} %{% else %}-{% endif %}</strong>
+        <small>{{ etiqueta }}</small>
+    </div>
+</div>
+{% if estado %}<div class="anillo-estado">{% include 'includes/_semaforo_insignia.html' with estado=estado estado_class=estado_class %}</div>{% endif %}

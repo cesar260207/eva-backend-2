@@ -173,6 +173,10 @@
     /* Aparición al bajar: solo se ocultan los elementos que todavía no están a la vista. */
     function iniciarApariciones() {
         if (movimientoReducido || !hayObservador) { return; }
+        /* En las pantallas internas, cada bloque principal también aparece al bajar. */
+        document.querySelectorAll('main .panel:not(.reveal), main .cifras-panel:not(.reveal)').forEach(function (elemento) {
+            if (!elemento.closest('.reveal, .panel-hero, .panel-aside')) { elemento.classList.add('reveal'); }
+        });
         var pendientes = [];
         document.querySelectorAll('.reveal').forEach(function (elemento) {
             if (estaALaVista(elemento)) { return; }
@@ -185,6 +189,10 @@
             pendientes.push(elemento);
         });
         observar(pendientes, function (elemento) { elemento.classList.add('is-visible'); });
+
+        var lineas = document.querySelectorAll('[data-linea-tiempo]');
+        lineas.forEach(function (lista) { lista.classList.add('linea-tiempo-pendiente'); });
+        observar(Array.prototype.slice.call(lineas), function (lista) { lista.classList.add('is-visible'); });
 
         var pasos = document.querySelectorAll('[data-linea-pasos]');
         pasos.forEach(function (lista) { lista.classList.add('linea-pendiente'); });
@@ -225,9 +233,40 @@
     /* Barras de avance que se llenan desde 0 en 700 ms al aparecer. */
     function iniciarBarras() {
         if (movimientoReducido || !hayObservador) { return; }
-        var barras = Array.prototype.slice.call(document.querySelectorAll('.progress'));
+        var barras = Array.prototype.slice.call(document.querySelectorAll('.progress, .barra-avance'));
         barras.forEach(function (barra) { barra.classList.add('barra-pendiente'); });
         observar(barras, function (barra) { barra.classList.add('is-visible'); });
+    }
+
+    /* Anillos de cumplimiento de los paneles: se llenan desde 0 al aparecer. Sin JavaScript se ven llenos. */
+    function iniciarAnillos() {
+        if (movimientoReducido || !hayObservador) { return; }
+        var anillos = Array.prototype.slice.call(document.querySelectorAll('.anillo'));
+        anillos.forEach(function (anillo) { anillo.classList.add('anillo-pendiente'); });
+        observar(anillos, function (anillo) { anillo.classList.add('is-visible'); });
+    }
+
+    /* Tubo de trabajo: «Tablero» o «Lista». La elección se recuerda en este navegador. */
+    function iniciarVistaTablero() {
+        var tablero = document.querySelector('[data-tablero]');
+        var botones = document.querySelectorAll('[data-vista]');
+        if (!tablero || !botones.length) { return; }
+        function aplicar(vista) {
+            tablero.classList.toggle('es-lista', vista === 'lista');
+            botones.forEach(function (boton) {
+                boton.setAttribute('aria-pressed', boton.getAttribute('data-vista') === vista ? 'true' : 'false');
+            });
+        }
+        var guardada = null;
+        try { guardada = window.localStorage.getItem('sgr-vista-tubo'); } catch (error) { guardada = null; }
+        aplicar(guardada === 'lista' ? 'lista' : 'tablero');
+        botones.forEach(function (boton) {
+            boton.addEventListener('click', function () {
+                var vista = boton.getAttribute('data-vista');
+                aplicar(vista);
+                try { window.localStorage.setItem('sgr-vista-tubo', vista); } catch (error) { /* sin almacenamiento: solo esta visita */ }
+            });
+        });
     }
 
     /* Si el formulario vuelve con errores, el foco va al primer campo con error. */
@@ -350,6 +389,8 @@
         iniciarApariciones();
         iniciarConteos();
         iniciarBarras();
+        iniciarAnillos();
+        iniciarVistaTablero();
         iniciarFocoEnError();
         iniciarArchivos();
         iniciarVerClave();

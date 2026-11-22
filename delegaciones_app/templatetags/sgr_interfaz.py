@@ -66,6 +66,30 @@ def partes_cifra(texto):
 
 
 @register.filter
+def avance(valor):
+    """Porcentaje para dibujar un anillo o una barra: número con punto, entre 0 y 100.
+
+    El cumplimiento puede pasar de 100 (tope 120 %); el dibujo se llena hasta 100 y el texto muestra el valor real.
+    Uso: style="--avance: {{ fila.cumplimiento|avance }}".
+    """
+    try:
+        numero = float(str(valor).replace(',', '.'))
+    except (TypeError, ValueError):
+        return '0'
+    numero = min(max(numero, 0), 100)
+    texto = f'{numero:.2f}'.rstrip('0').rstrip('.')
+    return texto or '0'
+
+
+@register.filter
+def por_estado(registros, estado):
+    """Registros con ese estado, en el mismo orden: arma las columnas del tablero del tubo de trabajo.
+    Uso: {% with columna=compromisos|por_estado:valor %}.
+    """
+    return [registro for registro in registros if getattr(registro, 'estado', None) == estado]
+
+
+@register.filter
 def campos_restantes(form, nombres):
     """Campos visibles que no están en la lista: así ningún campo queda fuera de un formulario agrupado a mano."""
     excluidos = set(str(nombres).split())
