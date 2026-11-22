@@ -9,9 +9,9 @@ from django.template import Context, Template
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Actividad, Delegacion
+from .models import Actividad, Delegacion, Validacion
 from .pruebas_base import CLAVE_PRUEBA, EscenarioBase, crear_funcionario, fijar_hoy
-from .templatetags.sgr_interfaz import campo_sgr, campos, campos_restantes, partes_cifra
+from .templatetags.sgr_interfaz import avance, campo_sgr, campos, campos_restantes, partes_cifra
 
 
 MENSAJES_DE_PERMISOS = ('Restringido para tu perfil', 'Permisos mínimos', 'Permisos intermedios', 'Acceso total')
@@ -62,6 +62,122 @@ class LimpiezaDePanelesTests(TestCase):
         self.assertEqual(respuesta.status_code, 200)
         self.assertNotContains(respuesta, 'Solo lectura para tu perfil')
         self.assertNotContains(respuesta, reverse('mantenedor_nuevo', args=['organizaciones']))
+
+
+class PanelesOrdenadosTests(TestCase):
+    """CU-26 Panel por perfil (RF-002, RNF-011). Encabezado con la acción principal y el anillo, cifras en una franja y dos columnas."""
+
+    ACCION_PRINCIPAL = {
+        'funcionario': ('Registrar actividad con evidencia', 'actividad_nueva', []),
+        'delegado': ('Revisar evidencias pendientes', 'actividades', []),
+        'coordinador': ('Delegados y asignaciones', 'delegados', []),
+        'administrador': ('Crear usuario', 'mantenedor_nuevo', ['funcionarios']),
+    }
+
+    def setUp(self):
+        self.centro = Delegacion.objects.create(nombre='Centro')
+        self.usuarios = {
+            'administrador': crear_funcionario('admin.orden', 'administrador'),
+            'coordinador': crear_funcionario('coord.orden', 'coordinador'),
+            'delegado': crear_funcionario('delegado.orden', 'delegado', delegacion=self.centro),
+            'funcionario': crear_funcionario('profesional.orden', 'funcionario', delegacion=self.centro),
+        }
+
+    def _panel(self, perfil):
+        self.client.force_login(self.usuarios[perfil])
+        respuesta = self.client.get(reverse('panel'))
+        self.assertEqual(respuesta.status_code, 200, perfil)
+        return respuesta.content.decode('utf-8')
+
+    def test_cada_panel_abre_con_su_accion_principal_y_el_anillo(self):
+        """CU-26 Panel por perfil (RF-002, RNF-011). La acción principal va en el encabezado, una sola vez, junto al anillo de cumplimiento."""
+        for perfil, (texto, ruta, argumentos) in self.ACCION_PRINCIPAL.items():
+            html = self._panel(perfil)
+            encabezado = html.split('class="panel-hero"', 1)[1].split('</section>', 1)[0]
+            self.assertIn(texto, encabezado, perfil)
+            self.assertIn(reverse(ruta, args=argumentos), encabezado, perfil)
+            self.assertEqual(html.count(texto), 1, perfil)
+            self.assertIn('class="anillo ', encabezado, perfil)
+            self.assertEqual(html.count('<h1'), 1, perfil)
+
+    def test_los_paneles_ordenan_en_dos_columnas_sin_metricas_ni_mosaicos_sueltos(self):
+        """CU-26 Panel por perfil (RNF-011). Una franja de cifras y dos columnas, en vez de filas de cajas del mismo peso."""
+        for perfil in self.usuarios:
+            html = self._panel(perfil)
+            self.assertEqual(html.count('class="cifras-panel'), 1, perfil)
+            self.assertIn('class="panel-cuerpo"', html, perfil)
+            self.assertIn('class="panel-aside"', html, perfil)
+            self.assertNotIn('class="metric', html, perfil)
+            self.assertNotIn('class="mosaico', html, perfil)
+            self.assertNotIn('role="list"', html, perfil)
+
+    def test_las_cifras_animadas_dejan_el_valor_final_para_el_lector_de_pantalla(self):
+        """CU-26 Panel por perfil (RNF-011, RNF-013). El número que cuenta es decorativo; el lector lee el valor real."""
+        for perfil in self.usuarios:
+            html = self._panel(perfil)
+            for cifra in re.findall(r'<strong class="cifra-panel-valor">(.*?)</strong>', html):
+                self.assertIn('class="visually-hidden"', cifra, perfil)
+                self.assertIn('aria-hidden="true" data-contar=', cifra, perfil)
+
+    def test_avance_deja_el_porcentaje_entre_0_y_100_con_punto(self):
+        """CU-26 Panel por perfil (RNF-011). El anillo y las barras se llenan hasta 100 aunque el cumplimiento llegue a 120 %."""
+        from decimal import Decimal
+        self.assertEqual(avance(Decimal('0.00')), '0')
+        self.assertEqual(avance(Decimal('57.61')), '57.61')
+        self.assertEqual(avance('57,5'), '57.5')
+        self.assertEqual(avance(Decimal('120.00')), '100')
+        self.assertEqual(avance(None), '0')
+
+
+class TableroYRecorridoTests(EscenarioBase, TestCase):
+    """CU-13 Actualización de estados (RF-018) y CU-03 Consultar actividad (RF-009). Tubo como tablero y ficha con recorrido."""
+
+    def setUp(self):
+        self.crear_escenario()
+
+    def test_el_tubo_agrupa_las_tareas_en_una_columna_por_estado(self):
+        """CU-13 Actualización de estados (RF-018, RNF-011). Cuatro columnas con su cantidad; cada tarea aparece una vez, en la de su estado."""
+        self.nuevo_compromiso(folio='TAB-PEND', estado='pendiente')
+        self.nuevo_compromiso(folio='TAB-PROC', estado='proceso')
+        self.client.force_login(self.usuario_autor)
+        html = self.client.get(reverse('agenda')).content.decode('utf-8')
+        columnas = re.findall(r'<section class="tablero-columna columna-(\w+)"', html)
+        self.assertEqual(columnas, ['ingresado', 'pendiente', 'proceso', 'realizado'])
+        bloque = html.split('columna-proceso', 1)[1].split('</section>', 1)[0]
+        self.assertIn('TAB-PROC', bloque)
+        self.assertNotIn('TAB-PEND', bloque)
+        self.assertIn('<span class="tablero-conteo">1</span>', bloque)
+        self.assertEqual(html.count('>TAB-PEND</h4>'), 1)
+
+    def test_el_cambio_de_vista_solo_aparece_con_javascript(self):
+        """CU-13 (RNF-011, RNF-012). «Tablero» y «Lista» son botones con estado; sin JavaScript quedan ocultos y se ve el tablero."""
+        self.nuevo_compromiso()
+        self.client.force_login(self.usuario_autor)
+        html = self.client.get(reverse('agenda')).content.decode('utf-8')
+        selector = re.search(r'<div class="selector-vista"[^>]*>', html).group(0)
+        self.assertIn('data-requiere-js hidden', selector)
+        self.assertIn('data-vista="tablero" aria-pressed="true"', html)
+        self.assertIn('data-vista="lista" aria-pressed="false"', html)
+        self.assertIn('<details class="panel panel-info', html)
+
+    def test_la_ficha_muestra_el_recorrido_de_la_actividad(self):
+        """CU-03 Consultar actividad y CU-11 Validación (RF-009, RF-013). Registro, evidencia, revisión y estado actual en orden."""
+        actividad = self.nueva_actividad(estado='aprobada')
+        evidencia = self.nueva_evidencia(actividad, estado_revision='aprobada')
+        Validacion.objects.create(evidencia=evidencia, funcionario_verificador=self.verificador, decision='aprobada')
+        self.client.force_login(self.usuario_autor)
+        html = self.client.get(reverse('actividad_detalle', args=[actividad.codigo_verificador])).content.decode('utf-8')
+        recorrido = html.split('data-linea-tiempo>', 1)[1].split('</ol>', 1)[0]
+        orden = [recorrido.index(texto) for texto in ('Registrada', f'Evidencia {evidencia.codigo_evidencia} subida', 'hito-aprobada', 'Estado actual: Aprobada')]
+        self.assertEqual(orden, sorted(orden))
+        self.assertIn(self.verificador.nombre, recorrido)
+
+    def test_sin_evidencia_el_recorrido_dice_que_falta(self):
+        """CU-03 Consultar actividad (RF-009). Una actividad pendiente sin evidencia avisa lo que falta."""
+        actividad = self.nueva_actividad()
+        self.client.force_login(self.usuario_autor)
+        respuesta = self.client.get(reverse('actividad_detalle', args=[actividad.codigo_verificador]))
+        self.assertContains(respuesta, 'Falta subir la evidencia.')
 
 
 class IndiceDeMantenedoresTests(TestCase):
