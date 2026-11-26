@@ -11,6 +11,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import sys
 from pathlib import Path
 
 import environ
@@ -47,24 +48,37 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'delegaciones_app',
     'gestion_app',
+    # Inscripción de beneficiarios de actividades de infancia (reemplaza el Google Form de fin de año).
+    'beneficiarios_app',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    # Evaluación 3: quien tiene una contraseña temporal solo puede cambiarla o salir.
+    'delegaciones_app.middleware.CambioContrasenaObligatorioMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+if not DEBUG:
+    # En desarrollo, runserver sirve directamente los archivos de STATICFILES_DIRS.
+    # WhiteNoise solo debe interceptar /static/ en despliegues con collectstatic.
+    MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
 # Cabeceras para reducir MIME sniffing, filtración de URLs y carga en iframes.
 # HSTS y cookies Secure dependen de HTTPS y se configuran en el despliegue TLS.
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = 'same-origin'
 X_FRAME_OPTIONS = 'DENY'
+# Con HTTPS (producción) se activan desde el .env: cookies solo por HTTPS, redirección y HSTS.
+SESSION_COOKIE_SECURE = env.bool('COOKIES_SEGURAS', default=False)
+CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
+SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=False)
+SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=0)
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
 
 ROOT_URLCONF = 'gestion_laserena.urls'
 
@@ -119,6 +133,12 @@ else:
 
 # Password validation
 # https://docs.djangoproject.com/en/6.1/ref/settings/#auth-password-validators
+
+# Las contraseñas se guardan con PBKDF2-SHA256 y sal (hasher por defecto de Django). Solo al ejecutar las pruebas
+# se usa un hasher rápido, para que la suite no tarde por el costo deliberado de PBKDF2.
+EJECUTANDO_PRUEBAS = len(sys.argv) > 1 and sys.argv[1] in ('test', 'plan_pruebas', 'protocolo_pruebas')
+if EJECUTANDO_PRUEBAS:
+    PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -186,9 +206,29 @@ DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER or 'no-re
 # Vigencia del enlace de recuperación, en segundos (1 hora por defecto).
 PASSWORD_RESET_TIMEOUT = env.int('PASSWORD_RESET_TIMEOUT', default=3600)
 
+# Bloqueo por intentos fallidos de ingreso (fuerza bruta): tras LOGIN_MAX_INTENTOS fallos seguidos con el mismo usuario
+# desde la misma IP, el ingreso se bloquea LOGIN_BLOQUEO_MINUTOS minutos.
+LOGIN_MAX_INTENTOS = env.int('LOGIN_MAX_INTENTOS', default=5)
+LOGIN_BLOQUEO_MINUTOS = env.int('LOGIN_BLOQUEO_MINUTOS', default=15)
+
+# El contador de intentos vive en la caché. Con Gunicorn hay varios procesos (workers) y la caché en memoria es propia de
+# cada uno: el bloqueo se saltaría repartiendo los intentos. Por eso se usa una caché en archivos, compartida por todos
+# los procesos del servidor. En las pruebas se mantiene la caché en memoria de Django.
+if not EJECUTANDO_PRUEBAS:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+            'LOCATION': env('CACHE_DIR', default=str(BASE_DIR / '.cache')),
+        }
+    }
+
 # Reglas configurables sin tocar el código (RNF-015): tamaño máximo de una evidencia en MB (RNF-017)
 # días de anticipación con que un compromiso se marca como próximo a vencer (RF-019)
 # y días sin registrar actividades a partir de los cuales se emite una alerta (RF-037).
 EVIDENCIA_TAMANO_MAXIMO_MB = env.int('EVIDENCIA_TAMANO_MAXIMO_MB', default=5)
 COMPROMISO_DIAS_ALERTA = env.int('COMPROMISO_DIAS_ALERTA', default=3)
 ALERTA_DIAS_SIN_REGISTRO = env.int('ALERTA_DIAS_SIN_REGISTRO', default=7)
+if EJECUTANDO_PRUEBAS:
+    # La caché en memoria dura todo el proceso de pruebas: sin este ajuste, los intentos fallidos de unas pruebas
+    # bloquearían el ingreso en otras. Las pruebas del bloqueo fijan su propio máximo con override_settings.
+    LOGIN_MAX_INTENTOS = 10_000

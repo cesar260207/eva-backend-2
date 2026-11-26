@@ -1,26 +1,23 @@
 {% extends 'base.html' %}
 {% load sgr_interfaz %}
-{% block title %}Tubo de trabajo | SGR{% endblock %}
+{% block title %}{% if es_cartas %}Tubo de cartas{% else %}Tubo de trabajo{% endif %} | SGR{% endblock %}
 {% block content %}
 <div class="page-header">
     <div>
         <div class="page-kicker">Seguimiento territorial</div>
-        <h1 class="page-title mb-2">Tubo de trabajo</h1>
-        <p class="page-intro mb-0">Tareas con la comunidad, su responsable, su plazo y su historial.</p>
+        <h1 class="page-title mb-2">{% if es_cartas %}Tubo de cartas{% else %}Tubo de trabajo{% endif %}</h1>
+        <p class="page-intro mb-0">{% if es_cartas %}Cartas recibidas por la delegación, su responsable, su plazo de respuesta y su historial.{% else %}Tareas con la comunidad, su responsable, su plazo y su historial.{% endif %} Toda la delegación lo consulta; cada funcionario modifica solo sus registros mientras no estén realizados.</p>
     </div>
-    {% if puede_crear_compromiso %}<a class="btn btn-sgr" href="{% url 'compromiso_nuevo' %}{% if delegacion_filtro %}?delegacion={{ delegacion_filtro }}{% endif %}">+ Agregar al tubo de trabajo</a>{% endif %}
+    {% if puede_crear_compromiso %}{% if es_cartas %}<a class="btn btn-sgr" href="{% url 'compromiso_nuevo' %}?tubo=carta{% if delegacion_filtro %}&amp;delegacion={{ delegacion_filtro }}{% endif %}">+ Registrar carta</a>{% else %}<a class="btn btn-sgr" href="{% url 'compromiso_nuevo' %}{% if delegacion_filtro %}?delegacion={{ delegacion_filtro }}{% endif %}">+ Agregar al tubo de trabajo</a>{% endif %}{% endif %}
 </div>
+<nav class="pestanas-tubo mb-3" aria-label="Tubos de la delegación">
+    <a class="btn {% if es_cartas %}btn-outline-sgr{% else %}btn-sgr{% endif %}" href="{% url 'agenda' %}?tubo=solicitud"{% if not es_cartas %} aria-current="page"{% endif %}>Tubo de trabajo (seguimiento)</a>
+    <a class="btn {% if es_cartas %}btn-sgr{% else %}btn-outline-sgr{% endif %}" href="{% url 'agenda' %}?tubo=carta"{% if es_cartas %} aria-current="page"{% endif %}>Tubo de cartas</a>
+</nav>
 <details class="panel panel-info ayuda-plegable mb-4">
     <summary class="section-label mb-0">¿Quién agrega tareas al tubo de trabajo?</summary>
     <p class="small mb-0 mt-2">Se agregan con el botón «+ Agregar al tubo de trabajo» de esta página. <strong>Coordinación y administración</strong> eligen la delegación y la <strong>asignan a un delegado</strong> responsable. <strong>Delegados y profesionales</strong> agregan las tareas que toman en terreno: quedan en su delegación y a su cargo. El responsable avanza el estado (Pendiente → En proceso → Realizada) y cada cambio queda en el historial.</p>
 </details>
-{% if por_vencer %}<div class="alert alert-warning" role="alert"><strong>{{ por_vencer }} tarea{{ por_vencer|pluralize }} próxima{{ por_vencer|pluralize }} a vencer</strong>: vence{{ por_vencer|pluralize:',n' }} en los próximos {{ dias_alerta }} días.</div>{% endif %}
-<ul class="cifras-panel">
-    <li class="cifra-panel tono-ambar"><span class="cifra-panel-etiqueta">Tareas pendientes</span><strong class="cifra-panel-valor">{% include 'includes/_valor_contado.html' with valor=proximos %}</strong></li>
-    <li class="cifra-panel tono-ambar"><span class="cifra-panel-etiqueta">Próximas a vencer</span><strong class="cifra-panel-valor">{% include 'includes/_valor_contado.html' with valor=por_vencer %}</strong></li>
-    <li class="cifra-panel tono-rojo"><span class="cifra-panel-etiqueta">Vencidas con alerta</span><strong class="cifra-panel-valor">{% include 'includes/_valor_contado.html' with valor=vencidos %}</strong></li>
-    <li class="cifra-panel tono-verde"><span class="cifra-panel-etiqueta">Realizadas</span><strong class="cifra-panel-valor">{% include 'includes/_valor_contado.html' with valor=realizados %}</strong></li>
-</ul>
 <div class="panel">
     <div class="panel-lateral-titulo flex-wrap">
         <div>
@@ -32,73 +29,20 @@
             <button class="btn btn-sm" type="button" data-vista="lista" aria-pressed="false">{% include 'includes/_icono.html' with nombre='lista' %} Lista</button>
         </div>
     </div>
-    <form class="filtros my-3" method="get">
-        <div class="filtro-texto"><label class="form-label small mb-1" for="q">Buscar</label><input class="form-control" id="q" name="q" value="{{ query }}" placeholder="Folio, tarea o delegación"></div>
+    <form class="filtros my-3" method="get" data-busqueda-dinamica="#tubo-resultados">
+        <input type="hidden" name="tubo" value="{{ tipo_tubo }}">
+        <div class="filtro-texto"><label class="form-label small mb-1" for="q">Buscar mientras escribes</label><input class="form-control" type="search" id="q" name="q" value="{{ query }}" placeholder="Código, RUT o nombre del solicitante" autocomplete="off" data-busqueda-texto aria-describedby="q-ayuda"><div class="form-text" id="q-ayuda">Los resultados se actualizan al escribir.</div></div>
         <div><label class="form-label small mb-1" for="delegacion">Delegación</label><select class="form-select" id="delegacion" name="delegacion">{% if delegaciones_filtro|length > 1 %}<option value="">Todas</option>{% endif %}{% for delegacion in delegaciones_filtro %}<option value="{{ delegacion.pk }}" {% if delegacion_filtro == delegacion.pk|stringformat:'s' %}selected{% endif %}>{{ delegacion.nombre }}</option>{% endfor %}</select></div>
+        <div><label class="form-label small mb-1" for="responsable">Funcionario</label><select class="form-select" id="responsable" name="responsable"><option value="">Todos</option>{% for funcionario in responsables_filtro %}<option value="{{ funcionario.pk }}" {% if filtros.responsable == funcionario.pk|stringformat:'s' %}selected{% endif %}>{{ funcionario.nombre }}</option>{% endfor %}</select></div>
         <div><label class="form-label small mb-1" for="estado">Estado</label><select class="form-select" id="estado" name="estado"><option value="">Todos</option>{% for valor, etiqueta in estados_filtro %}<option value="{{ valor }}" {% if estado_filtro == valor %}selected{% endif %}>{{ etiqueta }}</option>{% endfor %}</select></div>
         <div><label class="form-label small mb-1" for="plazo">Plazo</label><select class="form-select" id="plazo" name="plazo"><option value="">Todos</option>{% for valor, etiqueta in plazos_filtro %}<option value="{{ valor }}" {% if filtros.plazo == valor %}selected{% endif %}>{{ etiqueta }}</option>{% endfor %}</select></div>
         <div><label class="form-label small mb-1" for="desde">Desde</label><input class="form-control" type="date" id="desde" name="desde" value="{{ filtros.desde }}"></div>
         <div><label class="form-label small mb-1" for="hasta">Hasta</label><input class="form-control" type="date" id="hasta" name="hasta" value="{{ filtros.hasta }}"></div>
-        <div class="acciones"><button class="btn btn-outline-sgr" type="submit">Buscar / filtrar</button><a class="btn btn-link" href="{% url 'agenda' %}">Limpiar</a></div>
-        <div class="acciones"><a class="btn btn-link" href="{% url 'informe' %}?tipo=compromisos&{{ filtros.urlencode }}">Generar informe</a></div>
+        <div class="acciones"><button class="btn btn-outline-sgr" type="submit">Buscar / filtrar</button><a class="btn btn-link" href="{% url 'agenda' %}?tubo={{ tipo_tubo }}">Limpiar</a></div>
+        <div class="acciones"><a class="btn btn-link" href="{% url 'informe' %}?{{ filtros.urlencode }}&amp;tipo=compromisos">Generar informe</a></div>
     </form>
-    {% if compromisos %}
-    <div class="tablero" data-tablero>
-        {% for valor, etiqueta in estados_filtro %}{% with columna=compromisos|por_estado:valor %}
-        <section class="tablero-columna columna-{{ valor }}" aria-labelledby="columna-{{ valor }}">
-            <h3 class="tablero-titulo" id="columna-{{ valor }}"><span class="tablero-punto" aria-hidden="true"></span>{{ etiqueta }}<span class="tablero-conteo">{{ columna|length }}</span></h3>
-            <div class="tablero-tarjetas">
-            {% for compromiso in columna %}
-                <article class="tarea-tarjeta reveal{% if compromiso.vencido %} es-vencida{% endif %}" aria-labelledby="tarea-{{ compromiso.pk }}">
-                    <div class="tarea-cabecera">
-                        <h4 class="tarea-folio" id="tarea-{{ compromiso.pk }}">{{ compromiso.folio }}</h4>
-                        {% include 'includes/_semaforo_insignia.html' with estado=compromiso.estado_display estado_class=compromiso.estado_class %}
-                    </div>
-                    <p class="tarea-descripcion">{{ compromiso.descripcion }}</p>
-                    <p class="small text-muted mb-0">{{ compromiso.observacion|default:'Sin observaciones' }}</p>
-                    <dl class="tarea-datos">
-                        <div><dt>Delegación</dt><dd>{{ compromiso.delegacion }}</dd></div>
-                        <div><dt>Plazo</dt><dd>{{ compromiso.fecha_comprometida|date:'d-m-Y' }}</dd></div>
-                        <div><dt>Responsable</dt><dd>{{ compromiso.funcionario_responsable.nombre|default:'Sin responsable' }}</dd></div>
-                    </dl>
-                    <div class="acciones-tarea">
-                        {% if compromiso.puede_modificar %}
-                        <form method="post" class="acciones-tarea">{% csrf_token %}
-                            <input class="form-control form-control-sm" name="observacion" placeholder="Observación del cambio (opcional)" aria-label="Observación del cambio de estado de {{ compromiso.folio }}">
-                            <div class="acciones">{% for valor, etiqueta in compromiso.estados_permitidos %}<button class="btn btn-sm btn-outline-sgr" type="submit" formaction="{% url 'compromiso_estado' compromiso.pk valor %}">{{ etiqueta }}</button>{% endfor %}</div>
-                        </form>
-                        {% endif %}
-                        <div class="acciones">
-                            {% if compromiso.puede_modificar %}<a class="btn btn-sm btn-sgr" href="{% url 'compromiso_editar' compromiso.pk %}">Modificar</a>{% endif %}
-                            {% if puede_eliminar_compromiso %}<a class="btn btn-sm btn-outline-danger" href="{% url 'compromiso_eliminar' compromiso.pk %}">Eliminar</a>{% endif %}
-                            {% if not compromiso.puede_modificar and not puede_eliminar_compromiso %}<span class="small text-muted">Solo lectura</span>{% endif %}
-                        </div>
-                    </div>
-                </article>
-            {% empty %}
-                <p class="tablero-vacio">Sin tareas</p>
-            {% endfor %}
-            </div>
-        </section>
-        {% endwith %}{% endfor %}
-    </div>
-    {% else %}
-    {% include 'includes/_estado_vacio.html' with titulo='No hay tareas en este filtro.' %}
-    {% endif %}
 </div>
-<div class="panel mt-4">
-    <div class="section-label">Resumen colectivo</div>
-    <h2 class="h5">Tareas por responsable y estado</h2>
-    <p class="small text-muted">Totaliza las tareas del filtro actual. «Pendiente» es todo lo que aún no está realizado.</p>
-    <div class="table-responsive">
-        <table class="table table-sm align-middle">
-            <thead><tr><th>Responsable</th><th>Ingresadas</th><th>Pendientes</th><th>En proceso</th><th>Realizadas</th><th>Vencidas</th><th>Total</th><th>% realizado</th><th>% pendiente</th></tr></thead>
-            <tbody>
-            {% for fila in resumen_responsables %}<tr><td>{{ fila.nombre }}</td><td>{{ fila.ingresado }}</td><td>{{ fila.pendiente }}</td><td>{{ fila.proceso }}</td><td>{{ fila.realizado }}</td><td>{{ fila.vencidos }}</td><td>{{ fila.total }}</td><td><span class="celda-avance"><span class="barra-avance avance-success" aria-hidden="true"><span style="width: {{ fila.pct_realizado|avance }}%"></span></span>{{ fila.pct_realizado }}%</span></td><td>{{ fila.pct_pendiente }}%</td></tr>
-            {% empty %}<tr><td colspan="9" class="text-center py-3">No hay tareas en este filtro.</td></tr>{% endfor %}
-            </tbody>
-            {% if resumen_responsables %}<tfoot><tr class="fw-bold"><td>{{ resumen_total.nombre }}</td><td>{{ resumen_total.ingresado }}</td><td>{{ resumen_total.pendiente }}</td><td>{{ resumen_total.proceso }}</td><td>{{ resumen_total.realizado }}</td><td>{{ resumen_total.vencidos }}</td><td>{{ resumen_total.total }}</td><td>{{ resumen_total.pct_realizado }}%</td><td>{{ resumen_total.pct_pendiente }}%</td></tr></tfoot>{% endif %}
-        </table>
-    </div>
+<div id="tubo-resultados" class="mt-4" aria-live="polite" aria-busy="false">
+{% include 'delegaciones_app/_tubo_resultados.html' %}
 </div>
 {% endblock %}

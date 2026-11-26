@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+{% load l10n %}
+{% block title %}Dashboard | SGR{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="page-kicker">Resultados</div>
+        <h1 class="page-title mb-2">Dashboard de gestión</h1>
+        <p class="page-intro mb-0">Avance, cumplimiento, estado de compromisos, carga de trabajo y tendencia{% if periodo %} · {{ periodo.nombre }}{% endif %}. Solo cuentan para las metas los registros aprobados que ponderan.</p>
+    </div>
+    <a class="btn btn-outline-sgr" href="{% url 'semaforo' %}">Semáforo detallado</a>
+</div>
+
+<form class="panel filtros mb-4" method="get" aria-label="Filtros del dashboard">
+    <div><label class="form-label small mb-1" for="f-periodo">Período</label><select class="form-select" id="f-periodo" name="periodo">{% for p in periodos %}<option value="{{ p.pk }}" {% if periodo and p.pk == periodo.pk %}selected{% endif %}>{{ p.nombre }}</option>{% empty %}<option value="">Sin períodos con cálculo</option>{% endfor %}</select></div>
+    <div><label class="form-label small mb-1" for="f-delegacion">Delegación</label><select class="form-select" id="f-delegacion" name="delegacion">{% if delegaciones_filtro|length > 1 %}<option value="">Todas</option>{% endif %}{% for d in delegaciones_filtro %}<option value="{{ d.pk }}" {% if delegacion and d.pk == delegacion.pk %}selected{% endif %}>{{ d.nombre }}</option>{% endfor %}</select></div>
+    <div><label class="form-label small mb-1" for="f-funcionario">Funcionario</label><select class="form-select" id="f-funcionario" name="funcionario"><option value="">Todos</option>{% for f in funcionarios_filtro %}<option value="{{ f.pk }}" {% if funcionario and f.pk == funcionario.pk %}selected{% endif %}>{{ f.nombre }}</option>{% endfor %}</select></div>
+    <div><label class="form-label small mb-1" for="f-desde">Desde</label><input class="form-control" type="date" id="f-desde" name="desde" value="{{ desde|date:'Y-m-d' }}"></div>
+    <div><label class="form-label small mb-1" for="f-hasta">Hasta</label><input class="form-control" type="date" id="f-hasta" name="hasta" value="{{ hasta|date:'Y-m-d' }}"></div>
+    <div class="acciones"><button class="btn btn-sgr" type="submit">Aplicar filtros</button><a class="btn btn-link" href="{% url 'tablero_analitico' %}">Limpiar</a></div>
+</form>
+
+<ul class="cifras-panel">
+    <li class="cifra-panel"><span class="cifra-panel-etiqueta">Cumplimiento promedio</span><strong class="cifra-panel-valor">{{ promedio }} %</strong>{% if esperado != None %}<span class="small text-muted">Esperado al día: {{ esperado }} %</span>{% endif %}</li>
+    <li class="cifra-panel tono-verde"><span class="cifra-panel-etiqueta">Actividades aprobadas</span><strong class="cifra-panel-valor">{{ actividades_aprobadas }}</strong><span class="small text-muted">de {{ actividades_total }} registradas en el rango</span></li>
+    <li class="cifra-panel tono-ambar"><span class="cifra-panel-etiqueta">Tareas abiertas</span><strong class="cifra-panel-valor">{{ tareas_abiertas }}</strong></li>
+    <li class="cifra-panel tono-rojo"><span class="cifra-panel-etiqueta">Tareas vencidas</span><strong class="cifra-panel-valor">{{ tareas_vencidas }}</strong></li>
+</ul>
+
+<div class="row g-4 viz">
+    <section class="col-xl-6" aria-labelledby="g-delegaciones">
+        <div class="panel h-100">
+            <h2 class="h5" id="g-delegaciones">Cumplimiento por delegación</h2>
+            <p class="small text-muted">Barra: cumplimiento ponderado (tope 120 %, la escala llega a 100 %). Línea vertical: lo esperado al día. Color y texto: semáforo.</p>
+            {% for fila in resultados %}
+            <div class="viz-fila" title="{{ fila.nombre }}: {{ fila.cumplimiento }} % · esperado {{ esperado }} % · {{ fila.estado }}">
+                <span class="viz-etiqueta">{{ fila.nombre }}</span>
+                <span class="viz-pista"><span class="viz-barra viz-estado-{{ fila.estado_class }}" style="width: {{ fila.ancho|unlocalize }}%"></span>{% if esperado != None %}<span class="viz-esperado" style="left: {{ esperado|unlocalize }}%" aria-hidden="true"></span>{% endif %}</span>
+                <span class="viz-valor">{{ fila.cumplimiento }} % <span class="badge badge-{{ fila.estado_class }}-soft">{{ fila.estado }}</span></span>
+            </div>
+            {% empty %}<p class="text-muted mb-0">Sin indicadores calculados para este filtro.</p>{% endfor %}
+            {% if resultados %}<details class="mt-3"><summary class="small">Ver datos en tabla</summary>
+                <table class="table table-sm mt-2"><thead><tr><th>Delegación</th><th>Cumplimiento (%)</th><th>Diferencia con lo esperado</th><th>Semáforo</th></tr></thead>
+                <tbody>{% for fila in resultados %}<tr><td>{{ fila.nombre }}</td><td>{{ fila.cumplimiento }}</td><td>{{ fila.diferencia|default_if_none:'-' }}</td><td>{{ fila.estado }}</td></tr>{% endfor %}</tbody></table>
+            </details>{% endif %}
+        </div>
+    </section>
+
+    <section class="col-xl-6" aria-labelledby="g-personas">
+        <div class="panel h-100">
+            <h2 class="h5" id="g-personas">Semáforo por funcionario</h2>
+            <p class="small text-muted">Cumplimiento de cada funcionario en el período, con lo esperado ajustado por sus ausencias informadas.</p>
+            {% for fila in personas %}
+            <div class="viz-fila" title="{{ fila.funcionario.nombre }}: {{ fila.cumplimiento }} % · {{ fila.estado }}">
+                <span class="viz-etiqueta">{{ fila.funcionario.nombre }}</span>
+                <span class="viz-pista"><span class="viz-barra viz-estado-{{ fila.estado_class }}" style="width: {{ fila.ancho|unlocalize }}%"></span></span>
+                <span class="viz-valor">{{ fila.cumplimiento }} % <span class="badge badge-{{ fila.estado_class }}-soft">{{ fila.estado }}</span></span>
+            </div>
+            {% empty %}<p class="text-muted mb-0">Sin funcionarios con metas para este filtro.</p>{% endfor %}
+            {% if personas %}<details class="mt-3"><summary class="small">Ver datos en tabla</summary>
+                <table class="table table-sm mt-2"><thead><tr><th>Funcionario</th><th>Delegación</th><th>Cumplimiento (%)</th><th>Diferencia</th><th>Semáforo</th></tr></thead>
+                <tbody>{% for fila in personas %}<tr><td>{{ fila.funcionario.nombre }}</td><td>{{ fila.funcionario.delegacion|default:'-' }}</td><td>{{ fila.cumplimiento }}</td><td>{{ fila.diferencia|default_if_none:'-' }}</td><td>{{ fila.estado }}</td></tr>{% endfor %}</tbody></table>
+            </details>{% endif %}
+        </div>
+    </section>
+
+    <section class="col-xl-6" aria-labelledby="g-compromisos">
+        <div class="panel h-100">
+            <h2 class="h5" id="g-compromisos">Estado de los compromisos del Tubo</h2>
+            <ul class="viz-leyenda" aria-label="Leyenda">{% for clave, etiqueta, serie in series_tareas %}<li><span class="viz-muestra viz-serie-{{ serie }}" aria-hidden="true"></span>{{ etiqueta }}</li>{% endfor %}</ul>
+            {% for fila in estado_compromisos %}
+            <div class="viz-fila">
+                <span class="viz-etiqueta">{{ fila.nombre }}</span>
+                <span class="viz-pista viz-apilada">{% for s in fila.segmentos %}{% if s.valor %}<span class="viz-segmento viz-serie-{{ s.serie }}" style="width: {{ s.ancho|unlocalize }}%" title="{{ fila.nombre }} · {{ s.etiqueta }}: {{ s.valor }} ({{ s.ancho }} %)"></span>{% endif %}{% endfor %}</span>
+                <span class="viz-valor">{{ fila.pct_realizado }} % realizadas{% if fila.vencidas %} · <span class="text-danger-emphasis">{{ fila.vencidas }} vencida{{ fila.vencidas|pluralize }}</span>{% endif %}</span>
+            </div>
+            {% empty %}<p class="text-muted mb-0">No hay tareas en el Tubo para este filtro.</p>{% endfor %}
+            {% if estado_compromisos %}<details class="mt-3"><summary class="small">Ver datos en tabla</summary>
+                <table class="table table-sm mt-2"><thead><tr><th>Delegación</th>{% for clave, etiqueta, serie in series_tareas %}<th>{{ etiqueta }}</th>{% endfor %}<th>Vencidas</th><th>Total</th></tr></thead>
+                <tbody>{% for fila in estado_compromisos %}<tr><td>{{ fila.nombre }}</td>{% for s in fila.segmentos %}<td>{{ s.valor }}</td>{% endfor %}<td>{{ fila.vencidas }}</td><td>{{ fila.total }}</td></tr>{% endfor %}</tbody></table>
+            </details>{% endif %}
+        </div>
+    </section>
+
+    <section class="col-xl-6" aria-labelledby="g-carga">
+        <div class="panel h-100">
+            <h2 class="h5" id="g-carga">Carga de trabajo por funcionario</h2>
+            <p class="small text-muted">Actividades registradas entre el {{ desde|date:'d-m-Y' }} y el {{ hasta|date:'d-m-Y' }} (largo de la barra) y tareas abiertas a su cargo.</p>
+            <ul class="viz-leyenda" aria-label="Leyenda">{% for clave, etiqueta, serie in series_carga %}<li><span class="viz-muestra viz-serie-{{ serie }}" aria-hidden="true"></span>{{ etiqueta }}</li>{% endfor %}</ul>
+            {% for fila in carga %}
+            <div class="viz-fila">
+                <span class="viz-etiqueta">{{ fila.nombre }}</span>
+                <span class="viz-pista"><span class="viz-apilada" style="width: {{ fila.largo|unlocalize }}%">{% for s in fila.segmentos %}{% if s.valor %}<span class="viz-segmento viz-serie-{{ s.serie }}" style="width: {{ s.ancho|unlocalize }}%" title="{{ fila.nombre }} · {{ s.etiqueta }}: {{ s.valor }}"></span>{% endif %}{% endfor %}</span></span>
+                <span class="viz-valor">{{ fila.total }} act. · {{ fila.tareas_abiertas }} tarea{{ fila.tareas_abiertas|pluralize }}</span>
+            </div>
+            {% empty %}<p class="text-muted mb-0">Sin actividades ni tareas abiertas para este filtro.</p>{% endfor %}
+            {% if carga %}<details class="mt-3"><summary class="small">Ver datos en tabla</summary>
+                <table class="table table-sm mt-2"><thead><tr><th>Funcionario</th>{% for clave, etiqueta, serie in series_carga %}<th>{{ etiqueta }}</th>{% endfor %}<th>Total actividades</th><th>Tareas abiertas</th></tr></thead>
+                <tbody>{% for fila in carga %}<tr><td>{{ fila.nombre }}</td>{% for s in fila.segmentos %}<td>{{ s.valor }}</td>{% endfor %}<td>{{ fila.total }}</td><td>{{ fila.tareas_abiertas }}</td></tr>{% endfor %}</tbody></table>
+            </details>{% endif %}
+        </div>
+    </section>
+
+    <section class="col-12" aria-labelledby="g-tendencia">
+        <div class="panel">
+            <h2 class="h5" id="g-tendencia">Tendencia semanal de actividades</h2>
+            {% if tendencia %}
+            <ul class="viz-leyenda" aria-label="Leyenda">{% for serie in tendencia.series %}<li><span class="viz-muestra viz-serie-{{ serie.serie }}" aria-hidden="true"></span>{{ serie.nombre }} ({% if serie.serie == 1 %}{{ tendencia.total_registradas }}{% else %}{{ tendencia.total_aprobadas }}{% endif %})</li>{% endfor %}</ul>
+            <svg class="viz-lineas" viewBox="0 0 {{ tendencia.ancho }} {{ tendencia.alto }}" role="img" aria-labelledby="g-tendencia" preserveAspectRatio="xMidYMid meet">
+                {% for marca in tendencia.marcas_y %}<line class="viz-grilla" x1="{{ tendencia.izquierda }}" x2="{{ tendencia.derecha_x }}" y1="{{ marca.y|unlocalize }}" y2="{{ marca.y|unlocalize }}"/><text class="viz-eje" x="{{ tendencia.izquierda|add:'-8' }}" y="{{ marca.y|unlocalize }}" text-anchor="end" dominant-baseline="middle">{{ marca.valor }}</text>{% endfor %}
+                {% for marca in tendencia.marcas_x %}<text class="viz-eje" x="{{ marca.x|unlocalize }}" y="{{ tendencia.alto|add:'-10' }}" text-anchor="middle">{{ marca.texto }}</text>{% endfor %}
+                {% for serie in tendencia.series %}
+                <polyline class="viz-linea viz-trazo-{{ serie.serie }}" points="{{ serie.trazo }}" fill="none"/>
+                {% for p in serie.puntos %}<circle class="viz-punto viz-trazo-{{ serie.serie }}" cx="{{ p.x|unlocalize }}" cy="{{ p.y|unlocalize }}" r="4"><title>Semana del {{ p.semana|date:'d-m-Y' }} · {{ serie.nombre }}: {{ p.valor }}</title></circle>{% endfor %}
+                <text class="viz-rotulo" x="{{ serie.ultimo.x|unlocalize }}" y="{{ serie.rotulo_y|unlocalize }}" text-anchor="end">{{ serie.ultimo.valor }}</text>
+                {% endfor %}
+            </svg>
+            <details class="mt-3"><summary class="small">Ver datos en tabla</summary>
+                <table class="table table-sm mt-2"><thead><tr><th>Semana (desde el lunes)</th><th>Registradas</th><th>Aprobadas</th></tr></thead>
+                <tbody>{% for fila in tendencia.filas %}<tr><td>{{ fila.semana|date:'d-m-Y' }}</td><td>{{ fila.registradas }}</td><td>{{ fila.aprobadas }}</td></tr>{% endfor %}</tbody></table>
+            </details>
+            {% else %}<p class="text-muted mb-0">Sin datos en el rango elegido.</p>{% endif %}
+        </div>
+    </section>
+</div>
+{% endblock %}

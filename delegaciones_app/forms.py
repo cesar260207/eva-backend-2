@@ -6,7 +6,13 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from .models import Actividad, Ajuste, Ausencia, Cargo, CasoSocial, Catalogo, Comentario, Compromiso, Delegacion, Evidencia, Funcionario, ItemMedible, Meta, Organizacion, ParametroVersionado, Periodo, Rol, VersionOptimistaMixin
+from .models import (
+    Actividad, Ajuste, Ausencia, Cargo, CasoSocial, Catalogo, Comentario, Compromiso, Delegacion, Evidencia, Funcionario, Hito, ItemMedible,
+    MembresiaOrganizacion, Meta, Organizacion, ParametroVersionado, Periodo, ResponsableHito, Rol, SubtipoAtencion, Territorio, Vecino,
+    VersionOptimistaMixin,
+)
+from .cuentas import generar_contrasena_temporal
+from .rut import normalizar_rut
 from .permisos import (
     ADMINISTRADOR, COORDINADOR, DELEGADO, PERFIL_ADMINISTRADOR, PERFIL_DELEGADO, PERFIL_FUNCIONARIO, PERFILES, ROLES_DEL_SISTEMA, ROLES_RETIRADOS, asignar_perfil,
     funcionario_de, perfil_sugerido, puede_ver_todo,
@@ -82,8 +88,17 @@ class FuncionarioForm(FormularioBootstrap, forms.ModelForm):
                   'solo sus actividades, evidencias y tareas. Si lo dejas vacío, se deduce de los roles.',
     )
     roles = forms.ModelMultipleChoiceField(queryset=Rol.objects.all(), label='Roles', help_text='Mantén Ctrl presionado para elegir más de uno.')
-    password = forms.CharField(required=False, label='Contraseña', widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}), help_text='Obligatoria al crear. Déjala vacía al editar para conservar la actual.')
-    password_confirm = forms.CharField(required=False, label='Confirmar contraseña', widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}))
+    password = forms.CharField(
+        required=False, label='Contraseña temporal', widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}),
+        help_text='Opcional. Si la dejas vacía al crear la cuenta, el sistema genera una contraseña temporal segura y te la muestra '
+                  'una sola vez. Toda contraseña asignada aquí es temporal: el funcionario debe cambiarla en su primer ingreso. '
+                  'Al editar, déjala vacía para conservar la actual.',
+    )
+    password_confirm = forms.CharField(required=False, label='Confirmar contraseña temporal', widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}))
+    generar_temporal = forms.BooleanField(
+        required=False, label='Restablecer con una contraseña temporal generada',
+        help_text='Solo al editar: genera una contraseña temporal nueva y obliga a cambiarla en el próximo ingreso.',
+    )
 
     class Meta:
         model = Funcionario
@@ -91,7 +106,8 @@ class FuncionarioForm(FormularioBootstrap, forms.ModelForm):
         labels = {'cargo': 'Cargo', 'delegacion': 'Delegación', 'estado': 'Cuenta activa'}
         help_texts = {'delegacion': 'Déjala vacía para roles de alcance global (administrador, coordinador).'}
 
-    field_order = ['username', 'nombre', 'email', 'cargo', 'delegacion', 'perfil', 'roles', 'estado', 'password', 'password_confirm']
+    field_order = ['username', 'nombre', 'email', 'cargo', 'delegacion', 'perfil', 'roles', 'estado', 'password', 'password_confirm', 'generar_temporal']
+    campos_sin_auditar = ('password', 'password_confirm')
 
     def __init__(self, *args, actor=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -106,8 +122,8 @@ class FuncionarioForm(FormularioBootstrap, forms.ModelForm):
             self.fields['roles'].initial = self.instance.roles.all()
             self.fields['perfil'].initial = usuario.groups.filter(name__in=PERFILES).values_list('pk', flat=True).first()
         else:
-            self.fields['password'].required = True
-            self.fields['password_confirm'].required = True
+            del self.fields['generar_temporal']
+        self.contrasena_temporal = None
 
     def clean_username(self):
         username = self.cleaned_data['username']
@@ -168,8 +184,13 @@ class FuncionarioForm(FormularioBootstrap, forms.ModelForm):
         usuario.first_name = datos['nombre'][:150]
         usuario.email = datos['email']
         usuario.is_active = datos['estado']
-        if datos.get('password'):
-            usuario.set_password(datos['password'])
+        nueva = datos.get('password')
+        if not nueva and (not self.instance.pk or datos.get('generar_temporal')):
+            # Contraseña temporal generada por el sistema: se muestra una sola vez a quien crea la cuenta.
+            nueva = self.contrasena_temporal = generar_contrasena_temporal()
+        if nueva:
+            usuario.set_password(nueva)
+            funcionario.debe_cambiar_contrasena = True
         usuario.save()
         funcionario.usuario = usuario
         funcionario.identificador_institucional = usuario.username
@@ -198,8 +219,11 @@ class OrganizacionForm(FormularioBootstrap, forms.ModelForm):
 
     class Meta:
         model = Organizacion
-        fields = ['nombre', 'tipo', 'personalidad_juridica', 'domicilio', 'territorio', 'delegacion', 'verificada', 'observaciones', 'activa']
-        labels = {'personalidad_juridica': 'Personalidad jurídica', 'verificada': 'Registro verificado', 'activa': 'Organización activa'}
+        fields = ['nombre', 'tipo', 'personalidad_juridica', 'domicilio', 'territorio', 'delegacion', 'unidad_territorial', 'verificada', 'observaciones', 'activa']
+        labels = {
+            'personalidad_juridica': 'Personalidad jurídica', 'verificada': 'Registro verificado', 'activa': 'Organización activa',
+            'territorio': 'Territorio según el registro municipal', 'unidad_territorial': 'Territorio (unidad territorial)',
+        }
         widgets = {'observaciones': forms.Textarea(attrs={'rows': 3})}
 
 
@@ -287,6 +311,21 @@ class AsignarDelegadoForm(FormularioBootstrap, forms.Form):
         return cleaned_data
 
 
+class SelectConTipo(forms.Select):
+    """Select cuyas opciones llevan data-tipo (el tipo de atención del subtipo), para filtrarlas en el navegador."""
+
+    def __init__(self, attrs=None, tipos=None):
+        super().__init__(attrs)
+        self.tipos = tipos or {}
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        opcion = super().create_option(name, value, label, selected, index, subindex, attrs)
+        clave = getattr(value, 'value', value)
+        if clave in self.tipos:
+            opcion['attrs']['data-tipo'] = str(self.tipos[clave])
+        return opcion
+
+
 class VersionOptimistaForm:
     """Campo oculto `version` para el bloqueo optimista (RF-034): si otro usuario guardó antes, se rechaza."""
 
@@ -318,6 +357,19 @@ class ActividadForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm):
         self.fields['item'].queryset = ItemMedible.objects.filter(items | Q(pk=self.instance.item_id)).select_related('cargo', 'periodo')
         self.fields['catalogo'].queryset = Catalogo.objects.filter(Q(tipo='atencion', activo=True) | Q(pk=self.instance.catalogo_id))
         self.fields['catalogo'].label_from_instance = lambda elemento: elemento.nombre
+        subtipos = SubtipoAtencion.objects.filter(Q(activo=True) | Q(pk=self.instance.subtipo_atencion_id)).select_related('tipo')
+        self.fields['subtipo_atencion'].queryset = subtipos
+        self.fields['subtipo_atencion'].label_from_instance = lambda subtipo: subtipo.nombre
+        # data-tipo en cada opción permite al navegador mostrar solo los subtipos del tipo de atención elegido.
+        self.fields['subtipo_atencion'].widget = SelectConTipo(
+            attrs={**self.fields['subtipo_atencion'].widget.attrs, 'data-filtra-por': 'catalogo'},
+            tipos={subtipo.pk: subtipo.tipo_id for subtipo in subtipos},
+        )
+        self.fields['subtipo_atencion'].widget.choices = self.fields['subtipo_atencion'].choices
+        hitos = Q(estado__in=('planificado', 'en_curso'))
+        if not ve_todo:
+            hitos &= Q(delegacion_id=funcionario.delegacion_id) if funcionario and funcionario.delegacion_id else Q(pk__in=[])
+        self.fields['hito'].queryset = Hito.objects.filter(hitos | Q(pk=self.instance.hito_id))
         self.fields['compromiso'].queryset = (compromisos if compromisos is not None else Compromiso.objects.all()).select_related('delegacion')
         organizaciones = Q(activa=True)
         if not ve_todo:
@@ -332,6 +384,19 @@ class ActividadForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm):
         self.fields['fecha'].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M']
         if not self.instance.pk:
             self.fields['fecha'].initial = timezone.localtime().replace(second=0, microsecond=0)
+        else:
+            # Ingresar al Tubo es una decisión del registro; al modificar, la tarea ya vinculada se mantiene.
+            del self.fields['ingresar_al_tubo']
+            del self.fields['plazo_tubo']
+
+    ingresar_al_tubo = forms.BooleanField(
+        required=False, label='Ingresar al Tubo de seguimiento',
+        help_text='Crea una tarea en el Tubo de la delegación con estos datos, para hacerle seguimiento. No es necesario si ya elegiste una tarea vinculada.',
+    )
+    plazo_tubo = forms.DateField(
+        required=False, label='Plazo comprometido en el Tubo', widget=forms.DateInput(attrs={'type': 'date'}),
+        help_text='Si lo dejas vacío, el plazo es 14 días después de la fecha de la actividad.',
+    )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -339,13 +404,25 @@ class ActividadForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm):
         organizacion = cleaned_data.get('organizacion')
         if organizacion and delegacion and organizacion.delegacion_id != delegacion.pk:
             self.add_error('organizacion', 'La organización debe pertenecer a la delegación de la actividad.')
+        subtipo, tipo = cleaned_data.get('subtipo_atencion'), cleaned_data.get('catalogo')
+        if subtipo and tipo and subtipo.tipo_id != tipo.pk:
+            self.add_error('subtipo_atencion', 'El subtipo debe pertenecer al tipo de atención elegido.')
+        if cleaned_data.get('ingresar_al_tubo') and cleaned_data.get('compromiso'):
+            self.add_error('ingresar_al_tubo', 'La actividad ya está vinculada a una tarea del Tubo.')
+        plazo, fecha = cleaned_data.get('plazo_tubo'), cleaned_data.get('fecha')
+        if plazo and fecha and plazo < timezone.localtime(fecha).date():
+            self.add_error('plazo_tubo', 'El plazo no puede ser anterior a la fecha de la actividad.')
         return cleaned_data
 
     class Meta:
         model = Actividad
-        fields = ['delegacion', 'lugar', 'item', 'catalogo', 'fecha', 'solicitud_problema', 'accion', 'contacto_nombre', 'contacto_telefono', 'organizacion', 'tipo_accion', 'compromiso', 'gestion_interna']
+        fields = [
+            'delegacion', 'lugar', 'item', 'catalogo', 'subtipo_atencion', 'fecha', 'solicitud_problema', 'accion', 'contacto_nombre',
+            'contacto_telefono', 'organizacion', 'hito', 'tipo_accion', 'compromiso', 'gestion_interna',
+        ]
         labels = {
-            'gestion_interna': 'Gestión interna (el usuario es el delegado)',
+            'gestion_interna': 'Gestión interna (el usuario es el delegado)', 'subtipo_atencion': 'Subtipo de atención (opcional)',
+            'hito': 'Hito de la delegación (opcional)',
             'item': 'Ítem de medición', 'catalogo': 'Tipo de atención', 'fecha': 'Fecha y hora', 'lugar': 'Lugar (opcional)',
             'solicitud_problema': 'Solicitud o problema', 'accion': 'Acción ejecutada',
             'contacto_nombre': 'Nombre de contacto', 'contacto_telefono': 'Teléfono de contacto', 'compromiso': 'Tarea del tubo de trabajo vinculada (opcional)',
@@ -381,19 +458,22 @@ class RevisionForm(FormularioBootstrap, forms.Form):
     """Decisión sobre las evidencias pendientes de una actividad: aprobar, o rechazar indicando el motivo (RN-009).
     La decisión llega en la URL del botón que se pulsó; el motivo, en el formulario."""
 
-    DECISIONES = [('aprobar', 'Aprobar'), ('rechazar', 'Rechazar')]
+    DECISIONES = [('aprobar', 'Aprobar'), ('rechazar', 'Rechazar'), ('antecedentes', 'Solicitar más antecedentes')]
     MENSAJE_SIN_MOTIVO = 'El rechazo de una evidencia exige un motivo: quien registró la actividad lo necesita para corregirla.'
+    MENSAJE_SIN_DETALLE = 'Para solicitar más antecedentes indica qué falta: quien registró la actividad lo necesita para completarla.'
 
     decision = forms.ChoiceField(choices=DECISIONES)
     observacion = forms.CharField(
         label='Motivo u observación', required=False, max_length=1000,
-        widget=forms.Textarea(attrs={'class': 'mb-3', 'rows': 2, 'placeholder': 'Obligatorio para rechazar'}),
+        widget=forms.Textarea(attrs={'class': 'mb-3', 'rows': 2, 'placeholder': 'Obligatorio para rechazar o solicitar más antecedentes'}),
     )
 
     def clean(self):
         cleaned_data = super().clean()
         if cleaned_data.get('decision') == 'rechazar' and not cleaned_data.get('observacion'):
             self.add_error('observacion', self.MENSAJE_SIN_MOTIVO)
+        if cleaned_data.get('decision') == 'antecedentes' and not cleaned_data.get('observacion'):
+            self.add_error('observacion', self.MENSAJE_SIN_DETALLE)
         return cleaned_data
 
 
@@ -426,9 +506,28 @@ class CompromisoForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm)
         for campo in ('funcionario_responsable', 'origen'):
             self.fields[campo].required = True
         self.fields['origen'].initial = 'externo'
+        vecinos = Q(activo=True)
+        if not ve_todo:
+            vecinos &= Q(territorio__delegacion_id=funcionario.delegacion_id) if funcionario and funcionario.delegacion_id else Q(pk__in=[])
+        self.fields['vecino'].queryset = Vecino.objects.filter(vecinos | Q(pk=self.instance.vecino_id)).select_related('territorio')
+        self.fields['vecino'].required = False
+        # Autocompletado: al elegir un vecino o escribir un RUT registrado, el navegador completa nombre y teléfono.
+        self.fields['solicitante_rut'].widget.attrs.update({'data-autocompletar-rut': '1', 'placeholder': '12.345.678-5', 'autocomplete': 'off'})
+        self.fields['vecino'].widget.attrs['data-autocompletar-vecino'] = '1'
+        self.fields['tipo'].required = False
+        self.fields['tipo'].initial = self.fields['tipo'].initial or 'solicitud'
         if self.instance.pk:
-            # El estado cambia con las acciones de la agenda, que dejan su historial.
+            # El estado cambia con las acciones de la agenda, que dejan su historial; el tipo de registro no cambia.
             del self.fields['estado']
+            self.fields['tipo'].disabled = True
+
+    def clean_solicitante_rut(self):
+        return normalizar_rut(self.cleaned_data.get('solicitante_rut'))
+
+    def clean_tipo(self):
+        if self.instance.pk:
+            return self.instance.tipo
+        return self.cleaned_data.get('tipo') or 'solicitud'
 
     def clean(self):
         cleaned_data = super().clean()
@@ -442,7 +541,20 @@ class CompromisoForm(VersionOptimistaForm, FormularioBootstrap, forms.ModelForm)
 
     class Meta:
         model = Compromiso
-        fields = ['delegacion', 'funcionario_responsable', 'origen', 'solicitante', 'solicitante_telefono', 'territorio', 'organizacion', 'eje', 'descripcion', 'fecha_comprometida', 'area_apoyo', 'item', 'estado', 'observacion']
+        fields = [
+            'tipo', 'delegacion', 'funcionario_responsable', 'origen', 'vecino', 'solicitante_rut', 'solicitante', 'solicitante_telefono', 'territorio',
+            'organizacion', 'eje', 'descripcion', 'fecha_comprometida', 'area_apoyo', 'item', 'estado', 'observacion',
+        ]
+        labels = {
+            'tipo': 'Tubo', 'funcionario_responsable': 'Responsable', 'area_apoyo': 'Área de apoyo', 'item': 'Ítem medible (opcional)',
+            'vecino': 'Vecino registrado (opcional)', 'solicitante_rut': 'RUT del solicitante o remitente',
+            'solicitante': 'Nombre del solicitante o remitente', 'solicitante_telefono': 'Teléfono del solicitante',
+        }
+        help_texts = {'vecino': 'Si el vecino ya está registrado, elígelo y sus datos se completan solos.'}
+        widgets = {
+            'fecha_comprometida': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+            'descripcion': forms.Textarea(attrs={'rows': 3}), 'observacion': forms.Textarea(attrs={'rows': 2}),
+        }
 
 
 def _limitar_a_delegacion_propia(campos, user):
@@ -494,10 +606,82 @@ class AusenciaForm(FormularioBootstrap, forms.ModelForm):
 
 
 class CasoSocialForm(FormularioBootstrap, forms.ModelForm):
+    # Opciones sugeridas (datalist) para el subtipo de un informe social, según la hoja LISTA de la matriz.
+    listas = {'subtipos-informe': list(CasoSocial.SUBTIPOS_INFORME)}
+    ingresar_al_tubo = forms.BooleanField(
+        required=False, label='Ingresar al Tubo de seguimiento',
+        help_text='Crea una tarea en el Tubo de tu delegación para hacer seguimiento de esta gestión.',
+    )
+    plazo_tubo = forms.DateField(
+        required=False, label='Plazo comprometido en el Tubo', widget=forms.DateInput(attrs={'type': 'date'}),
+        help_text='Si lo dejas vacío, el plazo es 14 días desde hoy.',
+    )
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        funcionario = funcionario_de(user) if user else None
+        vecinos = Q(activo=True)
+        if user and not puede_ver_todo(user):
+            vecinos &= Q(territorio__delegacion_id=funcionario.delegacion_id) if funcionario and funcionario.delegacion_id else Q(pk__in=[])
+        self.fields['vecino'].queryset = Vecino.objects.filter(vecinos | Q(pk=self.instance.vecino_id))
+        self.fields['vecino'].widget.attrs['data-autocompletar-vecino'] = '1'
+        # Con un vecino elegido, nombre y teléfono se autocompletan: solo son obligatorios sin vecino (ver clean).
+        self.fields['nombre_usuario'].required = False
+        self.fields['telefono_usuario'].required = False
+        if self.instance.pk and self.instance.compromiso_id:
+            del self.fields['ingresar_al_tubo']
+            del self.fields['plazo_tubo']
+        # Con valor por defecto: si no se informan, la gestión ingresa hoy y sin reingresos del informe.
+        self.fields['fecha_ingreso'].required = False
+        self.fields['reingresos_informe'].required = False
+
+    def clean_plazo_tubo(self):
+        plazo = self.cleaned_data.get('plazo_tubo')
+        if plazo and plazo < timezone.localdate():
+            raise forms.ValidationError('El plazo no puede ser anterior a hoy.')
+        return plazo
+
+    def clean(self):
+        cleaned_data = super().clean()
+        vecino = cleaned_data.get('vecino')
+        if vecino:
+            cleaned_data['nombre_usuario'] = cleaned_data.get('nombre_usuario') or vecino.nombre_completo
+            cleaned_data['telefono_usuario'] = cleaned_data.get('telefono_usuario') or vecino.telefono
+        for campo in ('nombre_usuario', 'telefono_usuario'):
+            if not cleaned_data.get(campo) and campo not in self.errors:
+                self.add_error(campo, 'Este campo es obligatorio (o elige un vecino registrado que lo tenga).')
+        if not cleaned_data.get('fecha_ingreso') and 'fecha_ingreso' not in self.errors:
+            cleaned_data['fecha_ingreso'] = self.instance.fecha_ingreso or timezone.localdate()
+        if cleaned_data.get('reingresos_informe') is None and 'reingresos_informe' not in self.errors:
+            cleaned_data['reingresos_informe'] = self.instance.reingresos_informe or 0
+        return cleaned_data
+
     class Meta:
         model = CasoSocial
-        fields = ['nombre_usuario', 'telefono_usuario', 'etapa', 'tipo', 'subtipo', 'observacion']
-        widgets = {'observacion': forms.Textarea(attrs={'rows': 3})}
+        fields = [
+            'vecino', 'nombre_usuario', 'telefono_usuario', 'etapa', 'tipo', 'subtipo', 'observacion',
+            'fecha_ingreso', 'requiere_visita', 'fecha_programada_visita', 'fecha_visita', 'fecha_entrega_informe', 'reingresos_informe',
+        ]
+        labels = {
+            'vecino': 'Vecino registrado (opcional)', 'nombre_usuario': 'Nombre del usuario', 'telefono_usuario': 'Teléfono del usuario',
+            'etapa': 'Gestión n.º (1 a 3)', 'subtipo': 'Subtipo (sub atención)', 'fecha_ingreso': 'Fecha de ingreso',
+            'requiere_visita': 'Requiere visita en terreno', 'fecha_programada_visita': 'Fecha programada de la visita',
+            'fecha_visita': 'Fecha en que se hizo la visita', 'fecha_entrega_informe': 'Fecha de entrega del informe',
+            'reingresos_informe': 'Reingresos del informe (0 a 2)',
+        }
+        help_texts = {
+            'vecino': 'Si eliges un vecino registrado, su nombre y teléfono se completan solos.',
+            'subtipo': 'En un informe social: Informe aporte económico, Informe aporte material o Informe institución.',
+            'fecha_programada_visita': f'Plazo: hasta {CasoSocial.PLAZO_PROGRAMAR_VISITA} días desde el ingreso.',
+            'fecha_visita': 'La visita debe hacerse el día programado.',
+            'fecha_entrega_informe': f'Plazo: {CasoSocial.PLAZO_INFORME_TRAS_VISITA} días desde la visita y {CasoSocial.PLAZO_TOTAL_INFORME} desde el ingreso.',
+        }
+        widgets = {
+            'observacion': forms.Textarea(attrs={'rows': 3}),
+            'subtipo': forms.TextInput(attrs={'list': 'subtipos-informe'}),
+            **{campo: forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d') for campo in (
+                'fecha_ingreso', 'fecha_programada_visita', 'fecha_visita', 'fecha_entrega_informe')},
+        }
 
 
 class ComentarioForm(FormularioBootstrap, forms.ModelForm):
@@ -505,5 +689,158 @@ class ComentarioForm(FormularioBootstrap, forms.ModelForm):
         model = Comentario
         fields = ['contenido']
         widgets = {'contenido': forms.Textarea(attrs={'rows': 3})}
-        labels = {'funcionario_responsable': 'Responsable', 'area_apoyo': 'Área de apoyo', 'item': 'Ítem medible (opcional)'}
-        widgets = {'fecha_comprometida': forms.DateInput(attrs={'type': 'date'}), 'descripcion': forms.Textarea(attrs={'rows': 3}), 'observacion': forms.Textarea(attrs={'rows': 2})}
+        labels = {'contenido': 'Comentario'}
+
+
+
+# Evaluación 3: mantenedores de territorios, vecinos, membresías, hitos y subtipos de atención.
+
+def _delegaciones_del_usuario(user, actual_id=None):
+    """Delegaciones activas que el usuario puede elegir: todas para coordinación; solo la propia para un perfil local."""
+    delegaciones = Q(estado=True)
+    if user and not puede_ver_todo(user):
+        funcionario = funcionario_de(user)
+        delegaciones &= Q(pk=funcionario.delegacion_id) if funcionario and funcionario.delegacion_id else Q(pk__in=[])
+    return Delegacion.objects.filter(delegaciones | Q(pk=actual_id))
+
+
+def _territorios_del_usuario(user, actual_id=None):
+    territorios = Q(activo=True, delegacion__estado=True)
+    if user and not puede_ver_todo(user):
+        funcionario = funcionario_de(user)
+        territorios &= Q(delegacion_id=funcionario.delegacion_id) if funcionario and funcionario.delegacion_id else Q(pk__in=[])
+    return Territorio.objects.filter(territorios | Q(pk=actual_id)).select_related('delegacion')
+
+
+class TerritorioForm(FormularioBootstrap, forms.ModelForm):
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['delegacion'].queryset = _delegaciones_del_usuario(user, self.instance.delegacion_id)
+
+    def clean_nombre(self):
+        return ' '.join(self.cleaned_data['nombre'].split())
+
+    class Meta:
+        model = Territorio
+        fields = ['nombre', 'delegacion', 'descripcion', 'activo']
+        labels = {'nombre': 'Nombre del territorio', 'delegacion': 'Delegación', 'descripcion': 'Descripción', 'activo': 'Territorio activo'}
+        widgets = {'descripcion': forms.Textarea(attrs={'rows': 3})}
+
+
+class VecinoForm(FormularioBootstrap, forms.ModelForm):
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['territorio'].queryset = _territorios_del_usuario(user, self.instance.territorio_id)
+        self.fields['rut'].widget.attrs.update({'placeholder': '12.345.678-5', 'autocomplete': 'off'})
+
+    def clean_rut(self):
+        rut = normalizar_rut(self.cleaned_data['rut'])
+        if Vecino.objects.filter(rut=rut).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError('Ya existe un vecino registrado con este RUT.')
+        return rut
+
+    class Meta:
+        model = Vecino
+        fields = ['rut', 'nombres', 'apellidos', 'telefono', 'email', 'direccion', 'territorio', 'activo']
+        labels = {'rut': 'RUT', 'telefono': 'Teléfono', 'email': 'Correo electrónico', 'direccion': 'Dirección', 'activo': 'Registro activo'}
+        help_texts = {'rut': 'Con o sin puntos; se valida el dígito verificador.', 'territorio': 'La delegación del vecino es la de su territorio.'}
+
+
+class MembresiaOrganizacionForm(FormularioBootstrap, forms.ModelForm):
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        vecinos, organizaciones = Q(activo=True), Q(activa=True)
+        if user and not puede_ver_todo(user):
+            funcionario = funcionario_de(user)
+            if funcionario and funcionario.delegacion_id:
+                vecinos &= Q(territorio__delegacion_id=funcionario.delegacion_id)
+                organizaciones &= Q(delegacion_id=funcionario.delegacion_id)
+            else:
+                vecinos = organizaciones = Q(pk__in=[])
+        self.fields['vecino'].queryset = Vecino.objects.filter(vecinos | Q(pk=self.instance.vecino_id))
+        self.fields['organizacion'].queryset = Organizacion.objects.filter(organizaciones | Q(pk=self.instance.organizacion_id)).order_by('nombre')
+
+    class Meta:
+        model = MembresiaOrganizacion
+        fields = ['vecino', 'organizacion', 'cargo', 'fecha_inicio', 'fecha_termino']
+        labels = {'organizacion': 'Organización comunitaria', 'cargo': 'Cargo', 'fecha_inicio': 'Desde', 'fecha_termino': 'Hasta (opcional)'}
+        help_texts = {'cargo': 'Socio/a, o su cargo en la directiva. Presidente, vicepresidente, secretario y tesorero son únicos a la vez.'}
+        widgets = {'fecha_inicio': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'), 'fecha_termino': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d')}
+
+
+def _etiqueta_responsable(funcionario):
+    return f'{funcionario.nombre} · {funcionario.delegacion or "alcance global"}'
+
+
+class HitoForm(FormularioBootstrap, forms.ModelForm):
+    """Hito con un responsable principal y responsables de apoyo, guardados en ResponsableHito."""
+
+    responsable_principal = forms.ModelChoiceField(queryset=Funcionario.objects.none(), label='Responsable principal')
+    responsables_apoyo = forms.ModelMultipleChoiceField(
+        queryset=Funcionario.objects.none(), required=False, label='Responsables de apoyo', help_text='Mantén Ctrl presionado para elegir más de uno.',
+    )
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['delegacion'].queryset = _delegaciones_del_usuario(user, self.instance.delegacion_id)
+        self.fields['territorio'].queryset = _territorios_del_usuario(user, self.instance.territorio_id)
+        funcionarios = Q(estado=True)
+        if user and not puede_ver_todo(user):
+            funcionario = funcionario_de(user)
+            funcionarios &= Q(delegacion_id=funcionario.delegacion_id) if funcionario and funcionario.delegacion_id else Q(pk__in=[])
+        candidatos = Funcionario.objects.filter(funcionarios).select_related('delegacion')
+        for campo in ('responsable_principal', 'responsables_apoyo'):
+            self.fields[campo].queryset = candidatos
+            self.fields[campo].label_from_instance = _etiqueta_responsable
+        if self.instance.pk:
+            asignaciones = list(self.instance.asignaciones.all())
+            self.fields['responsable_principal'].initial = next((a.funcionario_id for a in asignaciones if a.rol == 'principal'), None)
+            self.fields['responsables_apoyo'].initial = [a.funcionario_id for a in asignaciones if a.rol == 'apoyo']
+
+    def clean(self):
+        cleaned_data = super().clean()
+        delegacion = cleaned_data.get('delegacion')
+        principal = cleaned_data.get('responsable_principal')
+        apoyo = list(cleaned_data.get('responsables_apoyo') or [])
+        if principal and delegacion and principal.delegacion_id not in (None, delegacion.pk):
+            self.add_error('responsable_principal', f'{principal.nombre} pertenece a la delegación {principal.delegacion}, no a {delegacion}.')
+        for funcionario in apoyo:
+            if delegacion and funcionario.delegacion_id not in (None, delegacion.pk):
+                self.add_error('responsables_apoyo', f'{funcionario.nombre} pertenece a la delegación {funcionario.delegacion}, no a {delegacion}.')
+        if principal and principal in apoyo:
+            self.add_error('responsables_apoyo', 'El responsable principal no se repite como apoyo.')
+        return cleaned_data
+
+    @transaction.atomic
+    def save(self, commit=True):
+        hito = super().save(commit=True)
+        hito.asignaciones.all().delete()
+        ResponsableHito.objects.create(hito=hito, funcionario=self.cleaned_data['responsable_principal'], rol='principal')
+        for funcionario in self.cleaned_data.get('responsables_apoyo') or []:
+            ResponsableHito.objects.create(hito=hito, funcionario=funcionario, rol='apoyo')
+        return hito
+
+    class Meta:
+        model = Hito
+        fields = ['nombre', 'descripcion', 'delegacion', 'territorio', 'fecha_programada', 'estado', 'fecha_realizacion']
+        labels = {
+            'delegacion': 'Delegación', 'territorio': 'Territorio (opcional)', 'fecha_programada': 'Fecha programada',
+            'fecha_realizacion': 'Fecha de realización', 'descripcion': 'Descripción',
+        }
+        widgets = {
+            'descripcion': forms.Textarea(attrs={'rows': 3}),
+            'fecha_programada': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+            'fecha_realizacion': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+        }
+
+
+class SubtipoAtencionForm(FormularioBootstrap, forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['tipo'].queryset = Catalogo.objects.filter(Q(tipo='atencion', activo=True) | Q(pk=self.instance.tipo_id))
+        self.fields['tipo'].label_from_instance = lambda elemento: elemento.nombre
+
+    class Meta:
+        model = SubtipoAtencion
+        fields = ['tipo', 'nombre', 'activo']
+        labels = {'tipo': 'Tipo de atención', 'nombre': 'Nombre del subtipo', 'activo': 'Subtipo activo'}

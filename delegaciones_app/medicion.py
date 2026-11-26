@@ -123,9 +123,18 @@ def periodo_de_ficha(funcionario, periodo_id=None):
 
 def _formula(meta, indicador, tope):
     """Detalle verificable del cálculo de una meta (CU-07.3): meta, avance, fórmula, ponderación y resultado."""
-    bruto = meta.evaluar_progreso(indicador.avance)
+    if meta.item.tipo_calculo == 'tubo_pendientes':
+        bruto = Indicador.puntaje_por_pendientes(indicador.avance)
+        calculo = (f'Tareas pendientes del tubo = {_numero(indicador.avance)} % de las ingresadas; tramos: hasta 10 % vale 100 %, '
+                   f'hasta 50 % vale 50 %, sobre 50 % vale 0 % → {_numero(bruto)} %')
+    elif meta.item.tipo_calculo == 'tubo':
+        calculo = f'Cumplimiento = tareas realizadas / tareas ingresadas × 100 ({_numero(indicador.avance)} realizadas)'
+        bruto = indicador.cumplimiento - (indicador.ajuste or 0)
+    else:
+        bruto = meta.evaluar_progreso(indicador.avance)
+        calculo = f'Cumplimiento = avance / meta × 100 = {_numero(indicador.avance)} / {_numero(meta.valor_objetivo)} × 100 = {_numero(bruto)} %'
     return [
-        f'Cumplimiento = avance / meta × 100 = {_numero(indicador.avance)} / {_numero(meta.valor_objetivo)} × 100 = {_numero(bruto)} %',
+        calculo,
         f'Máximo computable: {_numero(tope)} %' + (f'; se aplica el tope y queda en {_numero(indicador.cumplimiento)} %' if bruto > tope else ''),
         f'Cumplimiento ponderado = ponderador × cumplimiento = {_numero(meta.ponderador)} % × {_numero(indicador.cumplimiento)} % = {_numero(indicador.ponderacion)}',
     ]

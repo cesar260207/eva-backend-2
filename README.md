@@ -5,6 +5,10 @@ Municipales de La Serena. Persistencia 100% en base de datos relacional (MySQL),
 administrable desde pantallas propias (Django Templates + Bootstrap, **sin Django Admin**) y
 desplegable en una instancia AWS EC2.
 
+> **Evaluación 3:** guía técnica completa de instalación, configuración, arquitectura y respaldo en
+> [docs/IMPLEMENTACION.md](docs/IMPLEMENTACION.md); protocolo de pruebas con resultados y defectos en
+> [docs/PROTOCOLO_PRUEBAS.md](docs/PROTOCOLO_PRUEBAS.md); matriz de trazabilidad en [docs/TRAZABILIDAD.md](docs/TRAZABILIDAD.md).
+
 ## Incluye
 
 - Modelo de 17 clases (más dos tablas adicionales) con las reglas de negocio en los modelos.
@@ -154,7 +158,17 @@ python manage.py generar_matriz "<ruta>/MATRIZ SGR TRIMESTRE.xlsx"
 python manage.py cargar_matriz data/matriz_cargos.json --periodo "Trimestre octubre-diciembre 2026"
 # Organizaciones comunitarias: asigna la delegación por territorio y el tipo por el nombre
 python manage.py importar_organizaciones "<ruta>/organizaciones_comunitarias.xlsx"
+# Hojas TUBO y TUBO CARTAS (exportadas a CSV): sin --aplicar solo revisa y no guarda nada
+python manage.py importar_tubo "<ruta>/02_TUBO_COMPANIAS.csv" --delegacion "<nombre exacto de la delegación>"
+python manage.py importar_tubo "<ruta>/04_TUBO_CARTAS.csv" --delegacion "<nombre exacto de la delegación>" --aplicar
 ```
+
+`importar_tubo` deja como responsable al delegado activo de la delegación (o al funcionario de
+`--responsable <identificador>`) y detecta si la hoja es de cartas por su título (`--tipo` lo fuerza). El folio
+sale del contenido de la fila (`AGR-IMP-…`, `CAR-IMP-…`), así que repetir el comando no duplica tareas. Las filas
+sin actividad o sin fecha válida se informan y no se guardan. La correspondencia de cada hoja de la matriz con el
+sistema, los errores de sus fórmulas y las decisiones tomadas están en
+[docs/MATRIZ_SGR_HALLAZGOS.md](docs/MATRIZ_SGR_HALLAZGOS.md).
 
 `makemigrations` se usa durante el desarrollo cuando cambian los modelos; al
 instalar o desplegar se aplican las migraciones versionadas con `migrate`.
@@ -209,16 +223,22 @@ Los datos son sinteticos y solo sirven para demostracion academica.
 - `/actividad/nueva/`: registro de actividades; `/actividad/<código>/` muestra su detalle,
   evidencias, revisión y anulación de la aprobación.
 - `/evidencia/<código>/archivo/`: abre o descarga el archivo de una evidencia, con los mismos permisos de su actividad.
-- `/agenda/`: tubo de trabajo (sus tareas), con filtros y alerta de vencimiento.
+- `/agenda/`: tubo de trabajo (sus tareas), con búsqueda al escribir por código, RUT o nombre, filtros por funcionario,
+  estado, plazo y fechas, y alerta de vencimiento. `/agenda/?tubo=carta`: Tubo de cartas.
+- `/cuenta/cambiar-contrasena/`: cambio de contraseña (obligatorio si la cuenta tiene una contraseña temporal).
+- `/casos-sociales/`: gestiones sociales (pueden ingresar o no al Tubo).
+- `/gestion/tablero/`: dashboard con gráficos (cumplimiento, semáforo por funcionario, compromisos, carga y tendencia).
 - `/actividad/<código>/evidencia/`: subir evidencia a una actividad.
 - `/coordinacion/delegados/`: delegados por delegación, su carga y su asignación (coordinación).
-- `/administracion/`: índice de los doce mantenedores.
+- `/administracion/`: índice de los diecisiete mantenedores.
 - `/administracion/<mantenedor>/`: listado, búsqueda y controles de cada mantenedor
   (`delegaciones`, `cargos`, `roles`, `funcionarios`, `catalogo`, `organizaciones`, `periodos`, `parametros`,
-  `items`, `metas`, `ajustes`, `ausencias`).
+  `items`, `metas`, `ajustes`, `ausencias`, `territorios`, `vecinos`, `membresias`, `hitos`, `subtipos`).
 - `/administracion/auditoria/`: consulta de solo lectura de la auditoría (perfil Administrador).
 - `/administracion/perfiles/`: perfiles, sus permisos y sus usuarios (perfil Administrador).
 - `/gestion/`, `/gestion/semaforo/`, `/gestion/resumen/`: medicion y cumplimiento.
+- `/gestion/matriz/`: matriz por cargos (hoja SALON): ítems, ponderador, meta, avance y ponderado de cada
+  funcionario por área, calendario del período y resumen de los tubos; exporta a Excel.
 - `/gestion/mi-ficha/`: ficha personal del funcionario.
 - `/gestion/informes/`: informes de actividades, compromisos, resumen por responsable, actividad reciente
   y cumplimiento (pantalla, imprimir y CSV).
@@ -228,6 +248,8 @@ Los datos son sinteticos y solo sirven para demostracion academica.
   La coordinación los aplica o rechaza desde `/administracion/ajustes/`.
 - `/ausencias/nuevo/`: registrar una ausencia (Delegado, desde el botón del semáforo).
 - `/casos-sociales/nuevo/`: registrar una atención social (Profesional; también en el menú del usuario).
+  Registra las fechas de ingreso, visita e informe; el listado `/casos-sociales/` muestra los plazos de la hoja
+  G SOC (visita programada hasta 10 días, informe hasta 4 días después de la visita y hasta 20 desde el ingreso).
 - `/actividad/<código>/comentario/`: comentar una actividad (botón «Comentar» del detalle).
 
 ## Roles de trabajo y flujo
@@ -388,6 +410,7 @@ python manage.py check
 python manage.py makemigrations --check --dry-run
 python manage.py test
 python manage.py plan_pruebas
+python manage.py protocolo_pruebas   # protocolo de la Evaluación 3: docs/PROTOCOLO_PRUEBAS.md y docs/TRAZABILIDAD.md
 ```
 
 Las pruebas están en `delegaciones_app`:
@@ -396,7 +419,9 @@ Las pruebas están en `delegaciones_app`:
   los requisitos que verifica, por ejemplo «CU-27.1 Restringir elemento duplicado (RF-004)».
   Incluyen los 8 casos de login (`test_unit_autenticacion.py`).
 - `test_integracion.py`: pruebas de integración de las vistas, los permisos y la migración de datos.
+- `test_evaluacion3.py`: pruebas de las funciones de la Evaluación 3 (CP-EVA-001 en adelante).
 - `pruebas_base.py`: datos de apoyo compartidos (no es una prueba).
+- `protocolo.py`: casos del protocolo, defectos, reejecuciones e incidencias (lo lee `protocolo_pruebas`).
 
 `plan_pruebas` ejecuta todo y escribe `PLAN_DE_PRUEBAS.md`: cobertura por caso de uso y por
 requisito, la tabla CP, CU, RF, método de prueba y resultado, y las fichas de login.
@@ -422,7 +447,7 @@ documento de octubre hasta que el municipio confirme:
 |---|---|---|---|---|
 | Tope del cumplimiento de cada ítem | 150 % | 120 % (regla 7) | 120 % | `maximo_cumplimiento` |
 | Valor de un reclamo | -20 % en la hoja RECLAMOS y en «Coordinador DISERCO» y «Gestor social 1»; -30 % en las demás hojas de cargo | No lo fija | -30 % | `valor_reclamo` |
-| Ponderaciones de «Planificación y control» | Suman 85 % | No lo fija | Se cargan como están; para iniciar el período el sistema exige 100 % por cargo | Ítems medibles |
+| Ponderaciones de «Planificación y control» | Su hoja suma 85 %; el 15 % que falta es el ítem «Pendientes en tubo menor a 10 %» de la hoja SALON | No lo fija | Se completa desde SALON y suma 100 %; el ítem se mide por tramos (hasta 10 % pendiente → 100; hasta 50 % → 50; sobre 50 % → 0) | Ítems medibles |
 | Meta del ítem «Emergencia» | En varias hojas coincide con el avance (por ejemplo, 304) | No lo fija | Se carga como está | Ítems medibles y metas |
 | Felicitación dirigida a un gestor | No lo distingue | No valen las del usuario al gestor por mensaje; las informa el delegado | Se acepta para cualquier funcionario si tiene respaldo formal y la informa el delegado | Ajustes |
 | Organizaciones sin delegación | 2 del territorio «ALFALFARES» y 22 sin territorio | No lo fija | Quedan sin delegación y sin verificar, para asignar a mano | Organizaciones |
@@ -436,7 +461,9 @@ Todos los casos de uso de la especificación detallada (CU-01 a CU-30, con sus e
 `test_casos_de_uso.py` comprueba que los actores de los cuadros de casos de uso coinciden con los permisos
 reales (184 de 184 combinaciones de perfil y pantalla). Con los requerimientos de octubre quedaron
 implementados RF-015 (atención social), RF-020 (el ítem tipo «tubo» mide las tareas realizadas), RF-025
-(felicitaciones y reclamos) y RF-035 (comentarios). Sigue pendiente RF-031 (vista global por cargos). El
+(felicitaciones y reclamos) y RF-035 (comentarios). Con la revisión completa de la Matriz SGR quedaron RF-031
+(matriz por cargos), RF-063 (ítem de pendientes del tubo), RF-064 (plazos de la atención social) y RF-065
+(importación de los tubos). El
 detalle está en [docs/REQUERIMIENTOS_V2.md](docs/REQUERIMIENTOS_V2.md) y en la sección 4 de
 [PLAN_DE_PRUEBAS.md](PLAN_DE_PRUEBAS.md).
 
@@ -445,6 +472,7 @@ detalle está en [docs/REQUERIMIENTOS_V2.md](docs/REQUERIMIENTOS_V2.md) y en la 
 | Documento | Contenido |
 |---|---|
 | [docs/REQUERIMIENTOS_V2.md](docs/REQUERIMIENTOS_V2.md) | Requerimientos v2: los de octubre 2026 como RF y RNF, con criterio de aceptación y prueba |
+| [docs/MATRIZ_SGR_HALLAZGOS.md](docs/MATRIZ_SGR_HALLAZGOS.md) | Las 25 hojas de la Matriz SGR: dónde quedó cada una, errores de sus fórmulas y decisiones |
 | [docs/CASOS_DE_USO.md](docs/CASOS_DE_USO.md) | 19 gestiones de alto nivel y sus casos de detalle, cuadros y trazabilidad |
 | [docs/DIAGRAMA_CLASES.md](docs/DIAGRAMA_CLASES.md) | Diagrama de clases desde los modelos reales, con las clases nuevas de octubre |
 | [docs/diagramas/](docs/diagramas/) | Diagramas del informe que cambiaron: requerimientos, entidad-relación, paquetes y trazabilidad |

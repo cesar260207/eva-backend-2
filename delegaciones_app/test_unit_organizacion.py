@@ -178,10 +178,12 @@ class FuncionarioFormUnitTests(TestCase):
         self.assertIn('password', formulario.errors)
 
     def test_al_crear_la_contrasena_es_obligatoria(self):
-        """CU-26 Administración de usuarios (RF-002). Sin contraseña no hay alta."""
+        """CU-26 Administración de usuarios (RF-002, RF-051). Sin contraseña escrita, el alta genera una temporal (guía de la Evaluación 3)."""
         formulario = FuncionarioForm(self._datos(password='', password_confirm=''))
-        self.assertFalse(formulario.is_valid())
-        self.assertIn('password', formulario.errors)
+        self.assertTrue(formulario.is_valid(), formulario.errors)
+        funcionario = formulario.save()
+        self.assertTrue(funcionario.debe_cambiar_contrasena)
+        self.assertTrue(funcionario.usuario.check_password(formulario.contrasena_temporal))
 
     def test_no_se_ofrecen_cargos_retirados_ni_delegaciones_inactivas(self):
         """CU-26 Administración de usuarios (RF-002). Las listas solo muestran opciones vigentes."""

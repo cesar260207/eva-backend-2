@@ -306,7 +306,11 @@ class MantenedoresUnitTests(TestCase):
 
     def test_son_exactamente_doce_mantenedores(self):
         """CU-26 Administración de delegaciones, usuarios y roles (RF-001). Las ocho tablas maestras."""
-        self.assertEqual(set(crud.MANTENEDORES), {'delegaciones', 'cargos', 'roles', 'funcionarios', 'catalogo', 'organizaciones', 'periodos', 'parametros', 'items', 'metas', 'ajustes', 'ausencias'})
+        self.assertEqual(set(crud.MANTENEDORES), {
+            'delegaciones', 'cargos', 'roles', 'funcionarios', 'catalogo', 'organizaciones', 'periodos', 'parametros', 'items', 'metas', 'ajustes', 'ausencias',
+            # Evaluación 3
+            'territorios', 'vecinos', 'membresias', 'hitos', 'subtipos',
+        })
 
     def test_cada_mantenedor_apunta_a_un_modelo_y_un_formulario_coherentes(self):
         """CU-26 Administración de delegaciones, usuarios y roles (RF-001). La consulta se arma sin error."""

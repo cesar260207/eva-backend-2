@@ -435,6 +435,8 @@ ul.errorlist.nonfield { margin: 0; }
 .filter-box, .filtros-caja { padding: var(--e4); border: 1px solid var(--line); border-radius: var(--radio-tarjeta); background: var(--fondo-filtros); }
 .filtros { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: .75rem; align-items: end; padding: var(--e4); border: 1px solid var(--line); border-radius: var(--radio-tarjeta); background: var(--fondo-filtros); }
 .filtros .filtro-texto { grid-column: span 2; }
+/* Los campos de fecha y las listas tienen un ancho mínimo propio: sin min-width: 0 empujan la grilla fuera de la tarjeta en móvil. */
+.filtros > * { min-width: 0; }
 .filtros .acciones { align-self: end; }
 .estado-vacio { display: grid; justify-items: center; gap: .4rem; padding: 2.25rem 1rem; color: var(--muted); text-align: center; }
 .estado-vacio .icono { width: 40px; height: 40px; padding: 8px; border-radius: 999px; background: var(--paper-2); color: var(--muted); }
@@ -959,7 +961,7 @@ html.a11y-contrast .footer { background: #000; }
     .page-header > * { width: 100%; }
     .page-header .acciones { justify-content: flex-start; }
     .page-header .acciones > .btn, .page-header > .btn { flex: 1 1 auto; }
-    .filtros { grid-template-columns: 1fr 1fr; }
+    .filtros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .filtros .filtro-texto { grid-column: 1 / -1; }
     .metric strong, .metric h3 { font-size: 1.5rem; }
     .metric { min-height: 0; }
@@ -992,4 +994,44 @@ html.a11y-contrast .footer { background: #000; }
     .panel, .card, .metric { box-shadow: none !important; }
     .tabla-fija { max-height: none; overflow: visible; border: 0; }
     .tabla-fija > .table thead th { position: static; }
+}
+
+/* Evaluación 3 · Dashboard con gráficos ------------------------------------
+   Categóricos (paleta validada con el validador CVD): 1 azul, 2 naranja, 3 aqua, 4 amarillo; pasos propios en oscuro.
+   El semáforo usa los colores de estado reservados y siempre va con su texto (Verde, Ámbar, Rojo). */
+.viz { --serie-1: #2a78d6; --serie-2: #eb6834; --serie-3: #1baf7a; --serie-4: #eda100; }
+[data-bs-theme="dark"] .viz { --serie-1: #3987e5; --serie-2: #d95926; --serie-3: #199e70; --serie-4: #c98500; }
+.viz-serie-1 { background: var(--serie-1); } .viz-serie-2 { background: var(--serie-2); }
+.viz-serie-3 { background: var(--serie-3); } .viz-serie-4 { background: var(--serie-4); }
+.viz-fila { display: grid; grid-template-columns: minmax(90px, 9rem) minmax(0, 1fr) auto; align-items: center; gap: .75rem; padding: .35rem 0; }
+.viz-etiqueta { font-size: .875rem; color: var(--ink); overflow-wrap: anywhere; }
+.viz-valor { font-size: .8125rem; color: var(--texto-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.viz-pista { position: relative; display: block; height: 14px; border-radius: 4px; background: var(--pista); }
+.viz-barra { display: block; height: 100%; border-radius: 0 4px 4px 0; min-width: 2px; }
+.viz-estado-success { background: var(--verde); } .viz-estado-warning { background: var(--ambar); }
+.viz-estado-danger { background: var(--rojo); } .viz-estado-secondary { background: var(--neutro); }
+.viz-esperado { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--ink); }
+.viz-apilada { display: flex; height: 14px; gap: 2px; }
+.viz-pista.viz-apilada { background: transparent; }
+.viz-segmento { display: block; height: 100%; min-width: 3px; }
+.viz-apilada > .viz-segmento:last-child { border-radius: 0 4px 4px 0; }
+.viz-leyenda { display: flex; flex-wrap: wrap; gap: .25rem 1rem; list-style: none; padding: 0; margin: 0 0 .5rem; font-size: .8125rem; color: var(--texto-2); }
+.viz-leyenda li { display: inline-flex; align-items: center; gap: .4rem; }
+.viz-muestra { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.viz-lineas { width: 100%; height: auto; max-height: 280px; display: block; }
+.viz-grilla { stroke: var(--line); stroke-width: 1; }
+.viz-eje { fill: var(--texto-2); font-size: 11px; }
+.viz-rotulo { fill: var(--ink); font-size: 12px; font-weight: 600; }
+.viz-linea { stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.viz-linea.viz-trazo-1 { stroke: var(--serie-1); } .viz-linea.viz-trazo-2 { stroke: var(--serie-2); }
+.viz-punto { stroke: var(--panel); stroke-width: 2; }
+.viz-punto.viz-trazo-1 { fill: var(--serie-1); } .viz-punto.viz-trazo-2 { fill: var(--serie-2); }
+.viz-punto:hover { r: 6; }
+.pestanas-tubo { display: flex; flex-wrap: wrap; gap: .5rem; }
+@media (max-width: 575.98px) {
+    .viz-fila { grid-template-columns: minmax(0, 1fr) auto; }
+    .viz-fila .viz-pista { grid-column: 1 / -1; grid-row: 2; }
+}
+@media (forced-colors: active) {
+    .viz-segmento, .viz-barra, .viz-muestra { forced-color-adjust: none; border: 1px solid CanvasText; }
 }

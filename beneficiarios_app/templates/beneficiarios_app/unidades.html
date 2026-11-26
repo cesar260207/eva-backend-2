@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Unidades municipales | SGR{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="page-kicker">Beneficiarios · Administración</div>
+        <h1 class="page-title mb-2">Unidades municipales</h1>
+        <p class="page-intro mb-0">Quién puede ingresar solicitudes. Las delegaciones toman a sus funcionarios automáticamente; Gabinete, DIDECO y Depto. de la Familia necesitan funcionarios asignados.</p>
+    </div>
+    <div class="acciones d-flex gap-2">
+        <a class="btn btn-light" href="{% url 'beneficiarios:inscripciones' %}">Volver</a>
+        <a class="btn btn-sgr" href="{% url 'beneficiarios:unidad_nueva' %}">+ Nueva unidad</a>
+    </div>
+</div>
+<div class="panel">
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <caption class="visually-hidden">Unidades municipales</caption>
+            <thead><tr><th scope="col">Unidad</th><th scope="col">Delegación enlazada</th><th scope="col">Funcionarios asignados</th><th scope="col">Inscritos</th><th scope="col">Estado</th><th scope="col"><span class="visually-hidden">Acciones</span></th></tr></thead>
+            <tbody>
+            {% for u in unidades %}
+            <tr>
+                <td><strong>{{ u.nombre }}</strong></td>
+                <td>{{ u.delegacion|default:'—' }}</td>
+                <td>{{ u.asignados }}</td>
+                <td>{{ u.total }}</td>
+                <td>{% if u.activa %}Activa{% else %}<span class="text-muted">Inactiva</span>{% endif %}</td>
+                <td class="text-end"><a class="btn btn-sm btn-outline-sgr" href="{% url 'beneficiarios:unidad_editar' u.pk %}">Modificar</a></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

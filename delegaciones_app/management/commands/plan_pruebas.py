@@ -82,7 +82,7 @@ class Command(BaseCommand):
             'tecnologia': f'Python {platform.python_version()}, Django {django.get_version()}, unittest de Django',
         }
         salida = Path(opciones['salida'])
-        salida.write_text(construir_markdown(registros, entorno), encoding='utf-8')
+        salida.write_text(construir_markdown(registros, entorno), encoding='utf-8', newline='\n')
         aprobadas = sum(1 for r in registros if r['resultado'] == 'Aprobado')
         self.stdout.write(self.style.SUCCESS(f'{aprobadas} de {len(registros)} pruebas aprobadas. Plan escrito en {salida}.'))
         if aprobadas != len(registros):

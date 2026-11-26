@@ -32,7 +32,7 @@
                     <td class="col-texto">{{ actividad.solicitud_problema|truncatechars:70 }}</td>
                     <td>{{ actividad.funcionario_autor.nombre }}</td>
                     <td>{{ actividad.delegacion }}</td>
-                    <td><span class="badge badge-soft">{{ actividad.get_estado_display }}</span><div class="small text-muted mt-1">{% if actividad.estado == 'aprobada' %}Lista para medir{% elif actividad.estado == 'pendiente' %}Esperando revisión{% elif actividad.estado == 'rechazada' %}Requiere corrección{% else %}En preparación{% endif %}</div></td>
+                    <td><span class="badge badge-soft">{{ actividad.get_estado_display }}</span><div class="small text-muted mt-1">{% if actividad.estado == 'aprobada' %}Lista para medir{% elif actividad.estado == 'pendiente' %}Esperando revisión{% elif actividad.estado == 'rechazada' %}Requiere corrección{% elif actividad.estado == 'antecedentes' %}Completar antecedentes solicitados{% else %}En preparación{% endif %}</div></td>
                     <td>
                         {% if actividad.total_evidencias %}
                         <span class="badge badge-success-soft">Con evidencia ({{ actividad.total_evidencias }})</span>

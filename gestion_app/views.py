@@ -5,7 +5,8 @@ from django.contrib.auth.models import Group, User
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
-from delegaciones_app import medicion
+from delegaciones_app import medicion, salon
+from . import graficos
 from delegaciones_app.alertas import alertas_de
 from delegaciones_app.informes import (
     TIPOS_INFORME, filas_de_actividad_reciente, filas_de_actividades, filas_de_compromisos, filas_de_cumplimiento, filas_de_resumen,
@@ -18,7 +19,7 @@ from delegaciones_app.permisos import (
     DELEGADO, PERFIL_ADMINISTRADOR, PERFIL_COORDINADOR, PERFIL_DELEGADO, PERFILES, delegacion_propia, funcionario_de, perfil_de, puede_revisar,
     puede_ver_todo, roles_de,
 )
-from delegaciones_app.views import _delegaciones_visibles
+from delegaciones_app.views import _delegaciones_visibles, _responsables_visibles
 from delegaciones_app.views import _actividades_autorizadas, _compromisos_autorizados
 
 
@@ -253,4 +254,91 @@ def alertas(request):
         'advertencia': sum(1 for alerta in lista if alerta['nivel'] == 'warning'),
         'dias_sin_registro': settings.ALERTA_DIAS_SIN_REGISTRO,
         'dias_alerta': settings.COMPROMISO_DIAS_ALERTA,
+    })
+
+
+@login_required
+def tablero_analitico(request):
+    """Dashboard con gráficos y semáforo por delegación y por funcionario (Evaluación 3).
+
+    Filtros: período, delegación, funcionario y rango de fechas. Todo se limita al ámbito del usuario: el delegado y el
+    profesional ven su delegación; la coordinación, todas.
+    """
+    periodo = periodo_vigente(request.GET.get('periodo'))
+    delegaciones_visibles = _delegaciones_visibles(request.user)
+    funcionarios_visibles = _responsables_visibles(request.user)
+    delegacion = delegaciones_visibles.filter(pk=request.GET['delegacion']).first() if request.GET.get('delegacion', '').isdigit() else None
+    funcionario = funcionarios_visibles.filter(pk=request.GET['funcionario']).first() if request.GET.get('funcionario', '').isdigit() else None
+    if funcionario and delegacion is None and not puede_ver_todo(request.user):
+        delegacion = funcionario.delegacion
+    desde, hasta = graficos.rango_de_fechas(request.GET, periodo)
+
+    resultados = _solo_su_delegacion(request.user, resultados_por_delegacion(periodo)) if periodo else []
+    if delegacion:
+        resultados = [fila for fila in resultados if fila['nombre'] == delegacion.nombre]
+    elif funcionario and funcionario.delegacion_id:
+        resultados = [fila for fila in resultados if fila['nombre'] == funcionario.delegacion.nombre]
+    if periodo:
+        alcance = delegacion or (None if puede_ver_todo(request.user) else delegacion_propia(request.user))
+        if alcance is None and not puede_ver_todo(request.user):
+            personas = []
+        else:
+            personas = resultados_por_persona(periodo, alcance)
+        if funcionario:
+            personas = [fila for fila in personas if fila['funcionario'].pk == funcionario.pk]
+    else:
+        personas = []
+    for fila in personas:
+        fila['ancho'] = min(fila['cumplimiento'], 100)
+
+    compromisos = graficos.filtro_compromisos(_compromisos_autorizados(request.user), delegacion, funcionario)
+    actividades = graficos.filtro_actividades(_actividades_autorizadas(request.user), desde, hasta, delegacion, funcionario)
+    esperado = periodo.porcentaje_esperado() if periodo else None
+    return render(request, 'gestion_app/tablero.html', {
+        'periodo': periodo, 'periodos': periodos_con_indicadores(), 'esperado': esperado,
+        'delegaciones_filtro': delegaciones_visibles, 'funcionarios_filtro': funcionarios_visibles,
+        'delegacion': delegacion, 'funcionario': funcionario, 'desde': desde, 'hasta': hasta,
+        'resultados': resultados, 'personas': personas, 'promedio': promedio_general(resultados),
+        'estado_compromisos': graficos.estado_de_compromisos(compromisos),
+        'carga': graficos.carga_de_trabajo(actividades, compromisos),
+        'tendencia': graficos.tendencia_semanal(actividades, desde, hasta),
+        'tareas_abiertas': compromisos.exclude(estado='realizado').count(),
+        'tareas_vencidas': graficos.compromisos_vencidos(compromisos),
+        'actividades_aprobadas': actividades.filter(estado='aprobada').count(),
+        'actividades_total': actividades.count(),
+        'series_tareas': graficos.ESTADOS_TAREA, 'series_carga': graficos.ESTADOS_CARGA,
+    })
+
+
+@login_required
+def matriz_cargos(request):
+    """Matriz por cargos (hoja SALON de la Matriz SGR, RF-031): ítems, ponderador, meta, avance y ponderado de cada
+    funcionario, agrupados por área, con el calendario del período y el resumen de los tubos.
+
+    La coordinación ve todas las delegaciones (y puede filtrar una); el delegado, su equipo; el funcionario, solo su fila.
+    """
+    periodo = periodo_vigente(request.GET.get('periodo'))
+    delegaciones = _delegaciones_visibles(request.user)
+    delegacion = delegaciones.filter(pk=request.GET['delegacion']).first() if request.GET.get('delegacion', '').isdigit() else None
+    funcionarios = _responsables_visibles(request.user)
+    propio = funcionario_de(request.user)
+    if not puede_ver_todo(request.user) and perfil_de(request.user) != PERFIL_DELEGADO:
+        funcionarios = funcionarios.filter(pk=propio.pk) if propio else funcionarios.none()
+    if delegacion:
+        funcionarios = funcionarios.filter(delegacion=delegacion)
+    bloques = salon.matriz_por_cargos(periodo, funcionarios)
+    if request.GET.get('formato') == 'excel' and periodo:
+        columnas, filas = salon.filas_para_exportar(bloques)
+        Auditoria.registrar_evento(request.user, 'exportar', 'Informe', 'matriz_cargos', None, {'filtros': request.GET.urlencode(), 'filas': len(filas)})
+        return respuesta_excel(f'matriz_cargos_{timezone.localdate():%Y%m%d}.xlsx', columnas, filas)
+    compromisos = _compromisos_autorizados(request.user)
+    if delegacion:
+        compromisos = compromisos.filter(delegacion=delegacion)
+    parametros = request.GET.copy()
+    parametros.pop('formato', None)
+    return render(request, 'gestion_app/matriz_cargos.html', {
+        'periodo': periodo, 'periodos': periodos_con_indicadores(), 'delegaciones_filtro': delegaciones, 'delegacion': delegacion,
+        'calendario': salon.calendario(periodo) if periodo else None, 'bloques': bloques,
+        'tope': periodo.obtener_parametro('maximo_cumplimiento', '120') if periodo else None,
+        'tubos': salon.resumen_de_tubos(compromisos, periodo), 'consulta': parametros.urlencode(),
     })

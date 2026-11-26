@@ -2,7 +2,7 @@ import calendar
 import json
 import os
 import secrets
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from io import StringIO
 from pathlib import Path
 
@@ -14,9 +14,11 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from delegaciones_app.models import (
-    Actividad, Ajuste, Ausencia, Cargo, CasoSocial, Catalogo, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol,
-    Indicador, ItemMedible, MedicionDelegacion, Meta, Organizacion, ParametroVersionado, Periodo, Rol, UsuarioMaestro, Validacion,
+    Actividad, Ajuste, Ausencia, Cargo, CasoSocial, Catalogo, Compromiso, Delegacion, Evidencia, Funcionario, FuncionarioRol, Hito,
+    Indicador, ItemMedible, MedicionDelegacion, MembresiaOrganizacion, Meta, Organizacion, ParametroVersionado, Periodo, ResponsableHito, Rol,
+    SubtipoAtencion, Territorio, UsuarioMaestro, Validacion, Vecino,
 )
+from delegaciones_app.rut import digito_verificador
 from delegaciones_app.management.commands.importar_organizaciones import Command as ImportarOrganizaciones
 from delegaciones_app.permisos import PERFIL_ADMINISTRADOR, PERFILES, ROLES_DEL_SISTEMA, asignar_perfil
 
@@ -115,6 +117,7 @@ class Command(BaseCommand):
         self._organizaciones(delegaciones)
         if trimestre:
             self._ejemplos_de_octubre(trimestre, centro, delegado_centro, administrador)
+        self._datos_evaluacion3(delegaciones, catalogo, centro, delegado_centro)
         indicadores = sum(self._indicadores(p) for p in (periodo, trimestre) if p)
 
         if clave_generada:
@@ -218,8 +221,50 @@ class Command(BaseCommand):
         )
         CasoSocial.objects.get_or_create(
             funcionario=profesional, nombre_usuario='Vecina de ejemplo', etapa=1,
-            defaults={'telefono_usuario': '900000000', 'tipo': 'informe_social', 'observacion': 'Ejemplo de demostración, datos ficticios.'},
+            defaults={'telefono_usuario': '900000000', 'tipo': 'informe_social', 'subtipo': 'Informe aporte material', 'observacion': 'Ejemplo de demostración, datos ficticios.'},
         )
+
+    def _datos_evaluacion3(self, delegaciones, catalogo, profesional, delegado):
+        """Territorios, vecinos (RUT ficticios válidos), directiva de una junta de vecinos, un hito, subtipos y una carta."""
+        territorios = {}
+        for nombre_delegacion, sectores in {'Centro': ('Casco histórico', 'Barrio Estación'), 'Las Compañías': ('Villa El Indio',), 'Rural': ('Algarrobito',)}.items():
+            for sector in sectores:
+                territorios[sector] = Territorio.objects.get_or_create(delegacion=delegaciones[nombre_delegacion], nombre=sector)[0]
+        vecinos = []
+        for numero, (nombres, apellidos, sector) in enumerate([
+            ('Vecina', 'Ejemplo Uno', 'Casco histórico'), ('Vecino', 'Ejemplo Dos', 'Casco histórico'),
+            ('Vecina', 'Ejemplo Tres', 'Barrio Estación'), ('Vecino', 'Ejemplo Cuatro', 'Villa El Indio'),
+        ], start=1):
+            cuerpo = 11111110 + numero  # RUT ficticios con dígito verificador válido
+            vecinos.append(Vecino.objects.get_or_create(rut=f'{cuerpo}-{digito_verificador(cuerpo)}', defaults={
+                'nombres': nombres, 'apellidos': apellidos, 'telefono': f'+56 9 0000 000{numero}', 'territorio': territorios[sector],
+                'direccion': 'Dirección de ejemplo',
+            })[0])
+        junta = Organizacion.objects.filter(nombre='Junta de Vecinos Ejemplo Centro').first()
+        if junta:
+            if junta.unidad_territorial_id is None:
+                junta.unidad_territorial = territorios['Casco histórico']
+                junta.save(update_fields=['unidad_territorial'])
+            for vecino, cargo in ((vecinos[0], 'presidente'), (vecinos[1], 'tesorero'), (vecinos[2], 'socio')):
+                MembresiaOrganizacion.objects.get_or_create(vecino=vecino, organizacion=junta, fecha_inicio=date(2026, 1, 1), defaults={'cargo': cargo})
+        hito, creado = Hito.objects.get_or_create(nombre='Operativo de invierno Casco histórico', delegacion=delegaciones['Centro'], defaults={
+            'territorio': territorios['Casco histórico'], 'fecha_programada': timezone.localdate(), 'descripcion': 'Hito de demostración.',
+        })
+        if creado:
+            ResponsableHito.objects.create(hito=hito, funcionario=delegado, rol='principal')
+            ResponsableHito.objects.create(hito=hito, funcionario=profesional, rol='apoyo')
+        solicitud = catalogo[('atencion', 'Solicitud ciudadana')]
+        for nombre in ('Alumbrado público', 'Poda y áreas verdes', 'Seguridad vecinal'):
+            SubtipoAtencion.objects.get_or_create(tipo=solicitud, nombre=nombre)
+        if not Compromiso.objects.filter(tipo='carta', delegacion=delegaciones['Centro']).exists():
+            carta = Compromiso.objects.create(
+                tipo='carta', folio=Compromiso.generar_folio('carta'), delegacion=delegaciones['Centro'], funcionario_responsable=delegado,
+                origen='externo', vecino=vecinos[0], solicitante=vecinos[0].nombre_completo, solicitante_rut=vecinos[0].rut,
+                solicitante_telefono=vecinos[0].telefono, territorio='Casco histórico', organizacion=junta,
+                descripcion='Carta de la junta de vecinos solicitando reunión con el delegado (ejemplo ficticio).',
+                fecha_comprometida=timezone.localdate() + timedelta(days=10),
+            )
+            carta.registrar_historial(delegado, '', 'Ingreso de la carta (datos de demostración)')
 
     def _catalogo(self):
         elementos = {}

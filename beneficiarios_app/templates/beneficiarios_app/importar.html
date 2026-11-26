@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %}Importar planilla | SGR{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="page-kicker">Actividades de infancia</div>
+        <h1 class="page-title mb-2">Importar planilla de inscripción</h1>
+        <p class="page-intro mb-0">Sube la planilla Excel que entregó la JJ.VV. Cada fila se revisa igual que una inscripción manual (RUT, duplicados, teléfono, folio). Primero revisa; cuando no haya errores, desmarca «Solo revisar» para inscribir.</p>
+    </div>
+    <div class="acciones d-flex gap-2">
+        <a class="btn btn-light" href="{% url 'beneficiarios:inscripciones' %}">Volver</a>
+        <a class="btn btn-outline-sgr" href="{% url 'beneficiarios:plantilla' %}">Descargar plantilla</a>
+    </div>
+</div>
+
+<div class="panel mb-4">
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        {% include 'includes/_formulario.html' %}
+        <div class="form-acciones"><button class="btn btn-sgr" type="submit">Procesar planilla</button></div>
+    </form>
+</div>
+
+{% if resultado %}
+<div class="panel">
+    {% if resultado.error_general %}<div class="alert alert-danger">{{ resultado.error_general }}</div>{% endif %}
+    {% if resultado.filas %}
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3"><div class="metric"><strong>{{ resultado.filas|length }}</strong><small>Filas leídas</small></div></div>
+        <div class="col-6 col-md-3"><div class="metric navy"><strong>{{ resultado.validas }}</strong><small>{% if resultado.guardado %}Inscritas{% else %}Válidas (no guardadas){% endif %}</small></div></div>
+        <div class="col-6 col-md-3"><div class="metric coral"><strong>{{ resultado.con_error }}</strong><small>Con errores</small></div></div>
+    </div>
+    {% if not resultado.guardado and resultado.validas %}<p class="small text-muted">Modo revisión: no se guardó nada. Corrige las filas con error en el Excel o desmarca «Solo revisar» para inscribir solo las válidas.</p>{% endif %}
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <caption class="visually-hidden">Resultado por fila</caption>
+            <thead><tr><th scope="col">Fila</th><th scope="col">Nombre</th><th scope="col">RUT</th><th scope="col">Resultado</th></tr></thead>
+            <tbody>
+            {% for f in resultado.filas %}
+            <tr>
+                <td>{{ f.fila }}</td><td>{{ f.nombre }}</td><td>{{ f.rut }}</td>
+                <td>{% if f.ok %}<span class="text-success">{% if resultado.guardado %}Inscrito{% else %}Correcta{% endif %}</span>{% else %}{% for e in f.errores %}<span class="d-block text-danger small">{{ e }}</span>{% endfor %}{% endif %}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

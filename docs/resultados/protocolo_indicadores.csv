@@ -1,0 +1,12 @@
+﻿indicador;cantidad
+Planificados;35
+Ejecutados;33
+Aprobados;33
+Fallidos;0
+Bloqueados;0
+No ejecutados (manuales pendientes);2
+Defectos registrados;8
+Defectos corregidos;8
+Casos reejecutados tras corrección;6
+Pruebas automáticas que respaldan casos;103
+Requerimientos de la guía cubiertos;12

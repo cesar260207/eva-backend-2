@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}{{ titulo }} | SGR{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-9 col-xl-8">
+        <div class="page-header">
+            <div>
+                <div class="page-kicker">Actividades de infancia</div>
+                <h1 class="page-title mb-2">{{ titulo }}</h1>
+                <p class="page-intro mb-0">Los campos marcados con <span aria-hidden="true">*</span> son obligatorios. Tu correo y la fecha se registran automáticamente.</p>
+            </div>
+        </div>
+        <div class="panel">
+            <form method="post" novalidate data-url-verificar-rut="{% url 'beneficiarios:verificar_rut' %}">
+                {% csrf_token %}
+                {% include 'includes/_formulario.html' %}
+                <div id="aviso-rut" class="alert d-none mt-2" role="status" aria-live="polite"></div>
+                <div class="form-acciones">
+                    <a class="btn btn-light" href="{% url 'beneficiarios:inscripciones' %}">Cancelar</a>
+                    {% if nueva %}<button class="btn btn-outline-sgr" type="submit" name="otra" value="1">Guardar e inscribir otro</button>{% endif %}
+                    <button class="btn btn-sgr" type="submit">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script src="{% static 'beneficiarios_app/verificar_rut.js' %}" defer></script>
+{% endblock %}

@@ -12,9 +12,10 @@
             </div>
         </div>
         <div class="panel">
-            <form method="post" enctype="multipart/form-data" novalidate>
+            <form method="post" enctype="multipart/form-data" novalidate data-url-vecino="{% url 'vecino_buscar' %}">
                 {% csrf_token %}
                 {% include 'includes/_formulario.html' %}
+                {% for id, opciones in form.listas.items %}<datalist id="{{ id }}">{% for opcion in opciones %}<option value="{{ opcion }}">{% endfor %}</datalist>{% endfor %}
                 <div class="form-acciones">
                     <a class="btn btn-light" href="{% url 'inicio' %}">Cancelar</a>
                     <button class="btn btn-sgr" type="submit">Guardar</button>

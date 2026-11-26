@@ -1,12 +1,10 @@
 import os
-import uuid
-from datetime import datetime
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, JsonResponse
 from django.db import transaction
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
@@ -16,15 +14,17 @@ from django.utils import timezone
 from .forms import ActividadForm, AjusteForm, AsignarDelegadoForm, AusenciaForm, CasoSocialForm, ComentarioForm, CompromisoForm, EvidenciaForm, RevisionForm
 from .informes import PLAZOS, filtrar_actividades, filtrar_compromisos, resumen_por_responsable, situacion_de_plazo
 from .medicion import periodo_vigente, promedio_general, resultados_por_delegacion
-from .models import Actividad, Ajuste, Auditoria, Ausencia, CasoSocial, Comentario, Compromiso, Delegacion, Evidencia, Funcionario, Periodo, Validacion
+from .models import Actividad, Ajuste, Auditoria, Ausencia, CasoSocial, Comentario, Compromiso, Delegacion, Evidencia, Funcionario, Periodo, Validacion, Vecino
+from .rut import es_rut_valido, normalizar_rut
+from .tubo import ingresar_actividad, ingresar_caso_social
 from .permisos import (
     ADMINISTRADOR, COORDINADOR, DELEGADO, FUNCIONARIO, delegacion_propia, funcionario_de, puede_crear_tarea, puede_eliminar_actividad, puede_revisar,
     puede_ver_todo, registrar_acceso_denegado, rol_requerido, tiene_rol,
 )
 
-# Decisión de la revisión -> método de Validacion que la aplica a cada evidencia pendiente. La revisión
-# se simplificó a aprobar o rechazar con motivo: quien registró corrige y sube una evidencia nueva.
-DECISIONES = {'aprobar': 'aprobar_evidencia', 'rechazar': 'rechazar_evidencia'}
+# Decisión de la revisión -> método de Validacion que la aplica a cada evidencia pendiente. La revisión aprueba,
+# rechaza con motivo o solicita más antecedentes: en los dos últimos casos quien registró corrige o completa.
+DECISIONES = {'aprobar': 'aprobar_evidencia', 'rechazar': 'rechazar_evidencia', 'antecedentes': 'solicitar_antecedentes'}
 
 # Quién revisa evidencias lo decide permisos.puede_revisar (rol revisor y permiso del perfil). El delegado
 # revisa las de su delegación porque _actividades_autorizadas limita lo que ve.
@@ -226,14 +226,22 @@ def actividad_nueva(request):
         return redirect('inicio')
     form = ActividadForm(request.POST or None, user=request.user, compromisos=_compromisos_autorizados(request.user))
     if request.method == 'POST' and form.is_valid():
-        with transaction.atomic():
-            actividad = funcionario.registrar_actividad(form.cleaned_data)
-            Auditoria.registrar_evento(
-                request.user, 'crear', 'Actividad', actividad.codigo_verificador, None,
-                {'delegacion': actividad.delegacion.nombre, 'item': str(actividad.item)},
-            )
-        messages.success(request, f'Actividad creada con código {actividad.codigo_verificador}. Ahora sube su evidencia.')
-        return redirect('evidencia_subir', actividad.codigo_verificador)
+        datos = dict(form.cleaned_data)
+        ingresar, plazo = datos.pop('ingresar_al_tubo', False), datos.pop('plazo_tubo', None)
+        try:
+            with transaction.atomic():
+                actividad = funcionario.registrar_actividad(datos)
+                tarea = ingresar_actividad(actividad, funcionario, plazo) if ingresar else None
+                Auditoria.registrar_evento(
+                    request.user, 'crear', 'Actividad', actividad.codigo_verificador, None,
+                    {'delegacion': actividad.delegacion.nombre, 'item': str(actividad.item), 'tubo': tarea.folio if tarea else None},
+                )
+        except ValidationError as error:
+            form.add_error(None, error)
+        else:
+            extra = f' Ingresó al Tubo con el folio {tarea.folio}.' if tarea else ''
+            messages.success(request, f'Actividad creada con código {actividad.codigo_verificador}.{extra} Ahora sube su evidencia.')
+            return redirect('evidencia_subir', actividad.codigo_verificador)
     return render(request, 'delegaciones_app/actividad_form.html', {'form': form, 'titulo': 'Registrar actividad'})
 
 
@@ -417,8 +425,8 @@ def actividad_editar(request, codigo):
     form = ActividadForm(request.POST or None, instance=actividad, user=request.user, compromisos=_compromisos_autorizados(request.user))
     if request.method == 'POST' and form.is_valid():
         actividad = form.save(commit=False)
-        # Corregir una actividad rechazada la devuelve a la cola de revisión.
-        devuelta_a_revision = estado_anterior == 'rechazada'
+        # Corregir una actividad rechazada o con más antecedentes solicitados la devuelve a la cola de revisión.
+        devuelta_a_revision = estado_anterior in Actividad.ESTADOS_CORREGIBLES
         if devuelta_a_revision:
             actividad.estado = 'pendiente'
         try:
@@ -482,19 +490,21 @@ def compromiso_nuevo(request):
     funcionario = _funcionario_requerido(request)
     if funcionario is None:
         return redirect('inicio')
-    form = CompromisoForm(request.POST or None, user=request.user, initial={'delegacion': request.GET.get('delegacion')})
+    tipo = request.GET.get('tubo') if request.GET.get('tubo') in dict(Compromiso.TIPOS) else 'solicitud'
+    form = CompromisoForm(request.POST or None, user=request.user, initial={'delegacion': request.GET.get('delegacion'), 'tipo': tipo})
     if request.method == 'POST' and form.is_valid():
         compromiso = form.save(commit=False)
         if not puede_ver_todo(request.user):
             compromiso.funcionario_responsable = funcionario
-        compromiso.folio = f'AGR-{datetime.now():%Y%m%d}-{uuid.uuid4().hex[:5].upper()}'
+        compromiso.folio = Compromiso.generar_folio(compromiso.tipo)
         with transaction.atomic():
             compromiso.save()
-            compromiso.registrar_historial(funcionario, '', 'Creación de la tarea')
-            Auditoria.registrar_evento(request.user, 'crear', 'Compromiso', compromiso.folio, None, {'delegacion': compromiso.delegacion.nombre})
-        messages.success(request, f'Tarea creada con folio {compromiso.folio}.')
-        return redirect('agenda')
-    return render(request, 'delegaciones_app/compromiso_form.html', {'form': form, 'titulo': 'Agregar al tubo de trabajo', 'asigna': puede_ver_todo(request.user)})
+            compromiso.registrar_historial(funcionario, '', 'Creación de la tarea' if compromiso.tipo == 'solicitud' else 'Ingreso de la carta')
+            Auditoria.registrar_evento(request.user, 'crear', 'Compromiso', compromiso.folio, None, {'delegacion': compromiso.delegacion.nombre, 'tipo': compromiso.tipo})
+        messages.success(request, f'{"Carta registrada" if compromiso.tipo == "carta" else "Tarea creada"} con folio {compromiso.folio}.')
+        return redirect(f'{reverse("agenda")}?tubo=carta' if compromiso.tipo == 'carta' else 'agenda')
+    titulo = 'Registrar carta en el Tubo de cartas' if tipo == 'carta' else 'Agregar al tubo de trabajo'
+    return render(request, 'delegaciones_app/compromiso_form.html', {'form': form, 'titulo': titulo, 'asigna': puede_ver_todo(request.user)})
 
 
 @login_required
@@ -505,9 +515,7 @@ def compromiso_estado(request, pk, estado):
     if funcionario is None:
         return redirect(_url_de_lista(request, 'agenda'))
     compromiso = _obtener_autorizado(request, _compromisos_autorizados(request.user), 'Compromiso', pk=pk)
-    if not _editor_de_compromisos(request.user)(compromiso):
-        registrar_acceso_denegado(request, 'Compromiso', compromiso.folio, 'no es el responsable')
-        messages.error(request, MENSAJE_SOLO_RESPONSABLE)
+    if _denegar_edicion_de_tarea(request, compromiso):
         return redirect(_url_de_lista(request, 'agenda'))
     anterior = compromiso.estado
     observacion = request.POST.get('observacion', '').strip()
@@ -524,25 +532,37 @@ def compromiso_estado(request, pk, estado):
 
 
 MENSAJE_SOLO_RESPONSABLE = 'No tienes permiso para modificar esta tarea: lo hace su responsable o la coordinación.'
+MENSAJE_TAREA_CERRADA = 'La tarea ya está realizada: queda cerrada y solo la coordinación puede reabrirla.'
 
 
 def _editor_de_compromisos(user):
-    """Función que dice si el usuario modifica una tarea (sus datos y su estado): la modifican su responsable,
-    si es delegado o funcionario, y la coordinación. Consulta los roles una sola vez para toda una lista."""
+    """Función que dice si el usuario modifica una tarea (sus datos y su estado).
+
+    Todos los funcionarios de la delegación consultan el Tubo, pero cada uno modifica solo sus propios registros
+    mientras no estén cerrados (realizados); la coordinación modifica todos y es la única que reabre uno realizado.
+    Consulta los roles una sola vez para toda una lista."""
     if puede_ver_todo(user):
         return lambda compromiso: True
     funcionario = funcionario_de(user)
     if funcionario is None or not tiene_rol(user, DELEGADO, FUNCIONARIO):
         return lambda compromiso: False
-    return lambda compromiso: compromiso.funcionario_responsable_id == funcionario.pk
+    return lambda compromiso: compromiso.funcionario_responsable_id == funcionario.pk and compromiso.estado != 'realizado'
+
+
+def _denegar_edicion_de_tarea(request, compromiso):
+    """True (y deja el aviso y la auditoría) si el usuario no puede modificar la tarea ni cambiar su estado."""
+    if _editor_de_compromisos(request.user)(compromiso):
+        return False
+    cerrada = compromiso.estado == 'realizado' and compromiso.funcionario_responsable_id == getattr(funcionario_de(request.user), 'pk', None)
+    registrar_acceso_denegado(request, 'Compromiso', compromiso.folio, 'tarea realizada' if cerrada else 'no es el responsable')
+    messages.error(request, MENSAJE_TAREA_CERRADA if cerrada else MENSAJE_SOLO_RESPONSABLE)
+    return True
 
 
 @login_required
 def compromiso_editar(request, pk):
     compromiso = _obtener_autorizado(request, _compromisos_autorizados(request.user), 'Compromiso', pk=pk)
-    if not _editor_de_compromisos(request.user)(compromiso):
-        registrar_acceso_denegado(request, 'Compromiso', compromiso.folio, 'no es el responsable')
-        messages.error(request, MENSAJE_SOLO_RESPONSABLE)
+    if _denegar_edicion_de_tarea(request, compromiso):
         return redirect(_url_de_lista(request, 'agenda'))
     form = CompromisoForm(request.POST or None, instance=compromiso, user=request.user)
     if request.method == 'POST' and form.is_valid():
@@ -588,19 +608,37 @@ def compromiso_eliminar(request, pk):
     })
 
 
+def _responsables_visibles(user):
+    """Funcionarios que el usuario puede elegir en el filtro «Funcionario» del Tubo (los de su ámbito)."""
+    funcionarios = Funcionario.objects.filter(estado=True).select_related('delegacion').order_by('nombre')
+    if puede_ver_todo(user):
+        return funcionarios
+    propia = delegacion_propia(user)
+    return funcionarios.filter(delegacion=propia) if propia else funcionarios.none()
+
+
 @login_required
 def agenda(request):
+    """Tubo de seguimiento (solicitudes) o Tubo de cartas, según ?tipo=. Toda la delegación lo consulta."""
     _recordar_filtros(request, 'agenda')
     delegacion_id = request.GET.get('delegacion')
     estado = request.GET.get('estado')
     query = request.GET.get('q', '').strip()
-    compromisos = list(filtrar_compromisos(_compromisos_autorizados(request.user), request.GET))
+    tipo = request.GET.get('tubo') if request.GET.get('tubo') in dict(Compromiso.TIPOS) else 'solicitud'
+    filtros = request.GET.copy()
+    filtros['tubo'] = tipo
+    compromisos = list(filtrar_compromisos(_compromisos_autorizados(request.user), filtros).select_related('vecino'))
     puede_modificar = _editor_de_compromisos(request.user)
     for compromiso in compromisos:
         compromiso.estado_display, compromiso.estado_class = situacion_de_plazo(compromiso)
         compromiso.puede_modificar = puede_modificar(compromiso)
     resumen_responsables, resumen_total = resumen_por_responsable(compromisos)
-    return render(request, 'delegaciones_app/agenda.html', {
+    # Búsqueda dinámica: al escribir, el navegador pide solo el tablero (parcial=1) y lo reemplaza sin recargar.
+    plantilla = 'delegaciones_app/_tubo_resultados.html' if request.GET.get('parcial') == '1' else 'delegaciones_app/agenda.html'
+    return render(request, plantilla, {
+        'tipo_tubo': tipo,
+        'es_cartas': tipo == 'carta',
+        'responsables_filtro': _responsables_visibles(request.user),
         'compromisos': compromisos,
         'delegaciones_filtro': _delegaciones_visibles(request.user),
         'estado_filtro': estado or '',
@@ -755,18 +793,108 @@ def caso_social_nuevo(request):
     funcionario = _funcionario_requerido(request)
     if not funcionario:
         return redirect('inicio')
-    form = CasoSocialForm(request.POST or None)
+    form = CasoSocialForm(request.POST or None, user=request.user)
     if request.method == 'POST' and form.is_valid():
         caso = form.save(commit=False)
         caso.funcionario = funcionario
         if CasoSocial.objects.filter(funcionario=funcionario, nombre_usuario=caso.nombre_usuario).count() >= 3:
             form.add_error('nombre_usuario', 'Este usuario ya tiene el máximo de tres gestiones.')
         else:
-            caso.save()
-            Auditoria.registrar_evento(request.user, 'crear', 'CasoSocial', caso.pk, None, {'tipo': caso.tipo, 'etapa': caso.etapa})
-            messages.success(request, 'La gestión social fue registrada.')
-            return redirect('inicio')
+            try:
+                with transaction.atomic():
+                    caso.save()
+                    tarea = ingresar_caso_social(caso, funcionario, form.cleaned_data.get('plazo_tubo')) if form.cleaned_data.get('ingresar_al_tubo') else None
+                    Auditoria.registrar_evento(request.user, 'crear', 'CasoSocial', caso.pk, None,
+                                               {'tipo': caso.tipo, 'etapa': caso.etapa, 'tubo': tarea.folio if tarea else None})
+            except ValidationError as error:
+                form.add_error('ingresar_al_tubo', error)
+            else:
+                extra = f' Ingresó al Tubo con el folio {tarea.folio}.' if tarea else ''
+                messages.success(request, f'La gestión social fue registrada.{extra}')
+                return redirect('casos_sociales')
     return render(request, 'delegaciones_app/formulario_nuevo.html', {'form': form, 'titulo': 'Registrar atención social'})
+
+
+def _casos_autorizados(user):
+    """Gestiones sociales visibles: todas para coordinación; las de la delegación para el delegado; las propias para el resto."""
+    casos = CasoSocial.objects.select_related('funcionario__delegacion', 'compromiso', 'vecino').order_by('-creado')
+    if puede_ver_todo(user):
+        return casos
+    funcionario = funcionario_de(user)
+    if funcionario is None:
+        return casos.none()
+    if tiene_rol(user, DELEGADO) and funcionario.delegacion_id:
+        return casos.filter(funcionario__delegacion_id=funcionario.delegacion_id)
+    return casos.filter(funcionario=funcionario)
+
+
+@login_required
+def casos_sociales(request):
+    """Lista de gestiones sociales con su vínculo al Tubo; cada funcionario modifica solo las suyas."""
+    if not (request.user.has_perm('delegaciones_app.view_casosocial') or request.user.has_perm('delegaciones_app.add_casosocial')):
+        registrar_acceso_denegado(request, 'CasoSocial', request.path, 'permiso insuficiente')
+        raise Http404('Recurso no encontrado.')
+    casos = _casos_autorizados(request.user)
+    query = request.GET.get('q', '').strip()
+    if query:
+        casos = casos.filter(Q(nombre_usuario__icontains=query) | Q(subtipo__icontains=query) | Q(vecino__rut__icontains=normalizar_rut(query) or query))
+    propio = funcionario_de(request.user)
+    casos = list(casos)
+    for caso in casos:
+        caso.puede_modificar = bool(propio) and caso.funcionario_id == propio.pk and request.user.has_perm('delegaciones_app.change_casosocial')
+        caso.lista_plazos = caso.plazos()
+    return render(request, 'delegaciones_app/casos_sociales.html', {
+        'casos': casos, 'query': query, 'puede_crear': request.user.has_perm('delegaciones_app.add_casosocial'),
+        'plazo_visita': CasoSocial.PLAZO_PROGRAMAR_VISITA, 'plazo_informe': CasoSocial.PLAZO_INFORME_TRAS_VISITA,
+        'plazo_total': CasoSocial.PLAZO_TOTAL_INFORME,
+    })
+
+
+@login_required
+def caso_social_editar(request, pk):
+    caso = _obtener_autorizado(request, _casos_autorizados(request.user), 'CasoSocial', pk=pk)
+    propio = funcionario_de(request.user)
+    if not (propio and caso.funcionario_id == propio.pk and request.user.has_perm('delegaciones_app.change_casosocial')):
+        registrar_acceso_denegado(request, 'CasoSocial', str(pk), 'no es el autor')
+        messages.error(request, 'Solo quien registró la gestión social puede modificarla.')
+        return redirect('casos_sociales')
+    form = CasoSocialForm(request.POST or None, instance=caso, user=request.user)
+    if request.method == 'POST' and form.is_valid():
+        try:
+            with transaction.atomic():
+                caso = form.save()
+                tarea = ingresar_caso_social(caso, propio, form.cleaned_data.get('plazo_tubo')) if form.cleaned_data.get('ingresar_al_tubo') else None
+                Auditoria.registrar_evento(request.user, 'editar', 'CasoSocial', caso.pk, None, {'campos': form.changed_data, 'tubo': tarea.folio if tarea else None})
+        except ValidationError as error:
+            form.add_error(None, error)
+        else:
+            messages.success(request, 'La gestión social fue actualizada.')
+            return redirect('casos_sociales')
+    return render(request, 'delegaciones_app/formulario_nuevo.html', {'form': form, 'titulo': 'Modificar gestión social'})
+
+
+@login_required
+def vecino_buscar(request):
+    """Autocompletado: datos de un vecino registrado por su RUT o su id, dentro del ámbito del usuario (JSON)."""
+    if not request.user.has_perm('delegaciones_app.view_vecino'):
+        return JsonResponse({'encontrado': False}, status=403)
+    vecinos = Vecino.objects.filter(activo=True).select_related('territorio__delegacion')
+    if not puede_ver_todo(request.user):
+        propia = delegacion_propia(request.user)
+        vecinos = vecinos.filter(territorio__delegacion=propia) if propia else vecinos.none()
+    rut, pk = request.GET.get('rut', ''), request.GET.get('id', '')
+    if pk.isdigit():
+        vecino = vecinos.filter(pk=int(pk)).first()
+    elif es_rut_valido(rut):
+        vecino = vecinos.filter(rut=normalizar_rut(rut)).first()
+    else:
+        return JsonResponse({'encontrado': False, 'rut_valido': False})
+    if vecino is None:
+        return JsonResponse({'encontrado': False, 'rut_valido': True})
+    return JsonResponse({
+        'encontrado': True, 'id': vecino.pk, 'rut': vecino.rut, 'nombre': vecino.nombre_completo, 'telefono': vecino.telefono,
+        'territorio': vecino.territorio.nombre, 'delegacion': vecino.territorio.delegacion.nombre,
+    })
 
 
 @login_required

@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block title %}Cambiar contraseña | SGR{% endblock %}
+{% block content %}
+<div class="row justify-content-center"><div class="col-md-7 col-lg-5"><div class="panel">
+    <div class="page-kicker">Acceso institucional</div>
+    <h1 class="page-title h3 mb-3">{% if obligatorio %}Cambia tu contraseña temporal{% else %}Cambiar contraseña{% endif %}</h1>
+    {% if obligatorio %}
+    <div class="alert alert-warning" role="alert">Tu cuenta tiene una contraseña temporal entregada por la administración. Para continuar, crea una contraseña personal: no podrás usar el sistema hasta cambiarla.</div>
+    {% endif %}
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{% for error in form.non_field_errors %}{{ error }} {% endfor %}</div>{% endif %}
+        {% for campo in form %}
+        <div class="mb-3">
+            <label class="form-label" for="{{ campo.id_for_label }}">{{ campo.label }}</label>
+            <input class="form-control{% if campo.errors %} is-invalid{% endif %}" type="password" name="{{ campo.html_name }}" id="{{ campo.id_for_label }}" autocomplete="{% if campo.html_name == 'old_password' %}current-password{% else %}new-password{% endif %}" required{% if campo.errors %} aria-describedby="{{ campo.id_for_label }}_error"{% endif %}>
+            {% if campo.errors %}<div class="invalid-feedback" id="{{ campo.id_for_label }}_error">{% for error in campo.errors %}<span class="d-block">{{ error }}</span>{% endfor %}</div>{% endif %}
+            {% if campo.help_text %}<div class="form-text">{{ campo.help_text|safe }}</div>{% endif %}
+        </div>
+        {% endfor %}
+        <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-sgr" type="submit">Guardar contraseña</button>
+            {% if not obligatorio %}<a class="btn btn-light" href="{% url 'panel' %}">Cancelar</a>{% endif %}
+        </div>
+    </form>
+    {% if obligatorio %}
+    <form method="post" action="{% url 'logout' %}" class="mt-3">{% csrf_token %}<button class="btn btn-link px-0" type="submit">Salir sin cambiarla</button></form>
+    {% endif %}
+</div></div></div>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block title %}Matriz por cargos | SGR{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="page-kicker">Medición</div>
+        <h1 class="page-title mb-2">Matriz por cargos</h1>
+        <p class="page-intro mb-0">Vista global de la Matriz SGR (hoja SALON): cada cargo con sus ítems, ponderador, meta del trimestre, avance, cumplimiento (máximo {{ tope|default:'120' }} %) y cumplimiento ponderado. Todo se calcula con la misma regla para todos los cargos.</p>
+    </div>
+    {% if periodo and bloques %}<div class="acciones"><a class="btn btn-outline-sgr" href="?{{ consulta }}{% if consulta %}&amp;{% endif %}formato=excel">Exportar a Excel</a></div>{% endif %}
+</div>
+
+<div class="panel mb-4">
+    <form class="filtros" method="get">
+        <div><label class="form-label small mb-1" for="f-periodo">Período</label>
+            <select class="form-select" id="f-periodo" name="periodo">{% for opcion in periodos %}<option value="{{ opcion.pk }}"{% if opcion.pk == periodo.pk %} selected{% endif %}>{{ opcion.nombre }}</option>{% endfor %}</select></div>
+        {% if delegaciones_filtro|length > 1 %}
+        <div><label class="form-label small mb-1" for="f-delegacion">Delegación</label>
+            <select class="form-select" id="f-delegacion" name="delegacion"><option value="">Todas</option>{% for opcion in delegaciones_filtro %}<option value="{{ opcion.pk }}"{% if opcion.pk == delegacion.pk %} selected{% endif %}>{{ opcion.nombre }}</option>{% endfor %}</select></div>
+        {% endif %}
+        <div class="acciones"><button class="btn btn-outline-sgr" type="submit">Filtrar</button><a class="btn btn-link" href="{% url 'matriz_cargos' %}">Limpiar</a></div>
+    </form>
+</div>
+
+{% if not periodo %}
+<div class="alert alert-info">Todavía no hay indicadores calculados. Se generan al guardar una meta y al validar evidencias.</div>
+{% else %}
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-2"><div class="metric"><strong>{{ calendario.inicio|date:'d-m-Y' }}</strong><small>Fecha de inicio</small></div></div>
+    <div class="col-6 col-md-2"><div class="metric"><strong>{{ calendario.termino|date:'d-m-Y' }}</strong><small>Fecha de cierre</small></div></div>
+    <div class="col-4 col-md-2"><div class="metric navy"><strong>{{ calendario.total }}</strong><small>Días totales</small></div></div>
+    <div class="col-4 col-md-2"><div class="metric"><strong>{{ calendario.transcurridos }}</strong><small>Días transcurridos</small></div></div>
+    <div class="col-4 col-md-2"><div class="metric coral"><strong>{{ calendario.restantes }}</strong><small>Días al cierre</small></div></div>
+    <div class="col-6 col-md-2"><div class="metric amber"><strong>{{ calendario.esperado }} %</strong><small>Esperado al día</small></div></div>
+</div>
+
+{% for bloque in bloques %}
+<section class="panel mb-4" aria-labelledby="area-{{ forloop.counter }}">
+    <h2 class="h5 mb-3" id="area-{{ forloop.counter }}">{{ bloque.area }}</h2>
+    {% for persona in bloque.personas %}
+    <div class="mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+            <div><strong>{{ persona.funcionario.cargo }}</strong> · {{ persona.funcionario.nombre }} <span class="small text-muted">({{ persona.funcionario.delegacion|default:'Alcance global' }})</span></div>
+            <div>Total ponderado: <strong>{{ persona.total }} %</strong> {% include 'includes/_semaforo_insignia.html' with estado=persona.estado estado_class=persona.estado_class %}</div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <caption class="visually-hidden">Ítems de {{ persona.funcionario.cargo }}</caption>
+                <thead><tr><th scope="col">Ítem</th><th scope="col" class="text-end">Ponderador</th><th scope="col" class="text-end">Meta trimestre</th><th scope="col" class="text-end">Avance</th><th scope="col" class="text-end">Cumplimiento</th><th scope="col" class="text-end">Ponderado</th></tr></thead>
+                <tbody>
+                {% for fila in persona.filas %}
+                <tr>
+                    <td>{{ fila.item }}{% if fila.sin_calculo %} <span class="small text-muted">(sin cálculo)</span>{% endif %}</td>
+                    <td class="text-end">{{ fila.ponderador }} %</td>
+                    <td class="text-end">{{ fila.objetivo }}</td>
+                    <td class="text-end">{{ fila.avance }}</td>
+                    <td class="text-end">{{ fila.cumplimiento }} %</td>
+                    <td class="text-end">{{ fila.ponderacion }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+                <tfoot><tr><th scope="row">Cumplimiento total ponderado</th><td class="text-end">{{ persona.ponderador_total }} %</td><td colspan="3"></td><td class="text-end"><strong>{{ persona.total }} %</strong></td></tr></tfoot>
+            </table>
+        </div>
+        {% if persona.ponderador_total != 100 %}<p class="small text-danger mb-0">Las ponderaciones de este cargo suman {{ persona.ponderador_total }} %, no 100 %.</p>{% endif %}
+    </div>
+    {% endfor %}
+</section>
+{% empty %}
+<div class="panel">{% include 'includes/_estado_vacio.html' with titulo='No hay funcionarios con metas en este período y filtro.' %}</div>
+{% endfor %}
+
+<section class="panel" aria-labelledby="titulo-tubos">
+    <h2 class="h5 mb-1" id="titulo-tubos">Tubos de seguimiento del período</h2>
+    <p class="small text-muted">Tareas por estado y porcentaje realizado, como en las hojas TUBO y TUBO CARTAS. «Pendientes» son las tareas sin iniciar (ingresadas o pendientes).</p>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <caption class="visually-hidden">Resumen de los tubos</caption>
+            <thead><tr><th scope="col">Delegación</th><th scope="col">Tubo</th><th scope="col" class="text-end">Ingresadas</th><th scope="col" class="text-end">Pendientes</th><th scope="col" class="text-end">En proceso</th><th scope="col" class="text-end">Realizadas</th><th scope="col" class="text-end">Total</th><th scope="col" class="text-end">% realizado</th><th scope="col" class="text-end">% pendiente</th></tr></thead>
+            <tbody>
+            {% for fila in tubos %}
+            <tr><td>{{ fila.delegacion }}</td><td>{{ fila.tubo }}</td><td class="text-end">{{ fila.ingresado }}</td><td class="text-end">{{ fila.pendiente }}</td><td class="text-end">{{ fila.proceso }}</td><td class="text-end">{{ fila.realizado }}</td><td class="text-end">{{ fila.total }}</td><td class="text-end">{{ fila.realizado_pct }} %</td><td class="text-end">{{ fila.pendiente_pct }} %</td></tr>
+            {% empty %}
+            <tr><td colspan="9" class="text-center py-3">No hay tareas ingresadas en el período.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+{% endblock %}

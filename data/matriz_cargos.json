@@ -512,6 +512,12 @@
           "ponderacion": 35.0,
           "meta_trimestre": 0.8,
           "tipo_calculo": "tubo"
+        },
+        {
+          "nombre": "Pendientes en tubo menor a 10%",
+          "ponderacion": 15.0,
+          "meta_trimestre": 0.1,
+          "tipo_calculo": "tubo_pendientes"
         }
       ],
       "felicitacion": 10.0,
@@ -568,7 +574,7 @@
     }
   ],
   "advertencias": [
-    "«Planificación y control»: las ponderaciones suman 85 %, no 100 %.",
+    "«Planificación y control»: se agregó «Pendientes en tubo menor a 10%» desde la hoja SALON con 15 % para completar el 100 % (la hoja del cargo no lo trae).",
     "El reclamo no vale lo mismo en todas las hojas: -30 %, -20 %."
   ]
 }

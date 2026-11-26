@@ -10,6 +10,8 @@ import json
 import re
 import uuid
 
+from .rut import normalizar_rut, validar_rut
+
 DOS_DECIMALES = Decimal('0.01')
 # RF-010: teléfono de contacto con dígitos, espacios, guiones o paréntesis y un + inicial opcional (6 a 20 caracteres).
 FORMATO_TELEFONO = re.compile(r'^[+(]?[0-9][0-9 ()\-]{5,18}$')
@@ -107,6 +109,8 @@ class Funcionario(models.Model):
 	delegacion = models.ForeignKey(Delegacion, on_delete=models.PROTECT, null=True, blank=True, related_name='funcionarios')
 	estado = models.BooleanField(default=True)
 	roles = models.ManyToManyField(Rol, through='FuncionarioRol', related_name='funcionarios')
+	# Evaluación 3: la cuenta se crea con una contraseña temporal que se debe cambiar en el primer ingreso.
+	debe_cambiar_contrasena = models.BooleanField(default=False)
 
 	class Meta:
 		db_table = 'funcionario'
@@ -212,6 +216,8 @@ class Organizacion(models.Model):
 	fecha_inscripcion = models.DateField(null=True, blank=True)
 	registro_direccion = models.CharField(max_length=255, blank=True)
 	delegacion = models.ForeignKey(Delegacion, on_delete=models.PROTECT, null=True, blank=True, related_name='organizaciones')
+	# «territorio» conserva el texto del registro municipal importado; la unidad territorial normalizada es esta FK.
+	unidad_territorial = models.ForeignKey('Territorio', on_delete=models.PROTECT, null=True, blank=True, related_name='organizaciones')
 	verificada = models.BooleanField(default=False)
 	observaciones = models.TextField(blank=True)
 	activa = models.BooleanField(default=True)
@@ -225,9 +231,20 @@ class Organizacion(models.Model):
 	def __str__(self):
 		return self.nombre
 
+	def clean(self):
+		super().clean()
+		if self.unidad_territorial_id and self.delegacion_id and self.unidad_territorial.delegacion_id != self.delegacion_id:
+			raise ValidationError({'unidad_territorial': 'El territorio debe pertenecer a la delegación de la organización.'})
+
 
 class Actividad(VersionOptimistaMixin, models.Model):
-	ESTADOS = [('borrador', 'Borrador'), ('pendiente', 'Pendiente de revisión'), ('aprobada', 'Aprobada'), ('rechazada', 'Rechazada')]
+	# «antecedentes»: el verificador pidió más antecedentes; el autor completa y la actividad vuelve a revisión.
+	ESTADOS = [
+		('borrador', 'Borrador'), ('pendiente', 'Pendiente de revisión'), ('aprobada', 'Aprobada'), ('rechazada', 'Rechazada'),
+		('antecedentes', 'Solicitud de más antecedentes'),
+	]
+	# Estados en que el autor corrige y la actividad vuelve a la cola de revisión.
+	ESTADOS_CORREGIBLES = ('rechazada', 'antecedentes')
 	TIPOS_ACCION = [('ejecucion', 'Ejecución'), ('gestion_previa', 'Gestión previa')]
 	codigo_verificador = models.CharField(max_length=50, unique=True, editable=False)
 	funcionario_autor = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='actividades')
@@ -237,6 +254,8 @@ class Actividad(VersionOptimistaMixin, models.Model):
 	lugar = models.CharField(max_length=255, blank=True, default='')
 	item = models.ForeignKey('ItemMedible', on_delete=models.PROTECT, related_name='actividades')
 	catalogo = models.ForeignKey('Catalogo', on_delete=models.PROTECT, null=True, blank=True, related_name='actividades')
+	subtipo_atencion = models.ForeignKey('SubtipoAtencion', on_delete=models.PROTECT, null=True, blank=True, related_name='actividades')
+	hito = models.ForeignKey('Hito', on_delete=models.SET_NULL, null=True, blank=True, related_name='actividades')
 	compromiso = models.ForeignKey('Compromiso', on_delete=models.SET_NULL, null=True, blank=True, related_name='actividades')
 	fecha = models.DateTimeField()
 	solicitud_problema = models.TextField()
@@ -259,6 +278,11 @@ class Actividad(VersionOptimistaMixin, models.Model):
 		verbose_name = 'actividad'
 		verbose_name_plural = 'actividades'
 		ordering = ['-fecha', '-creada']
+		indexes = [
+			# Búsquedas frecuentes: actividades del autor por día (límite diario), cola de revisión por delegación y estado.
+			models.Index(fields=['funcionario_autor', 'fecha'], name='actividad_autor_fecha_idx'),
+			models.Index(fields=['delegacion', 'estado'], name='actividad_deleg_estado_idx'),
+		]
 
 	def __str__(self):
 		return f'{self.codigo_verificador} - {self.solicitud_problema[:50]}'
@@ -277,6 +301,10 @@ class Actividad(VersionOptimistaMixin, models.Model):
 
 		if self.compromiso_id:
 			self.gestion_interna = self.compromiso.gestion_interna
+		if self.subtipo_atencion_id and self.subtipo_atencion.tipo_id != self.catalogo_id:
+			raise ValidationError({'subtipo_atencion': 'El subtipo debe pertenecer al tipo de atención elegido.'})
+		if self.hito_id and self.delegacion_id and self.hito.delegacion_id != self.delegacion_id:
+			raise ValidationError({'hito': 'El hito debe pertenecer a la delegación de la actividad.'})
 
 		if self.contacto_telefono and not FORMATO_TELEFONO.match(self.contacto_telefono):
 			raise ValidationError({'contacto_telefono': 'El teléfono debe tener entre 6 y 20 caracteres: dígitos, espacios, guiones o paréntesis, con un + o un paréntesis inicial.'})
@@ -359,7 +387,7 @@ EXTENSIONES_EVIDENCIA = ['jpg', 'jpeg', 'png', 'pdf']
 
 
 class Evidencia(models.Model):
-	ESTADOS_REVISION = [('pendiente', 'Pendiente de revisión'), ('aprobada', 'Aprobada'), ('rechazada', 'Rechazada')]
+	ESTADOS_REVISION = [('pendiente', 'Pendiente de revisión'), ('aprobada', 'Aprobada'), ('rechazada', 'Rechazada'), ('antecedentes', 'Más antecedentes solicitados')]
 	codigo_evidencia = models.CharField(max_length=60, unique=True, editable=False)
 	actividad = models.ForeignKey(Actividad, on_delete=models.CASCADE, related_name='evidencias')
 	funcionario_autor = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='evidencias')
@@ -407,8 +435,8 @@ class Evidencia(models.Model):
 
 
 class Validacion(models.Model):
-	# La revisión solo aprueba o rechaza con motivo; quien registró corrige y vuelve a enviar (migración 0017).
-	DECISIONES = [('aprobada', 'Aprobada'), ('rechazada', 'Rechazada')]
+	# La revisión aprueba, rechaza con motivo o solicita más antecedentes; quien registró corrige y vuelve a enviar.
+	DECISIONES = [('aprobada', 'Aprobada'), ('rechazada', 'Rechazada'), ('antecedentes', 'Más antecedentes solicitados')]
 	evidencia = models.ForeignKey(Evidencia, on_delete=models.CASCADE, related_name='validaciones')
 	funcionario_verificador = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='validaciones')
 	decision = models.CharField(max_length=20, choices=DECISIONES)
@@ -453,6 +481,12 @@ class Validacion(models.Model):
 			raise ValidationError('El rechazo de una evidencia exige un motivo.')
 		return self._decidir('rechazada', motivo)
 
+	def solicitar_antecedentes(self, detalle):
+		"""Evaluación 3: el verificador pide más antecedentes; la actividad no suma hasta que se apruebe."""
+		if not (detalle or '').strip():
+			raise ValidationError('La solicitud de más antecedentes exige indicar qué falta.')
+		return self._decidir('antecedentes', detalle)
+
 
 class Compromiso(VersionOptimistaMixin, models.Model):
 	# En la interfaz cada compromiso es una «tarea» del tubo de trabajo: las etiquetas van en femenino.
@@ -464,14 +498,20 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 		('Organizaciones Comunitarias', 'Organizaciones Comunitarias'),
 	]
 	ORIGENES = [('interno', 'Interno'), ('externo', 'Externo')]
+	# Evaluación 3: el Tubo de seguimiento (solicitudes) y el Tubo de cartas comparten estructura, permisos e historial.
+	TIPOS = [('solicitud', 'Solicitud'), ('carta', 'Carta')]
+	PREFIJOS_FOLIO = {'solicitud': 'AGR', 'carta': 'CAR'}
 	# Ajuste 4: folio, eje, delegacion, descripcion y fecha_ingreso vienen de data/solicitudes.json.
 	folio = models.CharField(max_length=30, unique=True)
+	tipo = models.CharField(max_length=20, choices=TIPOS, default='solicitud')
 	delegacion = models.ForeignKey(Delegacion, on_delete=models.PROTECT, related_name='compromisos')
 	funcionario_responsable = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='compromisos')
 	item = models.ForeignKey('ItemMedible', on_delete=models.PROTECT, null=True, blank=True, related_name='compromisos')
 	origen = models.CharField(max_length=255, choices=ORIGENES)
 	solicitante = models.CharField(max_length=255)
+	solicitante_rut = models.CharField(max_length=12, blank=True, validators=[validar_rut])
 	solicitante_telefono = models.CharField(max_length=20, blank=True)
+	vecino = models.ForeignKey('Vecino', on_delete=models.PROTECT, null=True, blank=True, related_name='compromisos')
 	territorio = models.CharField(max_length=255)
 	organizacion = models.ForeignKey(Organizacion, on_delete=models.PROTECT, null=True, blank=True, related_name='compromisos')
 	gestion_interna = models.BooleanField(default=False)
@@ -491,12 +531,33 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 		ordering = ['-fecha_comprometida', '-creado']
 		verbose_name = 'tarea del tubo de trabajo'
 		verbose_name_plural = 'tareas del tubo de trabajo'
+		indexes = [
+			# Búsqueda dinámica del Tubo (por RUT o nombre del solicitante) y filtros por delegación, tipo y estado.
+			models.Index(fields=['solicitante_rut'], name='compromiso_rut_idx'),
+			models.Index(fields=['solicitante'], name='compromiso_solicitante_idx'),
+			models.Index(fields=['delegacion', 'tipo', 'estado'], name='compromiso_deleg_tipo_est_idx'),
+		]
 
 	def __str__(self):
 		return f'{self.folio} - {self.descripcion[:50]}'
 
+	@classmethod
+	def generar_folio(cls, tipo='solicitud'):
+		"""Folio único generado por el sistema: AGR-AAAAMMDD-XXXXX (solicitud) o CAR-AAAAMMDD-XXXXX (carta)."""
+		prefijo = cls.PREFIJOS_FOLIO.get(tipo, 'AGR')
+		while True:
+			folio = f'{prefijo}-{timezone.localdate():%Y%m%d}-{uuid.uuid4().hex[:5].upper()}'
+			if not cls.objects.filter(folio=folio).exists():
+				return folio
+
 	def clean(self):
 		super().clean()
+		self.solicitante_rut = normalizar_rut(self.solicitante_rut)
+		if self.vecino_id:
+			# Autocompletado: si se eligió un vecino registrado, sus datos completan los que falten.
+			self.solicitante_rut = self.solicitante_rut or self.vecino.rut
+			self.solicitante = self.solicitante or self.vecino.nombre_completo
+			self.solicitante_telefono = self.solicitante_telefono or self.vecino.telefono
 		self.gestion_interna = self.origen == 'interno'
 		if self.organizacion_id and self.delegacion_id and self.organizacion.delegacion_id != self.delegacion_id:
 			raise ValidationError({'organizacion': 'La organización debe pertenecer a la delegación de la tarea.'})
@@ -536,6 +597,9 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 		return None
 
 	def save(self, *args, **kwargs):
+		self.solicitante_rut = normalizar_rut(self.solicitante_rut)
+		if not self.folio:
+			self.folio = self.generar_folio(self.tipo)
 		super().save(*args, **kwargs)
 		self.actualizar_indicadores()
 
@@ -549,9 +613,14 @@ class Compromiso(VersionOptimistaMixin, models.Model):
 
 	def actualizar_indicadores(self):
 		"""Ítem tipo «tubo»: crear, cambiar de estado o eliminar una tarea cambia el porcentaje realizado de su delegación."""
-		if not self.item_id or self.item.tipo_calculo != 'tubo':
+		metas = Meta.objects.filter(funcionario__delegacion_id=self.delegacion_id)
+		# «Pendientes en el tubo» mira todas las tareas de la delegación, tengan o no un ítem asignado.
+		afectadas = Q(item__tipo_calculo='tubo_pendientes')
+		if self.item_id and self.item.tipo_calculo == 'tubo':
+			afectadas |= Q(item_id=self.item_id)
+		if self.tipo != 'solicitud':
 			return []
-		return Indicador.recalcular(Meta.objects.filter(item_id=self.item_id, funcionario__delegacion_id=self.delegacion_id))
+		return Indicador.recalcular(metas.filter(afectadas))
 
 	def registrar_historial(self, autor, estado_anterior, observacion=None):
 		HistorialCompromiso.objects.create(
@@ -766,7 +835,13 @@ class ParametroVersionado(ControlPeriodoCerradoMixin, models.Model):
 
 
 class ItemMedible(ControlPeriodoCerradoMixin, models.Model):
-	TIPOS_CALCULO = [('actividades', 'Conteo de actividades'), ('tubo', '% del tubo realizado')]
+	TIPOS_CALCULO = [
+		('actividades', 'Conteo de actividades'),
+		('tubo', '% del tubo realizado'),
+		# Hoja SALON, ítem de Planificación y control: puntaje por tramos según la proporción de tareas pendientes.
+		('tubo_pendientes', 'Pendientes en el tubo (por tramos)'),
+	]
+	TIPOS_TUBO = ('tubo', 'tubo_pendientes')
 	cargo = models.ForeignKey(Cargo, on_delete=models.PROTECT, related_name='items')
 	periodo = models.ForeignKey(Periodo, on_delete=models.PROTECT, related_name='items')
 	nombre = models.CharField(max_length=255)
@@ -832,6 +907,8 @@ class Meta(ControlPeriodoCerradoMixin, models.Model):
 	class Meta:
 		db_table = 'meta'
 		ordering = ['item__nombre']
+		# Una asignación por funcionario e ítem (el ítem ya fija el cargo y el trimestre): sin metas duplicadas.
+		constraints = [models.UniqueConstraint(fields=['item', 'funcionario'], name='meta_item_funcionario_unica')]
 
 	def __str__(self):
 		return f'{self.item.nombre} - {self.funcionario}'
@@ -873,6 +950,8 @@ class Meta(ControlPeriodoCerradoMixin, models.Model):
 
 class Indicador(ControlPeriodoCerradoMixin, models.Model):
 	SEMAFOROS = [('verde', 'Verde'), ('ambar', 'Ámbar'), ('rojo', 'Rojo')]
+	# Hoja TUBO: «pendiente» es una tarea que todavía no se empieza (Ingresada o Pendiente); «En proceso» ya se atiende.
+	ESTADOS_PENDIENTES = ('ingresado', 'pendiente')
 	meta = models.ForeignKey('Meta', on_delete=models.CASCADE, related_name='indicadores')
 	periodo = models.ForeignKey(Periodo, on_delete=models.PROTECT, related_name='indicadores')
 	fecha_calculo = models.DateTimeField(default=timezone.now)
@@ -912,30 +991,56 @@ class Indicador(ControlPeriodoCerradoMixin, models.Model):
 
 		Si el funcionario de la meta tiene delegación, solo cuentan las actividades de esa delegación.
 		"""
-		if self.meta.item.tipo_calculo == 'tubo':
-			desde = self.periodo.fecha_inicio
-			hasta = self.periodo.fecha_termino
-			tareas = Compromiso.objects.filter(
-				item=self.meta.item,
-				fecha_ingreso__gte=desde,
-				fecha_ingreso__lte=hasta,
-				delegacion=self.meta.funcionario.delegacion,
-				solicitante__isnull=False,
-				solicitante_telefono__isnull=False,
-			)
-			tareas = tareas.exclude(solicitante='').exclude(solicitante_telefono='')
-			self.avance = tareas.filter(estado='realizado').count()
+		tipo = self.meta.item.tipo_calculo
+		if tipo in ItemMedible.TIPOS_TUBO:
+			# Solo el Tubo de trabajo (solicitudes): las cartas tienen su propio Tubo y no cambian este porcentaje.
+			# «Soluciones de ingresos al tubo» mira las tareas del ítem; «Pendientes» mira todo el tubo de la delegación.
+			tareas = self.tareas_del_tubo(item=self.meta.item if tipo == 'tubo' else None)
 			self._tareas_ingresadas = tareas.count()
+			if tipo == 'tubo':
+				self.avance = tareas.filter(estado='realizado').count()
+			else:
+				pendientes = tareas.filter(estado__in=self.ESTADOS_PENDIENTES).count()
+				# El avance es el porcentaje de tareas pendientes (sin iniciar) sobre las ingresadas.
+				self.avance = (Decimal(pendientes) * 100 / self._tareas_ingresadas).quantize(DOS_DECIMALES) if self._tareas_ingresadas else Decimal('0')
 		else:
 			self.avance = self.meta.actividades_que_aportan(self.periodo).count()
 		return self.avance
 
+	def tareas_del_tubo(self, item=None):
+		"""Tareas del Tubo de trabajo de la delegación de la meta, ingresadas en el período y con contacto (RF-050)."""
+		tareas = Compromiso.objects.filter(
+			tipo='solicitud',
+			fecha_ingreso__gte=self.periodo.fecha_inicio,
+			fecha_ingreso__lte=self.periodo.fecha_termino,
+			delegacion=self.meta.funcionario.delegacion,
+			solicitante__isnull=False,
+			solicitante_telefono__isnull=False,
+		).exclude(solicitante='').exclude(solicitante_telefono='')
+		return tareas.filter(item=item) if item is not None else tareas
+
+	@staticmethod
+	def puntaje_por_pendientes(porcentaje_pendiente):
+		"""Hoja SALON, ítem «Pendientes en tubo menor a 10 %»: hasta 10 % pendiente vale 100 %; hasta 50 %, 50 %; sobre eso, 0 %.
+
+		En la planilla el resultado quedaba como texto («100%»); aquí es un número y entra al cálculo como cualquier ítem.
+		"""
+		if porcentaje_pendiente <= 10:
+			return Decimal('100')
+		if porcentaje_pendiente <= 50:
+			return Decimal('50')
+		return Decimal('0')
+
 	def calcular_cumplimiento(self):
 		"""RN-004 y RN-005: cumplimiento con tope configurable y cumplimiento ponderado."""
 		tope = Decimal(self.periodo.obtener_parametro('maximo_cumplimiento', '120'))
-		if self.meta.item.tipo_calculo == 'tubo':
-			total = getattr(self, '_tareas_ingresadas', 0)
+		tipo = self.meta.item.tipo_calculo
+		total = getattr(self, '_tareas_ingresadas', 0)
+		if tipo == 'tubo':
 			bruto = Decimal(self.avance) * 100 / Decimal(total) if total else Decimal('0')
+		elif tipo == 'tubo_pendientes':
+			# Sin tareas no hay proporción que medir: igual que el ítem del tubo, queda en 0 % hasta que haya ingresos.
+			bruto = self.puntaje_por_pendientes(Decimal(self.avance)) if total else Decimal('0')
 		else:
 			bruto = self.meta.evaluar_progreso(self.avance)
 		base = min(bruto, tope)
@@ -1084,20 +1189,121 @@ class CasoSocial(models.Model):
 		('suf', 'SUF'),
 		('sap', 'SAP'),
 		('derivacion', 'Derivación'),
+		('otras_gestiones', 'Otras gestiones sociales'),
 	]
+	# Hoja LISTA de la matriz: «tipo de atención» agrupa los tipos y cada subtipo tiene su forma de entrega.
+	GRUPOS = {
+		'informe_social': 'Informes sociales',
+		'subsidio_ips': 'Gestión de subsidios', 'pgu': 'Gestión de subsidios', 'suf': 'Gestión de subsidios', 'sap': 'Gestión de subsidios',
+		'derivacion': 'Derivaciones',
+		'otras_gestiones': 'Otras gestiones sociales',
+	}
+	SUBTIPOS_INFORME = {
+		'Informe aporte económico': 'Dinero',
+		'Informe aporte material': 'Material',
+		'Informe institución': 'Documento',
+	}
+	FORMAS_SUBSIDIO = {'subsidio_ips': 'Documento', 'pgu': 'Aporte', 'suf': 'Aporte', 'sap': 'Aporte'}
+	# Fila 19 de las hojas G SOC: plazos de respuesta de la atención social (en días corridos).
+	PLAZO_PROGRAMAR_VISITA = 10
+	PLAZO_INFORME_TRAS_VISITA = 4
+	PLAZO_TOTAL_INFORME = 20
+	MAX_REINGRESOS_INFORME = 2
+
 	funcionario = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='casos_sociales')
+	vecino = models.ForeignKey('Vecino', on_delete=models.PROTECT, null=True, blank=True, related_name='casos_sociales')
+	# Una gestión social puede ingresar o no al Tubo: si ingresa, queda vinculada a su tarea.
+	compromiso = models.ForeignKey(Compromiso, on_delete=models.SET_NULL, null=True, blank=True, related_name='casos_sociales')
 	nombre_usuario = models.CharField(max_length=255)
 	telefono_usuario = models.CharField(max_length=20)
 	etapa = models.PositiveSmallIntegerField(default=1, validators=[MinValueValidator(1)])
 	tipo = models.CharField(max_length=30, choices=TIPOS)
 	subtipo = models.CharField(max_length=255, blank=True)
 	observacion = models.TextField(blank=True)
+	# Seguimiento de la hoja G SOC: ingreso, visita (programada y realizada), entrega del informe y reingresos.
+	fecha_ingreso = models.DateField(default=timezone.localdate)
+	requiere_visita = models.BooleanField(default=False)
+	fecha_programada_visita = models.DateField(null=True, blank=True)
+	fecha_visita = models.DateField(null=True, blank=True)
+	fecha_entrega_informe = models.DateField(null=True, blank=True)
+	reingresos_informe = models.PositiveSmallIntegerField(default=0)
 	creado = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		verbose_name = 'gestión social'
+		verbose_name_plural = 'gestiones sociales'
+		ordering = ['-creado']
+
+	def __str__(self):
+		return f'{self.get_tipo_display()} - {self.nombre_usuario}'
+
+	@property
+	def grupo(self):
+		return self.GRUPOS.get(self.tipo, '')
+
+	@property
+	def forma(self):
+		"""Forma de entrega según la hoja LISTA (dinero, material, documento o aporte); vacía si no aplica."""
+		if self.tipo == 'informe_social':
+			return self.SUBTIPOS_INFORME.get(self.subtipo, '')
+		return self.FORMAS_SUBSIDIO.get(self.tipo, '')
 
 	def clean(self):
 		super().clean()
 		if self.etapa > 3:
 			raise ValidationError({'etapa': 'Un caso social puede tener como máximo tres gestiones.'})
+		if self.telefono_usuario and not FORMATO_TELEFONO.match(self.telefono_usuario):
+			raise ValidationError({'telefono_usuario': 'El teléfono debe tener entre 6 y 20 caracteres: dígitos, espacios, guiones o paréntesis.'})
+		if self.tipo == 'informe_social' and self.subtipo not in self.SUBTIPOS_INFORME:
+			raise ValidationError({'subtipo': 'Elige el tipo de informe: ' + ', '.join(self.SUBTIPOS_INFORME) + '.'})
+		if self.reingresos_informe > self.MAX_REINGRESOS_INFORME:
+			raise ValidationError({'reingresos_informe': f'Un informe se reingresa como máximo {self.MAX_REINGRESOS_INFORME} veces.'})
+		if self.reingresos_informe and not self.fecha_entrega_informe:
+			raise ValidationError({'reingresos_informe': 'Solo se reingresa un informe que ya fue entregado.'})
+		errores = {}
+		if not self.requiere_visita:
+			for campo in ('fecha_programada_visita', 'fecha_visita'):
+				if getattr(self, campo):
+					errores[campo] = 'Marca «Requiere visita» para registrar fechas de visita.'
+		ingreso = self.fecha_ingreso
+		if ingreso:
+			for campo in ('fecha_programada_visita', 'fecha_visita', 'fecha_entrega_informe'):
+				valor = getattr(self, campo)
+				if valor and valor < ingreso and campo not in errores:
+					errores[campo] = 'No puede ser anterior a la fecha de ingreso.'
+		if self.fecha_visita and self.fecha_entrega_informe and self.fecha_entrega_informe < self.fecha_visita:
+			errores.setdefault('fecha_entrega_informe', 'El informe no puede entregarse antes de la visita.')
+		if errores:
+			raise ValidationError(errores)
+
+	def plazos(self):
+		"""Plazos de respuesta de la hoja G SOC, con los días que tomó cada tramo y si cumple.
+
+		En la planilla cada diferencia se calculaba en una columna aparte y se comparaba a ojo con la fila 19.
+		Un tramo sin fecha final queda «en curso» y se mide hasta hoy.
+		"""
+		hoy = timezone.localdate()
+		filas = []
+
+		def tramo(nombre, desde, hasta, limite, exacto=False):
+			if not desde:
+				return
+			dias = ((hasta or hoy) - desde).days
+			cumple = dias == 0 if exacto else dias <= limite
+			filas.append({
+				'nombre': nombre, 'dias': dias, 'limite': limite, 'en_curso': hasta is None,
+				'cumple': cumple, 'vencido': hasta is None and not cumple,
+			})
+
+		if self.requiere_visita:
+			tramo('Ingreso → visita programada', self.fecha_ingreso, self.fecha_programada_visita, self.PLAZO_PROGRAMAR_VISITA)
+			if self.fecha_programada_visita:
+				tramo('Visita programada → visita realizada', self.fecha_programada_visita, self.fecha_visita, 0, exacto=self.fecha_visita is not None)
+			if self.fecha_visita:
+				tramo('Visita → entrega del informe', self.fecha_visita, self.fecha_entrega_informe, self.PLAZO_INFORME_TRAS_VISITA)
+		if self.tipo == 'informe_social':
+			tramo('Ingreso → entrega del informe', self.fecha_ingreso, self.fecha_entrega_informe, self.PLAZO_TOTAL_INFORME)
+		return filas
 
 
 class Comentario(models.Model):
@@ -1111,6 +1317,192 @@ class Comentario(models.Model):
 		super().clean()
 		if bool(self.actividad_id) == bool(self.compromiso_id):
 			raise ValidationError('El comentario debe asociarse a una actividad o a una tarea.')
+
+
+class Territorio(models.Model):
+	"""Unidad territorial (sector, villa o localidad) de una delegación. Normaliza el texto libre de territorio."""
+	nombre = models.CharField(max_length=255)
+	delegacion = models.ForeignKey(Delegacion, on_delete=models.PROTECT, related_name='territorios')
+	descripcion = models.TextField(blank=True)
+	activo = models.BooleanField(default=True)
+
+	class Meta:
+		db_table = 'territorio'
+		ordering = ['delegacion__nombre', 'nombre']
+		verbose_name = 'territorio'
+		verbose_name_plural = 'territorios'
+		constraints = [models.UniqueConstraint(fields=['delegacion', 'nombre'], name='territorio_delegacion_nombre_unico')]
+
+	def __str__(self):
+		return f'{self.nombre} ({self.delegacion})'
+
+
+class Vecino(models.Model):
+	"""Persona de la comunidad atendida por la delegación. Su delegación se deduce de su territorio (sin duplicarla)."""
+	rut = models.CharField(max_length=12, unique=True, validators=[validar_rut])
+	nombres = models.CharField(max_length=150)
+	apellidos = models.CharField(max_length=150)
+	telefono = models.CharField(max_length=20, blank=True)
+	email = models.EmailField(blank=True)
+	direccion = models.CharField(max_length=255, blank=True)
+	territorio = models.ForeignKey(Territorio, on_delete=models.PROTECT, related_name='vecinos')
+	fecha_registro = models.DateTimeField(auto_now_add=True)
+	activo = models.BooleanField(default=True)
+
+	class Meta:
+		db_table = 'vecino'
+		ordering = ['apellidos', 'nombres']
+		verbose_name = 'vecino'
+		verbose_name_plural = 'vecinos'
+		indexes = [models.Index(fields=['apellidos', 'nombres'], name='vecino_nombre_idx')]
+
+	def __str__(self):
+		return f'{self.nombre_completo} ({self.rut})'
+
+	@property
+	def nombre_completo(self):
+		return f'{self.nombres} {self.apellidos}'.strip()
+
+	@property
+	def delegacion(self):
+		return self.territorio.delegacion if self.territorio_id else None
+
+	def clean(self):
+		super().clean()
+		self.rut = normalizar_rut(self.rut)
+		if self.telefono and not FORMATO_TELEFONO.match(self.telefono):
+			raise ValidationError({'telefono': 'El teléfono debe tener entre 6 y 20 caracteres: dígitos, espacios, guiones o paréntesis.'})
+
+	def save(self, *args, **kwargs):
+		self.rut = normalizar_rut(self.rut)
+		super().save(*args, **kwargs)
+
+
+class MembresiaOrganizacion(models.Model):
+	"""Membresía de un vecino en una organización comunitaria y, si corresponde, su cargo en la directiva."""
+	CARGOS = [
+		('socio', 'Socio/a'), ('presidente', 'Presidente/a'), ('vicepresidente', 'Vicepresidente/a'),
+		('secretario', 'Secretario/a'), ('tesorero', 'Tesorero/a'), ('director', 'Director/a'),
+	]
+	# Cargos de la directiva que solo una persona ocupa a la vez en cada organización.
+	CARGOS_UNIPERSONALES = ('presidente', 'vicepresidente', 'secretario', 'tesorero')
+	vecino = models.ForeignKey(Vecino, on_delete=models.PROTECT, related_name='membresias')
+	organizacion = models.ForeignKey(Organizacion, on_delete=models.PROTECT, related_name='membresias')
+	cargo = models.CharField(max_length=20, choices=CARGOS, default='socio')
+	fecha_inicio = models.DateField(default=timezone.localdate)
+	fecha_termino = models.DateField(null=True, blank=True)
+
+	class Meta:
+		db_table = 'membresia_organizacion'
+		ordering = ['organizacion__nombre', 'cargo', 'vecino__apellidos']
+		verbose_name = 'membresía o dirigencia'
+		verbose_name_plural = 'membresías y dirigencias'
+		constraints = [
+			models.UniqueConstraint(fields=['vecino', 'organizacion', 'fecha_inicio'], name='membresia_vecino_org_inicio_unica'),
+			models.CheckConstraint(condition=Q(fecha_termino__isnull=True) | Q(fecha_termino__gte=models.F('fecha_inicio')), name='membresia_fechas_validas'),
+		]
+
+	def __str__(self):
+		return f'{self.vecino.nombre_completo} - {self.get_cargo_display()} en {self.organizacion}'
+
+	@property
+	def vigente(self):
+		return self.fecha_termino is None or self.fecha_termino >= timezone.localdate()
+
+	@property
+	def es_dirigente(self):
+		return self.cargo != 'socio'
+
+	def _traslapadas(self, otras):
+		"""Membresías de la misma organización cuyo período se cruza con el de esta."""
+		otras = otras.filter(organizacion_id=self.organizacion_id).exclude(pk=self.pk)
+		otras = otras.filter(Q(fecha_termino__isnull=True) | Q(fecha_termino__gte=self.fecha_inicio))
+		if self.fecha_termino:
+			otras = otras.filter(fecha_inicio__lte=self.fecha_termino)
+		return otras
+
+	def clean(self):
+		super().clean()
+		if not (self.vecino_id and self.organizacion_id and self.fecha_inicio):
+			return
+		if self.fecha_termino and self.fecha_termino < self.fecha_inicio:
+			raise ValidationError({'fecha_termino': 'El término no puede ser anterior al inicio.'})
+		if self._traslapadas(MembresiaOrganizacion.objects.filter(vecino_id=self.vecino_id)).exists():
+			raise ValidationError('El vecino ya tiene una membresía en esta organización para esas fechas.')
+		if self.cargo in self.CARGOS_UNIPERSONALES and self._traslapadas(MembresiaOrganizacion.objects.filter(cargo=self.cargo)).exists():
+			raise ValidationError({'cargo': f'La organización ya tiene {self.get_cargo_display().lower()} vigente en esas fechas.'})
+
+
+class Hito(models.Model):
+	"""Hito territorial de la delegación (operativo, reunión con dirigentes, inauguración) con sus responsables."""
+	ESTADOS = [('planificado', 'Planificado'), ('en_curso', 'En curso'), ('realizado', 'Realizado'), ('cancelado', 'Cancelado')]
+	nombre = models.CharField(max_length=255)
+	descripcion = models.TextField(blank=True)
+	delegacion = models.ForeignKey(Delegacion, on_delete=models.PROTECT, related_name='hitos')
+	territorio = models.ForeignKey(Territorio, on_delete=models.PROTECT, null=True, blank=True, related_name='hitos')
+	fecha_programada = models.DateField()
+	fecha_realizacion = models.DateField(null=True, blank=True)
+	estado = models.CharField(max_length=20, choices=ESTADOS, default='planificado')
+	responsables = models.ManyToManyField(Funcionario, through='ResponsableHito', related_name='hitos')
+	creado = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		db_table = 'hito'
+		ordering = ['-fecha_programada', 'nombre']
+		verbose_name = 'hito'
+		verbose_name_plural = 'hitos'
+		indexes = [models.Index(fields=['delegacion', 'fecha_programada'], name='hito_deleg_fecha_idx')]
+
+	def __str__(self):
+		return f'{self.nombre} ({self.fecha_programada:%d-%m-%Y})'
+
+	def clean(self):
+		super().clean()
+		if self.territorio_id and self.delegacion_id and self.territorio.delegacion_id != self.delegacion_id:
+			raise ValidationError({'territorio': 'El territorio debe pertenecer a la delegación del hito.'})
+		if self.estado == 'realizado' and not self.fecha_realizacion:
+			raise ValidationError({'fecha_realizacion': 'Indica la fecha en que se realizó el hito.'})
+		if self.fecha_realizacion and self.fecha_realizacion > timezone.localdate():
+			raise ValidationError({'fecha_realizacion': 'La fecha de realización no puede estar en el futuro.'})
+
+
+class ResponsableHito(models.Model):
+	"""Funcionario responsable de un hito: uno principal y los de apoyo que hagan falta."""
+	ROLES = [('principal', 'Responsable principal'), ('apoyo', 'Apoyo')]
+	hito = models.ForeignKey(Hito, on_delete=models.CASCADE, related_name='asignaciones')
+	funcionario = models.ForeignKey(Funcionario, on_delete=models.PROTECT, related_name='asignaciones_hito')
+	rol = models.CharField(max_length=20, choices=ROLES, default='apoyo')
+
+	class Meta:
+		db_table = 'responsable_hito'
+		verbose_name = 'responsable de hito'
+		verbose_name_plural = 'responsables de hitos'
+		constraints = [models.UniqueConstraint(fields=['hito', 'funcionario'], name='responsable_hito_unico')]
+
+	def __str__(self):
+		return f'{self.funcionario} - {self.get_rol_display()} de {self.hito}'
+
+
+class SubtipoAtencion(models.Model):
+	"""Subtipo de un tipo de atención del catálogo (por ejemplo, «Alumbrado» dentro de «Solicitud ciudadana»)."""
+	tipo = models.ForeignKey(Catalogo, on_delete=models.PROTECT, related_name='subtipos', limit_choices_to={'tipo': 'atencion'})
+	nombre = models.CharField(max_length=255)
+	activo = models.BooleanField(default=True)
+
+	class Meta:
+		db_table = 'subtipo_atencion'
+		ordering = ['tipo__nombre', 'nombre']
+		verbose_name = 'subtipo de atención'
+		verbose_name_plural = 'subtipos de atención'
+		constraints = [models.UniqueConstraint(fields=['tipo', 'nombre'], name='subtipo_atencion_tipo_nombre_unico')]
+
+	def __str__(self):
+		return f'{self.tipo.nombre} › {self.nombre}'
+
+	def clean(self):
+		super().clean()
+		if self.tipo_id and self.tipo.tipo != 'atencion':
+			raise ValidationError({'tipo': 'El subtipo debe colgar de un elemento del catálogo de tipo «Tipo de atención».'})
 
 
 MENSAJE_AUDITORIA_SOLO_LECTURA = 'La auditoría es de solo lectura: sus registros no se modifican ni se eliminan.'

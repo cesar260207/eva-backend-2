@@ -1,5 +1,6 @@
 """Filtros e informes compartidos por las listas (actividades, agenda) y por los informes exportables (RF-032, RF-033)."""
 import csv
+import re
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
@@ -52,13 +53,32 @@ def filtrar_actividades(actividades, datos):
     return actividades
 
 
+def buscar_en_tubo(compromisos, texto):
+    """Búsqueda del Tubo por código (folio), RUT o nombre del solicitante, además de descripción y delegación.
+
+    El RUT se compara sin puntos ni guion, así que «12.345.678-5», «12345678-5» y «123456785» encuentran lo mismo.
+    """
+    texto = (texto or '').strip()
+    if not texto:
+        return compromisos
+    condicion = (
+        Q(folio__icontains=texto) | Q(descripcion__icontains=texto) | Q(solicitante__icontains=texto)
+        | Q(delegacion__nombre__icontains=texto) | Q(vecino__nombres__icontains=texto) | Q(vecino__apellidos__icontains=texto)
+    )
+    rut = re.sub(r'[\s.\-]', '', texto).upper()
+    if len(rut) >= 3 and re.fullmatch(r'[0-9]+K?', rut):
+        # El RUT normalizado lleva guion antes del dígito verificador: se busca con y sin ese guion.
+        condicion |= Q(solicitante_rut__icontains=rut) | Q(solicitante_rut__icontains=f'{rut[:-1]}-{rut[-1]}')
+    return compromisos.filter(condicion).distinct()
+
+
 def filtrar_compromisos(compromisos, datos):
-    """Aplica q, delegacion, estado, plazo, periodo, desde y hasta (sobre la fecha comprometida)."""
-    texto = (datos.get('q') or '').strip()
-    if texto:
-        compromisos = compromisos.filter(
-            Q(folio__icontains=texto) | Q(descripcion__icontains=texto) | Q(solicitante__icontains=texto) | Q(delegacion__nombre__icontains=texto)
-        )
+    """Aplica q, tubo (solicitud o carta), delegacion, responsable, estado, plazo, periodo, desde y hasta (fecha comprometida)."""
+    compromisos = buscar_en_tubo(compromisos, datos.get('q'))
+    if datos.get('tubo') in dict(Compromiso.TIPOS):
+        compromisos = compromisos.filter(tipo=datos['tubo'])
+    if _entero(datos.get('responsable')):
+        compromisos = compromisos.filter(funcionario_responsable_id=int(datos['responsable']))
     if _entero(datos.get('delegacion')):
         compromisos = compromisos.filter(delegacion_id=int(datos['delegacion']))
     if datos.get('estado') in dict(Compromiso.ESTADOS):
@@ -103,10 +123,12 @@ def filas_de_actividades(actividades):
 
 def filas_de_compromisos(compromisos):
     """Columnas y filas planas de un informe de compromisos."""
-    columnas = ['Folio', 'Delegación', 'Eje', 'Solicitante', 'Responsable', 'Fecha comprometida', 'Estado', 'Situación del plazo', 'Descripción']
+    # «Tubo» y «RUT» van al final para no mover las columnas que ya usaban los informes exportados.
+    columnas = ['Folio', 'Delegación', 'Eje', 'Solicitante', 'Responsable', 'Fecha comprometida', 'Estado', 'Situación del plazo', 'Descripción', 'Tubo', 'RUT']
     filas = [
         [c.folio, c.delegacion.nombre, c.eje, c.solicitante, c.funcionario_responsable.nombre if c.funcionario_responsable_id else '',
-         c.fecha_comprometida.strftime('%d-%m-%Y'), c.get_estado_display(), situacion_de_plazo(c)[0], c.descripcion]
+         c.fecha_comprometida.strftime('%d-%m-%Y'), c.get_estado_display(), situacion_de_plazo(c)[0], c.descripcion,
+         'Cartas' if c.tipo == 'carta' else 'Trabajo', c.solicitante_rut]
         for c in compromisos
     ]
     return columnas, filas

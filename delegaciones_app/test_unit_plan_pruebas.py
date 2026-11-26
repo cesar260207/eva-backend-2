@@ -69,8 +69,9 @@ class ArmadoDelPlanTests(SimpleTestCase):
 
     def test_el_catalogo_tiene_los_casos_de_uso_y_los_38_requisitos(self):
         """Sin CU (herramienta de apoyo). Los catálogos coinciden con la especificación."""
-        self.assertEqual(len(CATALOGO_RF), 38)
-        self.assertEqual(sorted(CATALOGO_RF), list(range(1, 39)))
+        # Los 38 de la especificación, los 12 de la Evaluación 3 (RF-051 a RF-062) y los 3 de la Matriz SGR completa (RF-063 a RF-065).
+        self.assertEqual(len(CATALOGO_RF), 53)
+        self.assertEqual(sorted(CATALOGO_RF), list(range(1, 39)) + list(range(51, 66)))
         self.assertIn('CU-27.1', CATALOGO_CU)
         self.assertEqual(len([cu for cu in CATALOGO_CU if '.' not in cu]), 32)
 

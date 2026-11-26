@@ -324,7 +324,7 @@ class FichaPersonalUnitTests(MedicionBase):
         self.aprobar(self.nueva_actividad(solicitud_problema='Aprobada'))
         self.nueva_evidencia(self.nueva_actividad(solicitud_problema='Pendiente'))
         conteo = {fila['estado']: fila['total'] for fila in medicion.resumen_de_evidencias(self.autor, self.periodo)}
-        self.assertEqual(conteo, {'pendiente': 1, 'aprobada': 1, 'rechazada': 0})
+        self.assertEqual(conteo, {'pendiente': 1, 'aprobada': 1, 'rechazada': 0, 'antecedentes': 0})
 
     def test_resumen_de_compromisos_por_situacion(self):
         """CU-14.1 Clasificar compromisos por vencimiento (RF-019). Vigentes, por vencer, vencidos y realizados."""

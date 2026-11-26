@@ -99,3 +99,30 @@ Equipo de cuatro integrantes: se exigen 8 mantenedores y 4 transacciones.
 - [ ] Regenerar `docs/casos_uso/imagenes/diapositiva_g06.png` con Graphviz.
 - [ ] En el servidor: crear `~/.my.cnf`, probar `scripts/respaldo.sh` y programarlo con cron.
 - [ ] Preparar la presentación con la estructura de [docs/DEMO_EXPOSICION.md](docs/DEMO_EXPOSICION.md) sección 8.
+
+## Evaluación 3 (entrega lunes 30-11-2026, 11:25)
+
+Código (hecho y probado: suite completa en verde, ver [docs/PROTOCOLO_PRUEBAS.md](docs/PROTOCOLO_PRUEBAS.md)):
+
+- [x] Contraseña temporal al crear o restablecer usuarios y cambio obligatorio en el primer ingreso (`/cuenta/cambiar-contrasena/`).
+- [x] Bloqueo de ingreso tras 5 intentos fallidos (15 min), auditado.
+- [x] Revisión con «Solicitar más antecedentes», alerta al autor y vuelta a revisión al completar.
+- [x] Tubo de cartas (`/agenda/?tubo=carta`), búsqueda al escribir por código, RUT o nombre, filtro por funcionario.
+- [x] El menú «Tareas» pasa a llamarse «Tubo»: reúne el Tubo de trabajo y el Tubo de cartas (cada registro del Tubo de trabajo sigue siendo una «tarea»).
+- [x] Tareas realizadas cerradas para su responsable (solo coordinación las reabre).
+- [x] Actividades y gestiones sociales pueden ingresar o no al Tubo; lista y edición de gestiones sociales (`/casos-sociales/`).
+- [x] Mantenedores nuevos: territorios, vecinos (RUT validado), membresías y dirigencias, hitos con responsables, subtipos de atención.
+- [x] Meta única por funcionario e ítem (restricción en la base), índices para búsquedas frecuentes, restricción CHECK de fechas.
+- [x] Dashboard con gráficos y filtros (`/gestion/tablero/`), cada gráfico con su tabla de datos.
+- [x] Respaldo portable `python manage.py respaldo` y su restauración probada.
+- [x] Guía técnica [docs/IMPLEMENTACION.md](docs/IMPLEMENTACION.md), protocolo y [matriz de trazabilidad](docs/TRAZABILIDAD.md) generados.
+
+Pendiente del equipo:
+
+- [ ] Revisar y probar todo en local; recién entonces subir la rama y abrir el pull request.
+- [ ] Asignar responsables en `RESPONSABLE_POR_AREA` (`delegaciones_app/protocolo.py`) y regenerar con `python manage.py protocolo_pruebas`.
+- [ ] Ejecutar los casos manuales CP-05 (correo real) y CP-32 (revisión visual responsiva, tema oscuro, teclado),
+      anotar su resultado en `RESULTADOS_MANUALES` y regenerar el protocolo.
+- [ ] En EC2: `git pull`, `pip install -r requirements.txt`, `python manage.py migrate` (0030 y 0031), `collectstatic`,
+      reiniciar Gunicorn; opcional `seed_demo` para los datos demo nuevos.
+- [ ] Capturas o video breve de los flujos nuevos para el informe (sin reemplazar la demostración en vivo).

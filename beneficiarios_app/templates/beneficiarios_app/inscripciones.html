@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}Beneficiarios infancia | SGR{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="page-kicker">Actividades de infancia</div>
+        <h1 class="page-title mb-2">Beneficiarios inscritos</h1>
+        <p class="page-intro mb-0">Menores inscritos en Navidad, Día del Niño y Aniversario. Cada unidad ve solo sus inscripciones; un RUT se inscribe una sola vez por actividad.</p>
+    </div>
+    <div class="acciones d-flex flex-wrap gap-2">
+        {% if puede_administrar %}<a class="btn btn-outline-sgr" href="{% url 'beneficiarios:eventos' %}">Actividades</a><a class="btn btn-outline-sgr" href="{% url 'beneficiarios:unidades' %}">Unidades</a>{% endif %}
+        <a class="btn btn-outline-sgr" href="{% url 'beneficiarios:exportar' %}?{{ consulta }}">Exportar a Excel</a>
+        {% if puede_crear %}<a class="btn btn-outline-sgr" href="{% url 'beneficiarios:importar' %}">Importar planilla</a>{% endif %}
+        {% if puede_crear %}<a class="btn btn-sgr" href="{% url 'beneficiarios:inscribir' %}">+ Inscribir beneficiario</a>{% endif %}
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3"><div class="metric"><strong>{{ totales.total }}</strong><small>Inscritos</small></div></div>
+    <div class="col-6 col-md-3"><div class="metric coral"><strong>{{ totales.femenino }}</strong><small>Femenino</small></div></div>
+    <div class="col-6 col-md-3"><div class="metric navy"><strong>{{ totales.masculino }}</strong><small>Masculino</small>{% if totales.otro %}<span class="d-block small">Otro / no informa: <b>{{ totales.otro }}</b></span>{% endif %}</div></div>
+    <div class="col-6 col-md-3"><div class="metric amber"><small>Por rango de edad</small>{% for etiqueta, n in por_edad %}<span class="d-block small">{{ etiqueta }}: <b>{{ n }}</b></span>{% endfor %}</div></div>
+</div>
+
+<div class="panel">
+    <form class="filtros mb-3" method="get">
+        <div class="filtro-texto"><label class="form-label small mb-1" for="q">Buscar</label><input class="form-control" id="q" name="q" value="{{ filtros.q|default:'' }}" placeholder="Nombre, RUT o folio RSH"></div>
+        <div><label class="form-label small mb-1" for="f-evento">Actividad</label>
+            <select class="form-select" id="f-evento" name="evento"><option value="">Todas</option>{% for e in eventos %}<option value="{{ e.pk }}"{% if filtros.evento == e.pk|stringformat:'s' %} selected{% endif %}>{{ e }}{% if not e.inscripciones_abiertas %} (cerrada){% endif %}</option>{% endfor %}</select></div>
+        <div><label class="form-label small mb-1" for="f-unidad">Unidad</label>
+            <select class="form-select" id="f-unidad" name="unidad"><option value="">Todas</option>{% for u in unidades %}<option value="{{ u.pk }}"{% if filtros.unidad == u.pk|stringformat:'s' %} selected{% endif %}>{{ u }}</option>{% endfor %}</select></div>
+        <div><label class="form-label small mb-1" for="f-edad">Edad</label>
+            <select class="form-select" id="f-edad" name="rango_edad"><option value="">Todas</option>{% for valor, etiqueta in rangos %}<option value="{{ valor }}"{% if filtros.rango_edad == valor %} selected{% endif %}>{{ etiqueta }}</option>{% endfor %}</select></div>
+        <div><label class="form-label small mb-1" for="f-genero">Género</label>
+            <select class="form-select" id="f-genero" name="genero"><option value="">Todos</option>{% for valor, etiqueta in generos %}<option value="{{ valor }}"{% if filtros.genero == valor %} selected{% endif %}>{{ etiqueta }}</option>{% endfor %}</select></div>
+        <div><label class="form-label small mb-1" for="f-tramo">Tramo RSH</label>
+            <select class="form-select" id="f-tramo" name="tramo_rsh"><option value="">Todos</option>{% for valor, etiqueta in tramos %}<option value="{{ valor }}"{% if filtros.tramo_rsh == valor|stringformat:'s' %} selected{% endif %}>{{ etiqueta }}</option>{% endfor %}</select></div>
+        <div class="acciones"><button class="btn btn-outline-sgr" type="submit">Filtrar</button><a class="btn btn-link" href="{% url 'beneficiarios:inscripciones' %}">Limpiar</a></div>
+    </form>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <caption class="visually-hidden">Beneficiarios inscritos</caption>
+            <thead><tr><th scope="col">Menor</th><th scope="col">Edad / género</th><th scope="col">RSH</th><th scope="col">Organización</th><th scope="col">Unidad</th><th scope="col">Registro</th><th scope="col"><span class="visually-hidden">Acciones</span></th></tr></thead>
+            <tbody>
+            {% for i in inscripciones %}
+            <tr>
+                <td><strong>{{ i.nombre }}</strong><div class="small text-muted">{{ i.rut }} · {{ i.evento }}</div></td>
+                <td>{{ i.get_rango_edad_display }}<div class="small text-muted">{{ i.get_genero_display }}</div></td>
+                <td>Tramo {{ i.get_tramo_rsh_display }}<div class="small text-muted">Folio {{ i.folio_rsh }}</div></td>
+                <td>{{ i.organizacion_nombre }}<div class="small text-muted">{{ i.telefono }}</div></td>
+                <td>{{ i.unidad }}</td>
+                <td>{{ i.creado|date:'d-m-Y' }}<div class="small text-muted">{{ i.registrado_por.get_username }}</div></td>
+                <td class="text-end text-nowrap">
+                    {% if i.puede_modificar %}<a class="btn btn-sm btn-outline-sgr" href="{% url 'beneficiarios:modificar' i.pk %}">Modificar</a>{% endif %}
+                    {% if i.puede_eliminar %}<a class="btn btn-sm btn-outline-danger" href="{% url 'beneficiarios:eliminar' i.pk %}">Eliminar</a>{% endif %}
+                    {% if not i.puede_modificar and not i.puede_eliminar %}<span class="small text-muted">Solo lectura</span>{% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="text-center py-4">No hay beneficiarios inscritos{% if filtros.q %} para esta búsqueda{% endif %}.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

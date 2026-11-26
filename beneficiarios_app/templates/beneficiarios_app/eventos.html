@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Actividades de infancia | SGR{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="page-kicker">Beneficiarios · Administración</div>
+        <h1 class="page-title mb-2">Actividades</h1>
+        <p class="page-intro mb-0">Abre o cierra las inscripciones de cada actividad. Con la actividad cerrada nadie puede inscribir ni modificar.</p>
+    </div>
+    <div class="acciones d-flex gap-2">
+        <a class="btn btn-light" href="{% url 'beneficiarios:inscripciones' %}">Volver</a>
+        <a class="btn btn-sgr" href="{% url 'beneficiarios:evento_nuevo' %}">+ Nueva actividad</a>
+    </div>
+</div>
+<div class="panel">
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <caption class="visually-hidden">Actividades de infancia</caption>
+            <thead><tr><th scope="col">Actividad</th><th scope="col">Inscripciones</th><th scope="col">Inscritos</th><th scope="col"><span class="visually-hidden">Acciones</span></th></tr></thead>
+            <tbody>
+            {% for e in eventos %}
+            <tr>
+                <td><strong>{{ e }}</strong>{% if e.descripcion %}<div class="small text-muted">{{ e.descripcion }}</div>{% endif %}</td>
+                <td>{% if e.inscripciones_abiertas %}<span class="badge text-bg-success">Abiertas</span>{% else %}<span class="badge text-bg-secondary">Cerradas</span>{% endif %}</td>
+                <td><a href="{% url 'beneficiarios:inscripciones' %}?evento={{ e.pk }}">{{ e.total }}</a></td>
+                <td class="text-end"><a class="btn btn-sm btn-outline-sgr" href="{% url 'beneficiarios:evento_editar' e.pk %}">Modificar</a></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-center py-4">No hay actividades creadas.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

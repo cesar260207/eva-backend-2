@@ -6,15 +6,16 @@ vistas de django.contrib.auth con plantillas propias en templates/registration/.
 """
 from django.contrib.auth import views as auth_views
 from django.conf import settings
-from django.conf.urls.static import static
 from django.urls import include, path
 
-from delegaciones_app.cuentas import RestablecerContrasena, SolicitarRecuperacion
+from delegaciones_app.cuentas import CambiarContrasena, FormularioIngreso, RestablecerContrasena, SolicitarRecuperacion
 
 urlpatterns = [
     path('', include('delegaciones_app.urls')),
     path('gestion/', include('gestion_app.urls')),
-    path('login/', auth_views.LoginView.as_view(template_name='registration/login.html', redirect_authenticated_user=True), name='login'),
+    path('beneficiarios/', include('beneficiarios_app.urls')),
+    path('login/', auth_views.LoginView.as_view(template_name='registration/login.html', redirect_authenticated_user=True, authentication_form=FormularioIngreso), name='login'),
+    path('cuenta/cambiar-contrasena/', CambiarContrasena.as_view(), name='cambiar_contrasena'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     # Recuperación de contraseña: solicitud -> correo con enlace y token -> nueva contraseña -> confirmación.
     path('recuperar/', SolicitarRecuperacion.as_view(), name='password_reset'),
@@ -23,5 +24,5 @@ urlpatterns = [
     path('recuperar/listo/', auth_views.PasswordResetCompleteView.as_view(), name='password_reset_complete'),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# MEDIA_ROOT no se publica, tampoco con DEBUG=True: las evidencias contienen datos personales y solo se abren
+# por la vista evidencia_archivo, que verifica sesión y permisos (RNF-017).

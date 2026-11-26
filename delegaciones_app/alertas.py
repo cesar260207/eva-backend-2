@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from .medicion import periodo_vigente, resultados_por_delegacion
 from .reglas import porcentaje_esperado_ajustado
-from .models import Actividad, Funcionario
+from .models import Actividad, Funcionario, Validacion
 from .permisos import ADMINISTRADOR, COORDINADOR, DELEGADO, funcionario_de, puede_ver_todo, tiene_rol
 from .views import _actividades_autorizadas, _compromisos_autorizados
 
@@ -60,6 +60,22 @@ def alertas_de_evidencias_pendientes(user, hoy):
         alertas.append(_alerta(
             'evidencia', 'Evidencia pendiente', 'warning' if espera < 3 else 'danger', motivo,
             actividad.funcionario_autor.nombre, fecha, reverse('actividad_detalle', args=[actividad.codigo_verificador]),
+        ))
+    return alertas
+
+
+def alertas_de_antecedentes(user, hoy):
+    """Evaluación 3: actividades propias en las que el verificador pidió más antecedentes; el autor debe completarlas."""
+    funcionario = funcionario_de(user)
+    if funcionario is None:
+        return []
+    alertas = []
+    for actividad in Actividad.objects.filter(funcionario_autor=funcionario, estado='antecedentes').order_by('actualizada'):
+        ultima = Validacion.objects.filter(evidencia__actividad=actividad, decision='antecedentes').order_by('-fecha').first()
+        detalle = f': {ultima.observacion}' if ultima and ultima.observacion else ''
+        alertas.append(_alerta(
+            'antecedentes', 'Antecedentes solicitados', 'warning', f'{actividad.codigo_verificador} requiere más antecedentes{detalle}',
+            funcionario.nombre, timezone.localtime(actividad.actualizada).date(), reverse('actividad_detalle', args=[actividad.codigo_verificador]),
         ))
     return alertas
 
@@ -126,7 +142,7 @@ def alertas_de(user, hoy=None):
     """Todas las alertas del usuario, las más graves primero y, dentro de cada nivel, por fecha."""
     hoy = hoy or timezone.localdate()
     alertas = [
-        *alertas_de_vencimiento(user, hoy), *alertas_de_evidencias_pendientes(user, hoy),
+        *alertas_de_vencimiento(user, hoy), *alertas_de_evidencias_pendientes(user, hoy), *alertas_de_antecedentes(user, hoy),
         *alertas_de_ausencia_de_registros(user, hoy), *alertas_de_avance_bajo(user, hoy),
     ]
     return sorted(alertas, key=lambda alerta: (ORDEN_NIVEL[alerta['nivel']], alerta['fecha'] is None, alerta['fecha'] or hoy))

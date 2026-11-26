@@ -379,7 +379,7 @@ class CasoSocialTests(TestCase):
         self.funcionario = crear_funcionario('profesional-social', 'funcionario').funcionario
 
     def _caso(self, etapa):
-        return CasoSocial(funcionario=self.funcionario, nombre_usuario='Vecino de prueba', telefono_usuario='912345678', etapa=etapa, tipo='informe_social')
+        return CasoSocial(funcionario=self.funcionario, nombre_usuario='Vecino de prueba', telefono_usuario='912345678', etapa=etapa, tipo='informe_social', subtipo='Informe aporte material')
 
     def test_se_aceptan_las_gestiones_uno_a_tres(self):
         """CU-03 Registrar atención social (requerimientos de octubre 2026). Las etapas 1, 2 y 3 son válidas."""

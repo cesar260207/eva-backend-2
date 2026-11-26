@@ -48,7 +48,7 @@ Sin alargar el sprint: se agruparon las reglas, se formalizaron como RF y RNF co
 
 ## 9. ¿Qué falta?
 
-HTTPS con dominio municipal, la vista global por cargos (RF-031), alarmas de monitoreo, copia de respaldos fuera del servidor, límite de intentos de inicio de sesión y las respuestas del municipio a las preguntas pendientes (tope 150 % o 120 %, reclamo -20 % o -30 %, ponderaciones de «Planificación y control»).
+HTTPS con dominio municipal, alarmas de monitoreo, copia de respaldos fuera del servidor, límite de intentos de inicio de sesión y las respuestas del municipio a las preguntas pendientes (tope 150 % o 120 %, reclamo -20 % o -30 %, confirmar el ítem «Pendientes en tubo» que completa «Planificación y control»).
 **Dónde mostrarlo:** README, «Preguntas pendientes para el municipio»; [PLAN_MANTENCION.md](PLAN_MANTENCION.md) sección 6.
 
 ## 10. ¿Cómo evitan que un funcionario vea datos de otra delegación?
