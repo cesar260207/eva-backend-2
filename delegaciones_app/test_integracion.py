@@ -728,18 +728,19 @@ class MantenedoresTests(TestCase):
 
 	def test_indice_deshabilita_los_mantenedores_exclusivos_del_administrador(self):
 		respuesta = self.client.get(reverse('mantenedores'))
-		self.assertContains(respuesta, 'Abrir sección', count=12)
+		# Evaluación 3: a los doce se suman territorios, vecinos, membresías, hitos y subtipos de atención.
+		self.assertContains(respuesta, 'Abrir sección', count=17)
 		self.assertNotContains(respuesta, 'No disponible para tu perfil')
 		self.client.force_login(self.coordinador)
 		respuesta = self.client.get(reverse('mantenedores'))
-		self.assertContains(respuesta, 'Abrir sección', count=10)
+		self.assertContains(respuesta, 'Abrir sección', count=15)
 		# Las tarjetas que el Coordinador no usa ya no se muestran deshabilitadas: no aparecen.
 		self.assertNotContains(respuesta, 'No disponible para tu perfil')
 		for slug in ('roles', 'funcionarios'):
 			self.assertNotContains(respuesta, reverse('mantenedor_lista', args=[slug]), msg_prefix=slug)
 
 	def test_las_doce_listas_tienen_agregar_y_buscar(self):
-		self.assertEqual(len(MANTENEDORES), 12)
+		self.assertEqual(len(MANTENEDORES), 17)
 		for slug in MANTENEDORES:
 			respuesta = self.client.get(reverse('mantenedor_lista', args=[slug]))
 			self.assertEqual(respuesta.status_code, 200, slug)
@@ -1739,11 +1740,13 @@ class SeedDemoTests(TestCase):
 			# Dos períodos: julio-septiembre 2026 y el trimestre de la fecha actual, cada uno con sus 5 parámetros.
 			'Delegacion': 6, 'Funcionario': 9, 'FuncionarioRol': 9, 'UsuarioMaestro': 1, 'Periodo': 2, 'ParametroVersionado': 10,
 			# Julio-septiembre: un ítem por cargo (delegados y Profesional). Trimestre actual: el ítem del Profesional
-			# y los 79 ítems de los 13 cargos de la matriz (data/matriz_cargos.json).
-			'ItemMedible': 82, 'Meta': 7, 'Catalogo': 5, 'Indicador': 7, 'Compromiso': 8, 'HistorialCompromiso': 8,
+			# y los 80 ítems de los 13 cargos de la matriz (data/matriz_cargos.json).
+			'ItemMedible': 83, 'Meta': 7, 'Catalogo': 5, 'Indicador': 7, 'Compromiso': 9, 'HistorialCompromiso': 9,
 			'Actividad': 1, 'Evidencia': 1, 'Validacion': 1, 'MedicionDelegacion': 6,
 			# Ejemplos ficticios de las reglas de octubre.
 			'Organizacion': 7, 'Ajuste': 1, 'Ausencia': 1, 'CasoSocial': 1,
+			# Evaluación 3: territorios, vecinos ficticios, directiva de la junta de ejemplo, un hito, subtipos y una carta (en Compromiso).
+			'Territorio': 4, 'Vecino': 4, 'MembresiaOrganizacion': 3, 'Hito': 1, 'ResponsableHito': 2, 'SubtipoAtencion': 3,
 		}
 		for modelo, total in esperadas.items():
 			with self.subTest(modelo=modelo):

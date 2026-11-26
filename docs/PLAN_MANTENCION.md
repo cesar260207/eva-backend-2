@@ -118,7 +118,7 @@ Mejoras pendientes, ordenadas por prioridad.
 | Copia de respaldos fuera del servidor (S3) | Un respaldo dentro de la misma instancia se pierde con ella | 3 horas | Alta |
 | Monitoreo con alarmas de CloudWatch | Avisar por correo si la CPU supera 80 %, si la instancia falla su revisión de estado o si el disco se llena (RNF-018) | 3 horas | Media |
 | Escalar: instancia más grande o base de datos en Amazon RDS | Si crecen los usuarios o el volumen de evidencias; RDS agrega respaldos automáticos | 1 día | Baja (cuando haga falta) |
-| Funcionalidades postergadas del backlog | Vista global por cargos (RF-031), actividad reciente por funcionario (RF-030) | Según el backlog | Según el valor para el municipio |
+| Funcionalidades postergadas del backlog | Actividad reciente por funcionario (RF-030) | Según el backlog | Según el valor para el municipio |
 
 ## 7. Recursos
 

@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}Gestiones sociales | SGR{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="page-kicker">Atención social</div>
+        <h1 class="page-title mb-2">Gestiones sociales</h1>
+        <p class="page-intro mb-0">Atenciones sociales por etapas (hasta tres por usuario). Cada gestión puede ingresar o no al Tubo de seguimiento. Plazos: visita programada hasta {{ plazo_visita }} días desde el ingreso, visita el día programado e informe hasta {{ plazo_informe }} días después de la visita ({{ plazo_total }} desde el ingreso).</p>
+    </div>
+    {% if puede_crear %}<a class="btn btn-sgr" href="{% url 'caso_social_nuevo' %}">+ Registrar atención social</a>{% endif %}
+</div>
+<div class="panel">
+    <form class="filtros mb-3" method="get">
+        <div class="filtro-texto"><label class="form-label small mb-1" for="q">Buscar</label><input class="form-control" id="q" name="q" value="{{ query }}" placeholder="Nombre, subtipo o RUT del vecino"></div>
+        <div class="acciones"><button class="btn btn-outline-sgr" type="submit">Buscar</button><a class="btn btn-link" href="{% url 'casos_sociales' %}">Limpiar</a></div>
+    </form>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <caption class="visually-hidden">Gestiones sociales registradas</caption>
+            <thead><tr><th scope="col">Fecha</th><th scope="col">Usuario</th><th scope="col">Tipo</th><th scope="col">Gestión</th><th scope="col">Funcionario</th><th scope="col">Plazos</th><th scope="col">Tubo</th><th scope="col"><span class="visually-hidden">Acciones</span></th></tr></thead>
+            <tbody>
+            {% for caso in casos %}
+            <tr>
+                <td>{{ caso.creado|date:'d-m-Y' }}</td>
+                <td><strong>{{ caso.nombre_usuario }}</strong><div class="small text-muted">{{ caso.telefono_usuario }}{% if caso.vecino %} · {{ caso.vecino.rut }}{% endif %}</div></td>
+                <td>{{ caso.get_tipo_display }}<div class="small text-muted">{{ caso.grupo }}{% if caso.subtipo %} · {{ caso.subtipo }}{% endif %}{% if caso.forma %} · {{ caso.forma }}{% endif %}</div></td>
+                <td>{{ caso.etapa }} de 3</td>
+                <td>{{ caso.funcionario.nombre }}</td>
+                <td>{% for plazo in caso.lista_plazos %}<span class="d-block small {% if plazo.cumple %}text-success{% elif plazo.en_curso and not plazo.vencido %}text-muted{% else %}text-danger{% endif %}">{{ plazo.nombre }}: {{ plazo.dias }} d{% if plazo.en_curso %} (en curso){% endif %}</span>{% empty %}<span class="small text-muted">Sin plazos</span>{% endfor %}</td>
+                <td>{% if caso.compromiso %}<a href="{% url 'agenda' %}?q={{ caso.compromiso.folio|urlencode }}">{{ caso.compromiso.folio }}</a>{% else %}<span class="text-muted">No ingresó</span>{% endif %}</td>
+                <td class="text-end">{% if caso.puede_modificar %}<a class="btn btn-sm btn-outline-sgr" href="{% url 'caso_social_editar' caso.pk %}">Modificar</a>{% else %}<span class="small text-muted">Solo lectura</span>{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" class="text-center py-4">No hay gestiones sociales registradas{% if query %} para esta búsqueda{% endif %}.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

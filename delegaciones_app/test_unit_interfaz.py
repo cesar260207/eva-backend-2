@@ -184,11 +184,13 @@ class IndiceDeMantenedoresTests(TestCase):
     """CU-26.1 Restringir acceso por perfil (RF-002, RNF-011). El índice muestra solo las secciones que cada perfil usa."""
 
     def test_el_profesional_ve_solo_organizaciones_comunitarias(self):
-        """CU-26.1 (RF-002). El Profesional ve una sola tarjeta, la de organizaciones, sin tarjetas bloqueadas."""
+        """CU-26.1 (RF-002). El Profesional ve solo las tarjetas de consulta territorial (organizaciones y las tablas de la Evaluación 3)."""
         self.client.force_login(crear_funcionario('profesional.indice', 'funcionario'))
         respuesta = self.client.get(reverse('mantenedores'))
         self.assertEqual(respuesta.status_code, 200)
-        self.assertContains(respuesta, 'Abrir sección', count=1)
+        self.assertContains(respuesta, 'Abrir sección', count=6)
+        for slug in ('territorios', 'vecinos', 'membresias', 'hitos', 'subtipos',):
+            self.assertContains(respuesta, reverse('mantenedor_lista', args=[slug]), msg_prefix=slug)
         self.assertContains(respuesta, reverse('mantenedor_lista', args=['organizaciones']))
         self.assertNotContains(respuesta, 'No disponible para tu perfil')
         self.assertNotContains(respuesta, 'Sección 01')
@@ -472,10 +474,10 @@ class EncabezadoPieYAccesibilidadTests(TestCase):
         """RNF-011 Usabilidad. La sección actual lleva aria-current y el enlace del menú conserva su forma."""
         self.client.force_login(crear_funcionario('menu.ui', 'funcionario'))
         respuesta = self.client.get(reverse('agenda'))
-        self.assertContains(respuesta, f'aria-current="page" href="{reverse("agenda")}">Tareas</a>')
+        self.assertContains(respuesta, f'aria-current="page" href="{reverse("agenda")}">Tubo</a>')
         respuesta = self.client.get(reverse('actividades'))
         self.assertContains(respuesta, f'aria-current="page" href="{reverse("actividades")}">Actividades</a>')
-        self.assertContains(respuesta, f'href="{reverse("agenda")}">Tareas</a>')
+        self.assertContains(respuesta, f'href="{reverse("agenda")}">Tubo</a>')
 
     def test_las_pantallas_principales_tienen_un_solo_h1(self):
         """RNF-012 Accesibilidad. Un solo título principal por pantalla."""

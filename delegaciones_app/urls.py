@@ -37,4 +37,7 @@ urlpatterns = [
     path('ajustes/<int:pk>/<str:decision>/', views.ajuste_decidir, name='ajuste_decidir'),
     path('ausencias/nuevo/', views.ausencia_nueva, name='ausencia_nueva'),
     path('casos-sociales/nuevo/', views.caso_social_nuevo, name='caso_social_nuevo'),
+    path('casos-sociales/', views.casos_sociales, name='casos_sociales'),
+    path('casos-sociales/<int:pk>/editar/', views.caso_social_editar, name='caso_social_editar'),
+    path('vecinos/buscar/', views.vecino_buscar, name='vecino_buscar'),
 ]

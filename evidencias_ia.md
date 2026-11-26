@@ -185,3 +185,20 @@ Herramienta usada: **Claude Code** (asistente de IA dentro de VS Code), trabajan
 **Verificación:** La IA ejecutó la suite completa al cerrar cada tarea (de 601 pruebas con 26 fallas a 676 pruebas en verde), `makemigrations --check`, la migración de una base limpia de la 0001 a la 0028 y la reversión de las migraciones nuevas, y probó `scripts/respaldo.sh` con un `mysqldump` simulado.
 
 **Lo que la IA no hizo:** No pidió ni leyó contraseñas, el `.env` ni la llave `.pem`; no tocó la instancia EC2 (entregó los pasos); no cambió la visibilidad de los repositorios; no pudo regenerar la imagen `diapositiva_g06.png` porque no se permitió ejecutar Graphviz descargado (dejó la fuente `.dot` al día); no hizo la presentación (entregó su estructura).
+
+## Prompt 15 - Verificación final de la Evaluación 3 y corrección de dos defectos
+
+**Prompt literal:** Con la Guía de Evaluación 3 del Proyecto Integrado adjunta: «Verifica que todo lo que pide el documento funcione: https://github.com/cesar260207/proyecto-de-titulo-en-local». Después de leer el informe de verificación: «aplica los arreglos 1 y 4 en una rama».
+
+**Cómo ayudó la IA:**
+
+- Instaló el proyecto desde cero siguiendo solo el README, con MariaDB 10.11, y ejecutó la suite completa con cobertura (848 pruebas, 91 %).
+- Probó la aplicación en marcha, por HTTP con los cuatro perfiles y en un navegador Chrome real a 1.366 y 390 px, contra cada punto del alcance funcional de la guía: contraseña temporal, recuperación, reglas del cliente, tope de 120 %, flujo de verificación, Tubo, ausencias y felicitaciones.
+- Revisó la base de datos (claves foráneas, índices y restricciones), la configuración de seguridad, las dependencias con `pip-audit` y el historial de Git.
+- En la rama `fix/evidencias-y-movil` corrigió DEF-09 (filtros que se salían de su tarjeta a 390 px) y DEF-10 (con `DEBUG=True`, `urls.py` publicaba `MEDIA_ROOT` y una evidencia se descargaba sin sesión desde `/media/`), y agregó la prueba `ArchivosNoPublicadosTests`.
+
+**Errores que encontró la IA al revisar:** DEF-10, que la suite no detectaba porque corre con `DEBUG=False`; DEF-11 (la evidencia se valida solo por extensión); los responsables «Por asignar» en los 35 casos del protocolo; commits con la firma genérica «Tu Nombre».
+
+**Verificación:** La prueba nueva falla con el código anterior y se aprueba con la corrección; la suite completa pasa con 849 pruebas; `/media/` responde 404 y, a 390 px, Actividades y Tubo ya no se desbordan.
+
+**Lo que la IA no hizo:** No abrió el pull request (lo abre el equipo); no tocó la instancia EC2, el correo SMTP ni las credenciales; no completó los responsables del protocolo ni la autoría de los commits, que debe indicar el equipo.

@@ -22,9 +22,11 @@
                 <div class="col-md-6"><div class="section-label">Delegación</div><strong>{{ actividad.delegacion }}</strong>{% if actividad.lugar %}<div class="small text-muted">Lugar: {{ actividad.lugar }}</div>{% endif %}</div>
                 <div class="col-md-6"><div class="section-label">Funcionario</div><strong>{{ actividad.funcionario_autor.nombre|default:'-' }}</strong></div>
                 <div class="col-md-6"><div class="section-label">Fecha y hora</div><strong>{{ actividad.fecha|date:'d-m-Y H:i' }}</strong></div>
-                <div class="col-md-6"><div class="section-label">Tipo de atención</div><strong>{{ actividad.catalogo.nombre|default:'-' }}</strong></div>
+                <div class="col-md-6"><div class="section-label">Tipo de atención</div><strong>{{ actividad.catalogo.nombre|default:'-' }}</strong>{% if actividad.subtipo_atencion %}<div class="small text-muted">Subtipo: {{ actividad.subtipo_atencion.nombre }}</div>{% endif %}</div>
                 <div class="col-md-6"><div class="section-label">Ítem de medición</div><strong>{{ actividad.item.nombre|default:'-' }}</strong>{% if actividad.item %}<div class="small text-muted">{{ actividad.item.periodo }}</div>{% endif %}</div>
                 <div class="col-md-6"><div class="section-label">Contacto</div><strong>{{ actividad.contacto_nombre|default:'-' }}</strong>{% if actividad.contacto_telefono %}<div class="small text-muted">{{ actividad.contacto_telefono }}</div>{% endif %}</div>
+                {% if actividad.hito %}<div class="col-md-6"><div class="section-label">Hito</div><strong>{{ actividad.hito.nombre }}</strong><div class="small text-muted">{{ actividad.hito.fecha_programada|date:'d-m-Y' }}</div></div>{% endif %}
+                {% if not actividad.cuenta_puntaje %}<div class="col-md-6"><div class="section-label">Puntaje</div><strong>No suma a la meta</strong><div class="small text-muted">{{ actividad.motivo_sin_puntaje }}</div></div>{% endif %}
                 {% if actividad.compromiso %}<div class="col-12"><div class="section-label">Tarea del tubo de trabajo vinculada</div><strong>{{ actividad.compromiso.folio }}</strong> {{ actividad.compromiso.descripcion|truncatechars:80 }}</div>{% endif %}
                 <div class="col-12"><div class="section-label">Acción ejecutada</div><p class="mb-0">{{ actividad.accion }}</p></div>
             </div>
@@ -32,13 +34,14 @@
         {% if puede_validar and hay_pendientes %}
         <div class="panel mt-4">
             <div class="section-label mb-2">Revisión</div>
-            <p class="small text-muted">Aprueba si la evidencia respalda la actividad. Si no, recházala indicando el motivo: quien la registró podrá corregir y subir una evidencia nueva.</p>
+            <p class="small text-muted">Aprueba si la evidencia respalda la actividad. Si no la respalda, recházala indicando el motivo; si falta información, solicita más antecedentes indicando qué falta. En ambos casos quien la registró podrá corregir o completar y subir una evidencia nueva. Una actividad aprobada ya no se modifica.</p>
             <form method="post">
                 {% csrf_token %}
                 <label class="form-label" for="{{ revision_form.observacion.id_for_label }}">{{ revision_form.observacion.label }}</label>
                 {{ revision_form.observacion }}
                 <div class="d-flex flex-wrap gap-2">
                     <button class="btn btn-sgr" type="submit" formaction="{% url 'revisar_actividad' actividad.codigo_verificador 'aprobar' %}">Aprobar</button>
+                    <button class="btn btn-outline-sgr" type="submit" formaction="{% url 'revisar_actividad' actividad.codigo_verificador 'antecedentes' %}">Solicitar más antecedentes</button>
                     <button class="btn btn-outline-danger" type="submit" formaction="{% url 'revisar_actividad' actividad.codigo_verificador 'rechazar' %}">Rechazar</button>
                 </div>
             </form>
@@ -80,7 +83,7 @@
                 <li class="hito hito-{{ validacion.decision }}"><span class="hito-marca" aria-hidden="true"></span><div><strong>{{ validacion.get_decision_display }}</strong><small>{{ validacion.fecha|date:'d-m-Y H:i' }} · {{ validacion.funcionario_verificador.nombre }}</small>{% if validacion.observacion %}<small>{{ validacion.observacion }}</small>{% endif %}</div></li>
                 {% endfor %}
                 {% endfor %}
-                <li class="hito hito-actual hito-estado-{{ actividad.estado }}"><span class="hito-marca" aria-hidden="true"></span><div><strong>Estado actual: {{ actividad.get_estado_display }}</strong>{% if actividad.estado == 'pendiente' and not actividad.evidencias.all %}<small>Falta subir la evidencia.</small>{% elif hay_pendientes %}<small>Espera la revisión.</small>{% endif %}</div></li>
+                <li class="hito hito-actual hito-estado-{{ actividad.estado }}"><span class="hito-marca" aria-hidden="true"></span><div><strong>Estado actual: {{ actividad.get_estado_display }}</strong>{% if actividad.estado == 'pendiente' and not actividad.evidencias.all %}<small>Falta subir la evidencia.</small>{% elif hay_pendientes %}<small>Espera la revisión.</small>{% elif actividad.estado == 'antecedentes' %}<small>Completa lo solicitado y sube una evidencia nueva.</small>{% endif %}</div></li>
             </ol>
         </section>
         <div class="panel">
@@ -89,7 +92,7 @@
             <div class="evidencia-item">
                 <div class="d-flex justify-content-between align-items-start gap-2">
                     <strong>{{ evidencia.codigo_evidencia }}</strong>
-                    <span class="badge {% if evidencia.estado_revision == 'aprobada' %}badge-success-soft{% elif evidencia.estado_revision == 'pendiente' %}badge-warning-soft{% else %}badge-danger-soft{% endif %}">{{ evidencia.get_estado_revision_display }}</span>
+                    <span class="badge {% if evidencia.estado_revision == 'aprobada' %}badge-success-soft{% elif evidencia.estado_revision == 'pendiente' or evidencia.estado_revision == 'antecedentes' %}badge-warning-soft{% else %}badge-danger-soft{% endif %}">{{ evidencia.get_estado_revision_display }}</span>
                 </div>
                 {% if evidencia.archivo_vinculo %}<div class="small"><a href="{% url 'evidencia_archivo' evidencia.codigo_evidencia %}" target="_blank" rel="noopener">Ver archivo</a> · <a href="{% url 'evidencia_archivo' evidencia.codigo_evidencia %}?descargar=1">Descargar</a></div>{% endif %}
                 {% if evidencia.metadatos.comentario %}<div class="small">{{ evidencia.metadatos.comentario }}</div>{% endif %}

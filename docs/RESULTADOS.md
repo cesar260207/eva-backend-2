@@ -51,10 +51,11 @@ Sin cobertura quedan los archivos que no se ejecutan en las pruebas: `wsgi.py` y
 
 | Grupo | Planificados | Implementados | Pendientes |
 | --- | --- | --- | --- |
-| RF de la versión 1 (informe de diseño) | 38 | 37 | 1 (RF-031 vista global por cargos, postergado) |
+| RF de la versión 1 (informe de diseño) | 38 | 38 | 0 (RF-031, la vista global por cargos, se implementó en noviembre) |
 | RF de la versión 2 (octubre 2026) | 12 | 12 | 0 |
 | RNF de la versión 2 | 2 | 2 | 0 |
-| **Total de RF** | **50** | **49 (98 %)** | **1** |
+| RF de la Matriz SGR completa (RF-063 a RF-065) | 3 | 3 | 0 |
+| **Total de RF** | **53** | **53 (100 %)** | **0** |
 
 Las 10 reglas de octubre ([reglas_octubre.csv](resultados/reglas_octubre.csv)): 9 implementadas y probadas; la regla 6 («no ingresar solo para generar puntaje») es una política de uso y el sistema la apoya con el tope diario, el tope por ítem y la auditoría.
 

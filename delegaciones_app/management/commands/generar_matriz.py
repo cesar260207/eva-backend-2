@@ -22,6 +22,15 @@ HOJAS_DE_CARGO = {
     'PLAN y CON': 'Planificación y control',
     'GES SEG': 'Gestor de seguridad',
 }
+# Bloques de la hoja SALON (columna A) y los cargos que resume cada uno.
+BLOQUES_SALON = {
+    'APOY ADM': ('Apoyo administrativo',),
+    'T OO CC': ('Territorial OO.CC. 1', 'Territorial OO.CC. 2', 'Territorial OO.CC. 3', 'Territorial OO.CC. 4'),
+    'COSERCO': ('Coordinador DISERCO',),
+    'SOCIAL': ('Gestor social 1', 'Gestor social 2', 'Gestor social 3', 'Gestor social 4', 'Gestor social 5'),
+    'P Y C': ('Planificación y control',),
+    'G SEGUR': ('Gestor de seguridad',),
+}
 SIGLAS = ('DISERCO', 'OO.CC.', 'OOCC', 'JJVV')
 FIN_DE_ITEMS = ('CUMPLIMIENTO', 'FELICITACIONES', 'RECLAMOS', 'GESTION OPERATIVA')
 
@@ -43,6 +52,61 @@ def _nombre_de_item(texto):
     for sigla in SIGLAS:
         nombre = re.sub(re.escape(sigla), sigla, nombre, flags=re.IGNORECASE)
     return nombre
+
+
+def _tipo_de_calculo(nombre):
+    texto = nombre.upper()
+    if 'TUBO' in texto:
+        return 'tubo_pendientes' if 'PENDIENTE' in texto else 'tubo'
+    return 'actividades'
+
+
+def _clave(nombre):
+    """Nombre comparable entre hojas: sin tildes, mayúsculas ni espacios de más."""
+    import unicodedata
+    texto = unicodedata.normalize('NFKD', _texto(nombre)).encode('ascii', 'ignore').decode()
+    return re.sub(r'[^A-Z0-9%]+', ' ', texto.upper()).strip()
+
+
+def leer_salon(filas):
+    """Ítems de cada bloque de la hoja SALON: {bloque: [(nombre, meta)]}."""
+    bloques, actual = {}, None
+    for fila in filas:
+        valores = list(fila) + [None] * 6
+        etiqueta = _texto(valores[0]).upper()
+        if etiqueta:
+            actual = etiqueta if etiqueta in BLOQUES_SALON else None
+        nombre = _texto(valores[2])
+        if actual is None or not nombre or nombre.upper().startswith(FIN_DE_ITEMS):
+            continue
+        bloques.setdefault(actual, []).append((nombre, _numero(valores[4])))
+    return bloques
+
+
+def completar_con_salon(cargos, bloques, advertencias):
+    """Un cargo que no suma 100 % y al que le falta exactamente un ítem de su bloque en SALON lo recibe con la
+    ponderación que falta. Así «Planificación y control» recupera «Pendientes en tubo menor a 10 %» (85 % + 15 %)."""
+    por_nombre = {cargo['nombre']: cargo for cargo in cargos}
+    for bloque, nombres_cargo in BLOQUES_SALON.items():
+        for nombre_cargo in nombres_cargo:
+            cargo = por_nombre.get(nombre_cargo)
+            if cargo is None:
+                continue
+            total = sum(Decimal(str(item['ponderacion'])) for item in cargo['items'])
+            propios = {_clave(item['nombre']) for item in cargo['items']}
+            faltantes = [(nombre, meta) for nombre, meta in bloques.get(bloque, []) if _clave(nombre) not in propios]
+            if total >= 100 or len(faltantes) != 1:
+                continue
+            nombre, meta = faltantes[0]
+            ponderacion = 100 - total
+            cargo['items'].append({
+                'nombre': _nombre_de_item(nombre), 'ponderacion': float(ponderacion),
+                'meta_trimestre': float(meta) if meta is not None else None, 'tipo_calculo': _tipo_de_calculo(nombre),
+            })
+            advertencias.append(
+                f'«{nombre_cargo}»: se agregó «{_nombre_de_item(nombre)}» desde la hoja SALON con {ponderacion.normalize():f} % '
+                'para completar el 100 % (la hoja del cargo no lo trae).'
+            )
 
 
 def leer_hoja(filas, cargo):
@@ -74,7 +138,7 @@ def leer_hoja(filas, cargo):
             'nombre': _nombre_de_item(nombre),
             'ponderacion': float((ponderador * 100).quantize(Decimal('0.01'))),
             'meta_trimestre': float(meta) if meta is not None else None,
-            'tipo_calculo': 'tubo' if 'TUBO' in nombre.upper() else 'actividades',
+            'tipo_calculo': _tipo_de_calculo(nombre),
         })
     return {
         'nombre': cargo,
@@ -92,11 +156,13 @@ def leer_matriz(libro):
         if hoja not in hojas:
             advertencias.append(f'Falta la hoja «{hoja}» ({cargo}).')
             continue
-        datos = leer_hoja([list(fila) for fila in hojas[hoja].iter_rows(max_row=40, values_only=True)], cargo)
+        cargos.append(leer_hoja([list(fila) for fila in hojas[hoja].iter_rows(max_row=40, values_only=True)], cargo))
+    if 'SALON' in hojas:
+        completar_con_salon(cargos, leer_salon(hojas['SALON'].iter_rows(max_row=60, values_only=True)), advertencias)
+    for datos in cargos:
         total = sum(Decimal(str(item['ponderacion'])) for item in datos['items'])
         if total != 100:
-            advertencias.append(f'«{cargo}»: las ponderaciones suman {total.normalize():f} %, no 100 %.')
-        cargos.append(datos)
+            advertencias.append(f'«{datos["nombre"]}»: las ponderaciones suman {total.normalize():f} %, no 100 %.')
     reclamos = sorted({cargo['reclamo'] for cargo in cargos if cargo['reclamo'] is not None})
     if len(reclamos) > 1:
         advertencias.append('El reclamo no vale lo mismo en todas las hojas: ' + ', '.join(f'{valor:g} %' for valor in reclamos) + '.')

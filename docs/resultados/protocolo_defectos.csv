@@ -1,0 +1,9 @@
+﻿codigo;caso;fecha;severidad;detectado;reejecucion;estado
+DEF-01;CP-33;24-11-2026;Baja;Revisión de código antes de ejecutar el protocolo;Aprobado;Corregido y verificado
+DEF-02;CP-20;24-11-2026;Alta;Ejecución 2 de la suite de regresión (2 pruebas fallidas);Aprobado;Corregido y verificado
+DEF-03;CP-23;24-11-2026;Media;Ejecución 2 de la suite de regresión;Aprobado;Corregido y verificado
+DEF-04;CP-21;24-11-2026;Baja;Ejecución 2 de la suite de regresión (2 pruebas fallidas);Aprobado;Corregido y verificado
+DEF-05;CP-21;24-11-2026;Media;Ejecución 2 de la suite de regresión (2 pruebas fallidas);Aprobado;Corregido y verificado
+DEF-06;CP-20;24-11-2026;Baja;Ejecución 3 de la suite (1 prueba con error);Aprobado;Corregido y verificado
+DEF-07;CP-10;24-11-2026;Media;Revisión de las pantallas que muestran estados de actividad;Aprobado;Corregido y verificado
+DEF-08;CP-35;25-11-2026;Baja;Auditoría de la matriz de accesos (sin sesión);Aprobado;Corregido y verificado

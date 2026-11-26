@@ -1,0 +1,36 @@
+﻿codigo;nombre;requerimiento;prioridad;tipo;area;manual;pruebas;estado;defectos
+CP-01;Ingreso con credenciales válidas e inválidas;REQ-01;Alta;Funcional positiva y negativa;Autenticación y seguridad;no;3;Aprobado;
+CP-02;Crear usuario con contraseña temporal;REQ-02;Alta;Funcional positiva;Autenticación y seguridad;no;4;Aprobado;
+CP-03;Cambio obligatorio en el primer ingreso;REQ-02;Alta;Seguridad;Autenticación y seguridad;no;4;Aprobado;
+CP-04;Recuperación de contraseña con token que vence;REQ-02;Alta;Seguridad;Autenticación y seguridad;no;5;Aprobado;
+CP-05;Envío real del correo de recuperación (SMTP);REQ-02;Media;Configuración;Autenticación y seguridad;sí;0;No ejecutado;
+CP-06;Bloqueo de ingreso por intentos fallidos;REQ-11;Alta;Seguridad;Autenticación y seguridad;no;3;Aprobado;
+CP-07;Contraseñas con hash, sesión que vence y vistas protegidas;REQ-11;Alta;Seguridad;Autenticación y seguridad;no;4;Aprobado;
+CP-08;Autorización por perfil y control de acceso a evidencias;REQ-11;Alta;Permisos;Autenticación y seguridad;no;4;Aprobado;
+CP-09;Solicitar más antecedentes;REQ-06;Alta;Funcional positiva y negativa;Verificación de actividades;no;3;Aprobado;
+CP-10;Completar antecedentes y aprobar;REQ-06;Alta;Funcional positiva;Verificación de actividades;no;3;Aprobado;DEF-07
+CP-11;Bloqueo posterior a la aprobación;REQ-06;Alta;Funcional negativa;Verificación de actividades;no;3;Aprobado;
+CP-12;Tope de cumplimiento de 120 %;REQ-05;Alta;Cálculo / límite;Reglas del cliente y metas;no;3;Aprobado;
+CP-13;Solo cuentan registros aprobados que ponderan;REQ-05;Alta;Cálculo;Reglas del cliente y metas;no;5;Aprobado;
+CP-14;Límite diario de siete actividades;REQ-10;Alta;Límite;Reglas del cliente y metas;no;2;Aprobado;
+CP-15;Cierre semanal;REQ-10;Alta;Límite;Reglas del cliente y metas;no;4;Aprobado;
+CP-16;Felicitaciones con respaldo formal;REQ-10;Alta;Cálculo;Reglas del cliente y metas;no;3;Aprobado;
+CP-17;Ausencias ajustan el semáforo;REQ-10;Alta;Cálculo;Reglas del cliente y metas;no;2;Aprobado;
+CP-18;Meta única por funcionario e ítem del trimestre;REQ-05;Media;Validación;Reglas del cliente y metas;no;1;Aprobado;
+CP-19;Búsqueda dinámica por código, RUT o nombre;REQ-09;Alta;Funcional positiva y negativa;Tubo;no;2;Aprobado;
+CP-20;Tubo de cartas;REQ-07;Alta;Funcional positiva;Tubo;no;2;Aprobado;DEF-02,DEF-06
+CP-21;Permisos del Tubo;REQ-07;Alta;Permisos;Tubo;no;4;Aprobado;DEF-04,DEF-05
+CP-22;Filtros del Tubo y RUT válido;REQ-09;Media;Validación / filtros;Tubo;no;2;Aprobado;
+CP-23;Actividad y gestión social ingresan o no al Tubo;REQ-04;Alta;Funcional positiva;Tubo;no;3;Aprobado;DEF-03
+CP-24;Autocompletado desde el registro de vecinos;REQ-09;Media;Funcional positiva y negativa;Tubo;no;4;Aprobado;
+CP-25;Vecinos: RUT, unicidad y ámbito;REQ-03;Alta;Validación / permisos;Mantenedores y base de datos;no;4;Aprobado;
+CP-26;Membresía y dirigencia en juntas de vecinos;REQ-03;Alta;Validación;Mantenedores y base de datos;no;4;Aprobado;
+CP-27;Hitos con responsables;REQ-03;Media;Funcional positiva y negativa;Mantenedores y base de datos;no;3;Aprobado;
+CP-28;Territorios, tipos y subtipos de atención;REQ-03;Media;Validación / permisos;Mantenedores y base de datos;no;4;Aprobado;
+CP-29;Permisos de los perfiles sobre las tablas nuevas;REQ-01;Alta;Permisos;Mantenedores y base de datos;no;1;Aprobado;
+CP-30;Dashboard con gráficos y tabla de datos;REQ-08;Alta;Funcional positiva;Dashboard;no;3;Aprobado;
+CP-31;Filtros y ámbito del dashboard;REQ-08;Alta;Filtros / permisos;Dashboard;no;2;Aprobado;
+CP-32;Interfaz responsiva, legible y con identidad municipal;REQ-08;Media;Usabilidad;Interfaz;sí;0;No ejecutado;
+CP-33;Regresión: formulario del Tubo con calendario;REQ-09;Baja;Regresión;Interfaz;no;1;Aprobado;DEF-01
+CP-34;Respaldo y recuperación;REQ-12;Alta;Recuperación;Mantenedores y base de datos;no;1;Aprobado;
+CP-35;Matriz de accesos por perfil;REQ-01;Alta;Permisos / seguridad;Autenticación y seguridad;no;7;Aprobado;DEF-08

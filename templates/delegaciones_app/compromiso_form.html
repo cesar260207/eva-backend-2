@@ -4,18 +4,18 @@
 <div class="row justify-content-center"><div class="col-lg-9 col-xl-8">
     <div class="page-header">
         <div>
-            <div class="page-kicker">Tubo de trabajo</div>
+            <div class="page-kicker">{% if form.tipo.value == 'carta' %}Tubo de cartas{% else %}Tubo de trabajo{% endif %}</div>
             <h1 class="page-title mb-2">{{ titulo }}</h1>
             <p class="page-intro mb-0">{% if asigna %}Como coordinación, eliges la delegación y el delegado responsable de la tarea.{% else %}La tarea queda en tu delegación y a tu cargo.{% endif %}</p>
         </div>
     </div>
     <div class="panel">
-        <form method="post" novalidate>
+        <form method="post" novalidate data-url-vecino="{% url 'vecino_buscar' %}">
             {% csrf_token %}
             {% include 'includes/_formulario.html' %}
             <div class="form-acciones">
-                <a href="{% url 'agenda' %}" class="btn btn-light">Cancelar</a>
-                <button class="btn btn-sgr" type="submit">{% if compromiso %}Guardar cambios{% else %}Agregar al tubo de trabajo{% endif %}</button>
+                <a href="{% url 'agenda' %}?tubo={{ form.tipo.value|default:'solicitud' }}" class="btn btn-light">Cancelar</a>
+                <button class="btn btn-sgr" type="submit">{% if compromiso %}Guardar cambios{% elif form.tipo.value == 'carta' %}Registrar carta{% else %}Agregar al tubo de trabajo{% endif %}</button>
             </div>
         </form>
     </div>

@@ -58,18 +58,23 @@ CATALOGO_RF = {
     26: 'Calcular meta esperada al día', 27: 'Mostrar semáforo de avance', 28: 'Mostrar tablero personal', 29: 'Mostrar tablero de delegación',
     30: 'Medir actividad reciente', 31: 'Mostrar vista global por cargos', 32: 'Buscar y filtrar información', 33: 'Generar y exportar informes',
     34: 'Permitir trabajo simultáneo', 35: 'Facilitar coordinación', 36: 'Mantener trazabilidad', 37: 'Emitir alertas', 38: 'Versionar parámetros',
+    # Evaluación 3
+    51: 'Contraseña temporal y cambio obligatorio', 52: 'Solicitar más antecedentes', 53: 'Tubo de cartas',
+    54: 'Búsqueda dinámica del Tubo por código, RUT o nombre', 55: 'Mantener territorios y vecinos', 56: 'Membresía y dirigencia de organizaciones',
+    57: 'Hitos con responsables', 58: 'Tipos y subtipos de atención', 59: 'Ingreso opcional al Tubo', 60: 'Dashboard con gráficos',
+    61: 'Bloqueo de ingreso por intentos fallidos', 62: 'Autocompletar datos del vecino',
+    # Matriz SGR completa (las 25 hojas)
+    63: 'Ítem pendientes del tubo por tramos', 64: 'Plazos de respuesta de la atención social', 65: 'Importar los tubos de la planilla',
 }
 
 CODIGO_DE_MODULO = {
     'test_integracion': 'INT', 'test_unit_autenticacion': 'LOGIN', 'test_unit_organizacion': 'ORG', 'test_unit_actividades': 'ACT',
     'test_unit_medicion': 'MED', 'test_unit_compromisos': 'COM', 'test_unit_transversal': 'TRA', 'test_unit_plan_pruebas': 'PLAN', 'test_unit_alertas': 'ALE', 'test_unit_seguridad': 'SEG', 'test_unit_delegaciones': 'DEL',
-    'test_casos_de_uso': 'CUS',
+    'test_casos_de_uso': 'CUS', 'test_evaluacion3': 'EVA', 'test_unit_matriz_sgr': 'SGR',
 }
 
 # Estado de los requisitos que no están completos en el sistema (se declara aquí para que el plan lo diga con claridad).
-OBSERVACIONES_RF = {
-    31: 'No implementado: no hay vista global por cargos (postergado en el backlog).',
-}
+OBSERVACIONES_RF = {}
 
 # Responsable de ejecutar las pruebas de cada caso de uso (familia del CU) y de los casos de login.
 # Se edita aquí y se vuelve a generar el plan con `python manage.py plan_pruebas`.

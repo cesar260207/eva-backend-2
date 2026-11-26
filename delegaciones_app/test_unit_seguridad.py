@@ -260,10 +260,10 @@ class AccesoPorPerfilTests(TestCase):
             self.assertTemplateUsed(respuesta, plantilla)
 
     def test_el_panel_administrador_muestra_gestion_de_usuarios_y_todos_los_mantenedores(self):
-        """CU-26 Panel Administrador (RF-002, RF-029). Usuarios, perfiles y los doce mantenedores."""
+        """CU-26 Panel Administrador (RF-002, RF-029). Usuarios, perfiles y los diecisiete mantenedores."""
         self.client.force_login(self.administrador)
         respuesta = self.client.get(reverse('panel'))
-        self.assertEqual(len(respuesta.context['mantenedores']), 12)
+        self.assertEqual(len(respuesta.context['mantenedores']), 17)
         self.assertContains(respuesta, reverse('mantenedor_nuevo', args=['funcionarios']))
         self.assertContains(respuesta, reverse('perfiles'))
         for slug in ('delegaciones', 'cargos', 'roles', 'funcionarios', 'catalogo', 'organizaciones', 'periodos', 'parametros', 'items', 'metas', 'ajustes', 'ausencias'):
@@ -273,7 +273,7 @@ class AccesoPorPerfilTests(TestCase):
         """CU-26.1 Panel Coordinador (RF-002, RF-029). Seis mantenedores; sin usuarios ni auditoría."""
         self.client.force_login(self.coordinador)
         respuesta = self.client.get(reverse('panel'))
-        self.assertEqual(len(respuesta.context['mantenedores']), 10)
+        self.assertEqual(len(respuesta.context['mantenedores']), 15)
         self.assertNotContains(respuesta, reverse('perfiles'))
         self.assertNotContains(respuesta, reverse('auditoria_consulta'))
 
@@ -446,3 +446,22 @@ class CierreDeSesionTests(TestCase):
         self.assertEqual(self.client.get(reverse('panel')).status_code, 200)
         restante = (self._sesion().expire_date - timezone.now()).total_seconds()
         self.assertGreater(restante, 29 * 60)
+
+
+
+class ArchivosNoPublicadosTests(TestCase):
+    """RNF-017: las evidencias solo se abren por la vista evidencia_archivo, nunca por la ruta de MEDIA_URL."""
+
+    def test_media_url_no_se_publica_ni_con_debug(self):
+        import importlib
+
+        from django.conf import settings
+        from gestion_laserena import urls
+
+        try:
+            with override_settings(DEBUG=True):
+                rutas = importlib.reload(urls).urlpatterns
+                publicadas = [str(ruta.pattern) for ruta in rutas if str(ruta.pattern).lstrip('^').startswith(settings.MEDIA_URL.lstrip('/'))]
+        finally:
+            importlib.reload(urls)
+        self.assertEqual(publicadas, [], 'MEDIA_URL no debe tener una ruta pública: las evidencias pasan por evidencia_archivo.')

@@ -41,3 +41,9 @@ ACCESOS_EXPOSICION.txt
 .coverage
 .coverage.*
 htmlcov/
+
+# Respaldos generados con «python manage.py respaldo» (contienen datos personales)
+respaldos/
+
+# Caché compartida del servidor (contador de intentos de ingreso)
+.cache/

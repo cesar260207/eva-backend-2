@@ -433,9 +433,9 @@ class ValidacionUnitTests(EscenarioBase, TestCase):
         self.assertEqual(Validacion.objects.get().observacion, 'Foto ilegible')
 
     def test_la_revision_solo_aprueba_o_rechaza(self):
-        """CU-11 Validación de actividades (RF-013). Ya no existe «Solicitar corrección»: solo aprobar o rechazar."""
+        """CU-11 Validación de actividades (RF-013, RF-052). Aprobar, rechazar o solicitar más antecedentes (guía de la Evaluación 3)."""
         self.assertFalse(hasattr(Validacion, 'solicitar_correccion'))
-        self.assertEqual([valor for valor, _ in Validacion.DECISIONES], ['aprobada', 'rechazada'])
+        self.assertEqual([valor for valor, _ in Validacion.DECISIONES], ['aprobada', 'rechazada', 'antecedentes'])
         self.assertNotIn('correccion', dict(Actividad.ESTADOS))
         self.assertNotIn('correccion', dict(Evidencia.ESTADOS_REVISION))
 

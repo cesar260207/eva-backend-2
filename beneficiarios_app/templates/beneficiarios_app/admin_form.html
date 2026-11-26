@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}{{ titulo }} | SGR{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-9 col-xl-8">
+        <div class="page-header">
+            <div>
+                <div class="page-kicker">Beneficiarios · Administración</div>
+                <h1 class="page-title mb-2">{{ titulo }}</h1>
+            </div>
+        </div>
+        <div class="panel">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                {% include 'includes/_formulario.html' %}
+                <div class="form-acciones">
+                    <a class="btn btn-light" href="{% url volver %}">Cancelar</a>
+                    <button class="btn btn-sgr" type="submit">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

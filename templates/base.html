@@ -8,7 +8,7 @@
     <script src="{% static 'js/tema.js' %}?v=interfaz-r2"></script>
     <link rel="preload" href="{% static 'fonts/roboto-latin-400-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="{% static 'bootstrap/css/bootstrap.min.css' %}">
-    <link rel="stylesheet" href="{% static 'css/sgr.css' %}?v=interfaz-r3">
+    <link rel="stylesheet" href="{% static 'css/sgr.css' %}?v=e4">
 </head>
 <body>
     <a class="skip-link" href="#contenido-principal">Ir al contenido principal</a>
@@ -62,15 +62,17 @@
                     {% if user.is_authenticated %}
                     <li class="nav-item"><a class="nav-link"{% if ruta == 'panel' %} aria-current="page"{% endif %} href="{% url 'panel' %}">Mi panel</a></li>
                     <li class="nav-item"><a class="nav-link"{% if ruta|slice:':9' == 'actividad' or ruta == 'evidencia_subir' or ruta == 'comentario_nuevo' %} aria-current="page"{% endif %} href="{% url 'actividades' %}">Actividades</a></li>
-                    <li class="nav-item"><a class="nav-link"{% if ruta == 'agenda' or ruta == 'solicitudes' or ruta|slice:':10' == 'compromiso' %} aria-current="page"{% endif %} href="{% url 'agenda' %}">Tareas</a></li>
+                    <li class="nav-item"><a class="nav-link"{% if ruta == 'agenda' or ruta == 'solicitudes' or ruta|slice:':10' == 'compromiso' %} aria-current="page"{% endif %} href="{% url 'agenda' %}">Tubo</a></li>
                     {% if es_coordinacion %}<li class="nav-item"><a class="nav-link"{% if ruta == 'delegados' %} aria-current="page"{% endif %} href="{% url 'delegados' %}">Delegados</a></li>
                     {% elif mi_delegacion %}<li class="nav-item"><a class="nav-link"{% if ruta == 'delegacion_detalle' %} aria-current="page"{% endif %} href="{% url 'delegacion_detalle' mi_delegacion.nombre %}">Mi delegación</a></li>{% endif %}
                     <li class="nav-item dropdown">
-                        <button class="nav-link dropdown-toggle btn btn-link border-0{% if ruta == 'dashboard' or ruta == 'semaforo' or ruta == 'resumen' or ruta == 'informe' or ruta == 'alertas' %} activo{% endif %}" type="button" data-bs-toggle="dropdown" aria-expanded="false">Resultados</button>
+                        <button class="nav-link dropdown-toggle btn btn-link border-0{% if ruta == 'dashboard' or ruta == 'tablero_analitico' or ruta == 'semaforo' or ruta == 'matriz_cargos' or ruta == 'resumen' or ruta == 'informe' or ruta == 'alertas' %} activo{% endif %}" type="button" data-bs-toggle="dropdown" aria-expanded="false">Resultados</button>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><h6 class="dropdown-header">Seguimiento</h6></li>
+                            <li><a class="dropdown-item"{% if ruta == 'tablero_analitico' %} aria-current="page"{% endif %} href="{% url 'tablero_analitico' %}">Dashboard con gráficos</a></li>
                             <li><a class="dropdown-item"{% if ruta == 'dashboard' %} aria-current="page"{% endif %} href="{% url 'dashboard' %}">Cumplimiento general</a></li>
                             <li><a class="dropdown-item"{% if ruta == 'semaforo' %} aria-current="page"{% endif %} href="{% url 'semaforo' %}">Semáforo de avance</a></li>
+                            <li><a class="dropdown-item"{% if ruta == 'matriz_cargos' %} aria-current="page"{% endif %} href="{% url 'matriz_cargos' %}">Matriz por cargos</a></li>
                             <li><a class="dropdown-item"{% if ruta == 'resumen' %} aria-current="page"{% endif %} href="{% url 'resumen' %}">Resumen por delegación</a></li>
                             <li><a class="dropdown-item"{% if ruta == 'informe' %} aria-current="page"{% endif %} href="{% url 'informe' %}">Informes y exportación</a></li>
                             <li><a class="dropdown-item"{% if ruta == 'alertas' %} aria-current="page"{% endif %} href="{% url 'alertas' %}">Alertas pendientes</a></li>
@@ -84,6 +86,9 @@
                             <li><a class="dropdown-item"{% if ruta == 'institucional' %} aria-current="page"{% endif %} href="{% url 'institucional' %}">Territorio</a></li>
                             {% if perms.delegaciones_app.add_ajuste %}<li><a class="dropdown-item" href="{% url 'ajuste_nuevo' %}">Informar felicitación o reclamo</a></li>{% endif %}
                             {% if perms.delegaciones_app.add_casosocial %}<li><a class="dropdown-item" href="{% url 'caso_social_nuevo' %}">Registrar atención social</a></li>{% endif %}
+                            {% if perms.delegaciones_app.view_casosocial or perms.delegaciones_app.add_casosocial %}<li><a class="dropdown-item"{% if ruta == 'casos_sociales' %} aria-current="page"{% endif %} href="{% url 'casos_sociales' %}">Gestiones sociales</a></li>{% endif %}
+                            {% if perms.beneficiarios_app.view_inscripcion or perms.beneficiarios_app.add_inscripcion %}<li><a class="dropdown-item"{% if request.resolver_match.namespace == 'beneficiarios' %} aria-current="page"{% endif %} href="{% url 'beneficiarios:inscripciones' %}">Beneficiarios infancia</a></li>{% endif %}
+                            <li><a class="dropdown-item"{% if ruta == 'cambiar_contrasena' %} aria-current="page"{% endif %} href="{% url 'cambiar_contrasena' %}">Cambiar contraseña</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><form method="post" action="{% url 'logout' %}" class="m-0">{% csrf_token %}<button class="dropdown-item" type="submit">Salir</button></form></li>
                         </ul>
@@ -131,7 +136,7 @@
                         {% if user.is_authenticated %}
                         <li><a href="{% url 'panel' %}">Mi panel</a></li>
                         <li><a href="{% url 'actividades' %}">Actividades</a></li>
-                        <li><a href="{% url 'agenda' %}">Tareas</a></li>
+                        <li><a href="{% url 'agenda' %}">Tubo</a></li>
                         <li><a href="{% url 'dashboard' %}">Resultados</a></li>
                         {% else %}
                         <li><a href="{% url 'inicio' %}">Inicio</a></li>
@@ -155,5 +160,6 @@
 
     <script src="{% static 'bootstrap/js/bootstrap.bundle.min.js' %}"></script>
     <script src="{% static 'js/sgr.js' %}" defer></script>
+    <script src="{% static 'js/sgr-formularios.js' %}?v=e3" defer></script>
 </body>
 </html>
